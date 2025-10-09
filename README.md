@@ -8,3 +8,12 @@
 - Compat : fonctions globales `speakSelection`, `speakPage`, `stopSpeaking`, `brailleSelection`, `clearBraille`, `resetAll` + getters `sttStatus`, `brailleOut`
 
 Ouvrez `index.html` dans un navigateur moderne (Alt+Shift+A pour ouvrir).
+
+## Qualité du code
+
+Des scripts npm sont disponibles pour vérifier la qualité :
+
+```bash
+npm install
+npm run lint    # ESLint + Stylelint
+```

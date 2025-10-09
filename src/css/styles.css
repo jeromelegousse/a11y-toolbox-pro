@@ -2,9 +2,9 @@
 :root {
   --a11ytb-z: 2147483000;
   --a11ytb-radius: 14px;
-  --a11ytb-shadow: 0 8px 24px rgba(0,0,0,.15);
+  --a11ytb-shadow: 0 8px 24px rgb(0 0 0 / 15%);
   --a11ytb-bg: #0b0b0c;
-  --a11ytb-fg: #ffffff;
+  --a11ytb-fg: #fff;
   --a11ytb-accent: #4c8bf5;
   --a11ytb-safe-margin: 12px;
   --a11ytb-size: 56px;
@@ -14,25 +14,36 @@
 
 * { box-sizing: border-box; }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   color: #222;
 }
 
-.site-header, .site-footer {
+.site-header,
+.site-footer {
   position: sticky;
   z-index: 1;
   background: #111;
   color: #fff;
   padding: 12px 16px;
 }
-.site-header { top: 0; }
-.site-footer { bottom: 0; }
 
-.content { padding: 24px; max-width: 70ch; }
+.site-header {
+  top: 0;
+}
+
+.site-footer {
+  bottom: 0;
+}
+
+.content {
+  padding: 24px;
+  max-width: 70ch;
+}
 
 .a11ytb-fab {
   position: fixed;
@@ -50,8 +61,16 @@ html, body {
   border: none;
   cursor: pointer;
 }
-.a11ytb-fab:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
-.a11ytb-fab svg { width: 24px; height: 24px; }
+
+.a11ytb-fab:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+.a11ytb-fab svg {
+  width: 24px;
+  height: 24px;
+}
 
 .a11ytb-panel {
   position: fixed;
@@ -67,27 +86,41 @@ html, body {
   overflow: hidden;
   display: none;
 }
-.a11ytb-panel[data-open="true"] { display: grid; grid-template-rows: auto 1fr auto; }
+
+.a11ytb-panel[data-open="true"] {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
 
 .a11ytb-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 10px 12px;
-  border-bottom: 1px solid rgba(255,255,255,.08);
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
 }
-.a11ytb-title { font-weight: 700; font-size: 14px; letter-spacing: .3px; }
-.a11ytb-actions { display: flex; gap: 8px; }
+
+.a11ytb-title {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+}
+
+.a11ytb-actions {
+  display: flex;
+  gap: 8px;
+}
 
 .a11ytb-button {
   background: #1a1b1e;
   color: #fff;
-  border: 1px solid rgba(255,255,255,.08);
+  border: 1px solid rgb(255 255 255 / 8%);
   border-radius: 10px;
   padding: 8px 10px;
   font-size: 12px;
   cursor: pointer;
 }
+
 .a11ytb-button[aria-pressed="true"] {
   background: var(--a11ytb-accent);
   border-color: transparent;
@@ -103,7 +136,7 @@ html, body {
 
 .a11ytb-module {
   background: #121316;
-  border: 1px solid rgba(255,255,255,.06);
+  border: 1px solid rgb(255 255 255 / 6%);
   border-radius: 12px;
   padding: 10px;
   display: grid;
@@ -115,8 +148,23 @@ html, body {
   font-size: 13px;
 }
 
-[data-dock="right"] .a11ytb-panel { right: calc(var(--a11ytb-safe-margin) + env(safe-area-inset-right)); left: auto; }
-[data-dock="left"] .a11ytb-panel { left: calc(var(--a11ytb-safe-margin) + env(safe-area-inset-left)); right: auto; }
+.a11ytb-note {
+  margin: 0;
+  font-size: 12px;
+  color: #f6c945;
+  font-weight: 600;
+}
+
+[data-dock="right"] .a11ytb-panel {
+  right: calc(var(--a11ytb-safe-margin) + env(safe-area-inset-right));
+  left: auto;
+}
+
+[data-dock="left"] .a11ytb-panel {
+  left: calc(var(--a11ytb-safe-margin) + env(safe-area-inset-left));
+  right: auto;
+}
+
 [data-dock="bottom"] .a11ytb-panel {
   bottom: calc(var(--a11ytb-safe-margin) + env(safe-area-inset-bottom));
   right: calc(var(--a11ytb-safe-margin) + env(safe-area-inset-right));
@@ -124,21 +172,22 @@ html, body {
   height: min(40vh, 420px);
 }
 
-@media (max-width: 480px) {
+@media (width <= 480px) {
   :root {
     --a11ytb-panel-w: 96vw;
     --a11ytb-panel-h: 70vh;
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .a11ytb-panel {
-    transition: transform .2s ease, opacity .2s ease;
-    transform: translateY(8px);
-    opacity: 0;
+  @media (prefers-reduced-motion: no-preference) {
+    .a11ytb-panel {
+      transition: transform .2s ease, opacity .2s ease;
+      transform: translateY(8px);
+      opacity: 0;
+    }
+
+    .a11ytb-panel[data-open="true"] {
+      transform: translateY(0);
+      opacity: 1;
+    }
   }
-  .a11ytb-panel[data-open="true"] {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}

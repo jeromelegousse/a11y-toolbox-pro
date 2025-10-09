@@ -9,12 +9,23 @@ import './modules/spacing.js';
 
 const initial = {
   ui: { dock: 'right' },
-  tts: { rate: 1, pitch: 1, volume: 1, speaking: false },
+  tts: { rate: 1, pitch: 1, volume: 1, speaking: false, status: 'idle' },
   stt: { status: 'idle', transcript: '' },
   braille: { output: '' },
   contrast: { enabled: false },
   spacing: { lineHeight: 1.5, letterSpacing: 0 }
 };
+
+function ttsStatusMessage(status) {
+  switch (status) {
+    case 'unsupported':
+      return 'Synthèse vocale indisponible sur ce navigateur.';
+    case 'error':
+      return 'Erreur lors de la synthèse vocale. Réessayez.';
+    default:
+      return '';
+  }
+}
 
 const state = createStore('a11ytb/v1', initial);
 document.documentElement.dataset.dock = state.get('ui.dock') || 'right';
@@ -29,6 +40,10 @@ registerBlock({
   id: 'tts-controls',
   render: (state) => {
     const s = state.get();
+    const statusMessage = ttsStatusMessage(s.tts.status);
+    const statusMarkup = `
+      <p class="a11ytb-note" role="status" data-ref="status"${statusMessage ? '' : ' hidden'}>${statusMessage}</p>
+    `;
     return `
       <h3>Lecture vocale (TTS)</h3>
       <div class="row">
@@ -36,6 +51,7 @@ registerBlock({
         <button class="a11ytb-button" data-action="speak-page">Lire la page</button>
         <button class="a11ytb-button" data-action="stop">Stop</button>
       </div>
+      ${statusMarkup}
       <label>Vitesse <input type="range" min="0.5" max="2" step="0.1" value="${s.tts.rate}" data-bind="rate"></label>
       <label>Timbre <input type="range" min="0" max="2" step="0.1" value="${s.tts.pitch}" data-bind="pitch"></label>
       <label>Volume <input type="range" min="0" max="1" step="0.05" value="${s.tts.volume}" data-bind="volume"></label>
@@ -50,6 +66,18 @@ registerBlock({
         state.set(`tts.${inp.dataset.bind}`, inp.valueAsNumber || parseFloat(inp.value));
       });
     });
+    const statusNode = root.querySelector('[data-ref="status"]');
+    if (statusNode) {
+      state.on(s => {
+        const message = ttsStatusMessage(s.tts.status);
+        statusNode.textContent = message;
+        if (message) {
+          statusNode.removeAttribute('hidden');
+        } else {
+          statusNode.setAttribute('hidden', '');
+        }
+      });
+    }
   }
 });
 
@@ -62,16 +90,20 @@ registerBlock({
       <div class="row">
         <button class="a11ytb-button" data-action="start">Démarrer</button>
         <button class="a11ytb-button" data-action="stop">Arrêter</button>
-        <span>Status : <strong>${s.stt.status}</strong></span>
+        <span>Status&nbsp;: <strong data-ref="status">${s.stt.status}</strong></span>
       </div>
       <textarea rows="3" style="width:100%" placeholder="Transcription..." data-ref="txt">${s.stt.transcript}</textarea>
     `;
   },
   wire: ({ root, state }) => {
     const txt = root.querySelector('[data-ref="txt"]');
+    const statusEl = root.querySelector('[data-ref="status"]');
     root.querySelector('[data-action="start"]').addEventListener('click', () => window.a11ytb?.stt?.start?.());
     root.querySelector('[data-action="stop"]').addEventListener('click', () => window.a11ytb?.stt?.stop?.());
-    state.on(s => { txt.value = s.stt.transcript || ''; });
+    state.on(s => {
+      txt.value = s.stt.transcript || '';
+      if (statusEl) statusEl.textContent = s.stt.status;
+    });
   }
 });
 
@@ -85,7 +117,7 @@ registerBlock({
         <button class="a11ytb-button" data-action="sel">Transcrire la sélection</button>
         <button class="a11ytb-button" data-action="clear">Effacer</button>
       </div>
-      <div aria-live="polite">Sortie :</div>
+      <div aria-live="polite">Sortie&nbsp;:</div>
       <textarea rows="3" style="width:100%" readonly data-ref="out">${s.braille.output || ''}</textarea>
     `;
   },
