@@ -1,0 +1,10 @@
+# A11y Toolbox Pro (démo)
+
+- Marge de sécurité via `--a11ytb-safe-margin` + `env(safe-area-inset-*)`
+- Dock gauche/droite/bas
+- Système de blocs (inspiration WordPress)
+- Modules : TTS, STT (si dispo), Braille (grade 1 simpl.), Contraste, Espacements
+- Store observable + localStorage (`a11ytb/v1`)
+- Compat : fonctions globales `speakSelection`, `speakPage`, `stopSpeaking`, `brailleSelection`, `clearBraille`, `resetAll` + getters `sttStatus`, `brailleOut`
+
+Ouvrez `index.html` dans un navigateur moderne (Alt+Shift+A pour ouvrir).

@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "blocks": [
+    {
+      "id": "tts-controls",
+      "module": "tts"
+    },
+    {
+      "id": "stt-controls",
+      "module": "stt"
+    },
+    {
+      "id": "braille-controls",
+      "module": "braille"
+    },
+    {
+      "id": "contrast-controls",
+      "module": "contrast"
+    },
+    {
+      "id": "spacing-controls",
+      "module": "spacing"
+    }
+  ]
+}
