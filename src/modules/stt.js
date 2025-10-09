@@ -26,10 +26,25 @@ const stt = {
 
     const api = {
       start() {
-        if (!rec) { alert('Reconnaissance vocale non disponible.'); return; }
-        try { rec.start(); } catch {}
+        if (!rec) {
+          state.set('stt.status', 'unsupported');
+          console.warn('a11ytb: reconnaissance vocale indisponible sur ce navigateur.');
+          return;
+        }
+        try {
+          rec.start();
+        } catch (error) {
+          console.warn('a11ytb: impossible de démarrer la reconnaissance vocale.', error);
+        }
       },
-      stop() { if (rec) try { rec.stop(); } catch {} }
+      stop() {
+        if (!rec) return;
+        try {
+          rec.stop();
+        } catch (error) {
+          console.warn('a11ytb: impossible d’arrêter la reconnaissance vocale.', error);
+        }
+      }
     };
 
     if (!window.a11ytb) window.a11ytb = {};
