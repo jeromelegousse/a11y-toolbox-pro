@@ -16,6 +16,24 @@ const initial = {
   spacing: { lineHeight: 1.5, letterSpacing: 0 }
 };
 
+const moduleIcons = {
+  tts: '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 9v6h3l4 4V5L7 9H4zm13 3a3 3 0 00-3-3v6a3 3 0 003-3zm-3-6.9v2.07a5 5 0 010 9.66V18a7 7 0 000-13.9z"/></svg>',
+  stt: '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3zm5-3a1 1 0 012 0 7 7 0 01-6 6.92V21h3v1H8v-1h3v-3.08A7 7 0 015 11a1 1 0 012 0 5 5 0 0010 0z"/></svg>',
+  braille: '<svg viewBox="0 0 24 24" focusable="false"><path d="M6 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4zm12-14a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4z"/></svg>',
+  contrast: '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 2a10 10 0 100 20V2z"/></svg>',
+  spacing: '<svg viewBox="0 0 24 24" focusable="false"><path d="M7 4h10v2H7V4zm-2 5h14v2H5V9zm3 5h8v2H8v-2zm-3 5h14v2H5v-2z"/></svg>'
+};
+
+function moduleTitle(key, label) {
+  const icon = moduleIcons[key] || '';
+  return `
+    <h3 class="a11ytb-module-title">
+      <span class="a11ytb-module-icon" aria-hidden="true">${icon}</span>
+      ${label}
+    </h3>
+  `;
+}
+
 function ttsStatusMessage(status) {
   switch (status) {
     case 'unsupported':
@@ -45,8 +63,8 @@ registerBlock({
       <p class="a11ytb-note" role="status" data-ref="status"${statusMessage ? '' : ' hidden'}>${statusMessage}</p>
     `;
     return `
-      <h3>Lecture vocale (TTS)</h3>
-      <div class="row">
+      ${moduleTitle('tts', 'Lecture vocale (TTS)')}
+      <div class="a11ytb-row">
         <button class="a11ytb-button" data-action="speak-selection">Lire la sélection</button>
         <button class="a11ytb-button" data-action="speak-page">Lire la page</button>
         <button class="a11ytb-button" data-action="stop">Stop</button>
@@ -86,8 +104,8 @@ registerBlock({
   render: (state) => {
     const s = state.get();
     return `
-      <h3>Reconnaissance vocale (STT)</h3>
-      <div class="row">
+      ${moduleTitle('stt', 'Reconnaissance vocale (STT)')}
+      <div class="a11ytb-row">
         <button class="a11ytb-button" data-action="start">Démarrer</button>
         <button class="a11ytb-button" data-action="stop">Arrêter</button>
         <span>Status&nbsp;: <strong data-ref="status">${s.stt.status}</strong></span>
@@ -112,8 +130,8 @@ registerBlock({
   render: (state) => {
     const s = state.get();
     return `
-      <h3>Braille</h3>
-      <div class="row">
+      ${moduleTitle('braille', 'Braille')}
+      <div class="a11ytb-row">
         <button class="a11ytb-button" data-action="sel">Transcrire la sélection</button>
         <button class="a11ytb-button" data-action="clear">Effacer</button>
       </div>
@@ -134,7 +152,7 @@ registerBlock({
   render: (state) => {
     const s = state.get();
     return `
-      <h3>Contraste élevé</h3>
+      ${moduleTitle('contrast', 'Contraste élevé')}
       <button class="a11ytb-button" data-action="toggle" aria-pressed="${s.contrast.enabled}">${s.contrast.enabled ? 'Désactiver' : 'Activer'}</button>
     `;
   },
@@ -155,7 +173,7 @@ registerBlock({
   render: (state) => {
     const s = state.get();
     return `
-      <h3>Espacements</h3>
+      ${moduleTitle('spacing', 'Espacements')}
       <label>Interlignage <input type="range" min="1" max="2.4" step="0.1" value="${s.spacing.lineHeight}" data-bind="lineHeight"></label>
       <label>Espacement des lettres <input type="range" min="0" max="0.2" step="0.01" value="${s.spacing.letterSpacing}" data-bind="letterSpacing"></label>
     `;
