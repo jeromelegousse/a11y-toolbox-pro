@@ -139,10 +139,12 @@ export function mountUI({ root, state }) {
   const viewToggle = document.createElement('div');
   viewToggle.className = 'a11ytb-view-toggle';
   const viewButtons = new Map();
-  [
+  const viewDefinitions = [
     { id: 'modules', label: 'Modules' },
-    { id: 'options', label: 'Options & Profils' }
-  ].forEach((view) => {
+    { id: 'options', label: 'Options & Profils' },
+    { id: 'organize', label: 'Organisation' }
+  ];
+  viewDefinitions.forEach((view) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'a11ytb-chip a11ytb-chip--view';
@@ -170,6 +172,19 @@ export function mountUI({ root, state }) {
   optionsView.setAttribute('aria-label', 'Profils et options avancées');
   optionsView.setAttribute('hidden', '');
   optionsView.tabIndex = -1;
+
+  const organizeView = document.createElement('div');
+  organizeView.className = 'a11ytb-view a11ytb-view--organize';
+  organizeView.setAttribute('role', 'region');
+  organizeView.setAttribute('aria-label', 'Organisation des modules');
+  organizeView.setAttribute('hidden', '');
+  organizeView.tabIndex = -1;
+
+  const viewElements = new Map([
+    ['modules', modulesView],
+    ['options', optionsView],
+    ['organize', organizeView]
+  ]);
 
   const filters = document.createElement('div');
   filters.className = 'a11ytb-filters';
@@ -287,7 +302,7 @@ export function mountUI({ root, state }) {
   optionsScroll.append(profilesSection, configSection);
   optionsView.append(optionsScroll);
 
-  viewContainer.append(modulesView, optionsView);
+  viewContainer.append(modulesView, optionsView, organizeView);
   body.append(viewToggle, viewContainer);
 
   const footer = document.createElement('div');
@@ -318,8 +333,46 @@ export function mountUI({ root, state }) {
 
   const moduleElements = new Map();
   const adminItems = new Map();
-  const adminList = document.createElement('div');
+
+  const organizeScroll = document.createElement('div');
+  organizeScroll.className = 'a11ytb-organize-scroll';
+  const organizeSection = document.createElement('section');
+  organizeSection.className = 'a11ytb-options-section';
+  const organizeHeader = document.createElement('div');
+  organizeHeader.className = 'a11ytb-section-header';
+  const organizeTitle = document.createElement('h3');
+  organizeTitle.className = 'a11ytb-section-title';
+  organizeTitle.id = 'a11ytb-organize-title';
+  organizeTitle.textContent = 'Organisation des modules';
+  const organizeDescription = document.createElement('p');
+  organizeDescription.className = 'a11ytb-section-description';
+  organizeDescription.textContent = 'Réordonnez les cartes pour prioriser les modules affichés dans le panneau principal.';
+  organizeHeader.append(organizeTitle, organizeDescription);
+
+  const organizeKeyboardHint = document.createElement('p');
+  organizeKeyboardHint.className = 'a11ytb-admin-help';
+  organizeKeyboardHint.id = 'a11ytb-organize-help';
+  organizeKeyboardHint.textContent = 'Au clavier : appuyez sur Espace ou Entrée pour saisir une carte, utilisez ↑ ou ↓ pour la déplacer, Échap pour annuler.';
+
+  const organizePointerHint = document.createElement('p');
+  organizePointerHint.className = 'a11ytb-admin-help';
+  organizePointerHint.id = 'a11ytb-organize-pointer';
+  organizePointerHint.textContent = 'À la souris ou au tactile : maintenez la carte enfoncée pour la déplacer, relâchez pour déposer.';
+
+  const adminList = document.createElement('ol');
   adminList.className = 'a11ytb-admin-list';
+  adminList.setAttribute('aria-labelledby', organizeTitle.id);
+  adminList.setAttribute('aria-describedby', `${organizeKeyboardHint.id} ${organizePointerHint.id}`);
+
+  const organizeLive = document.createElement('p');
+  organizeLive.className = 'a11ytb-sr-only';
+  organizeLive.id = 'a11ytb-organize-live';
+  organizeLive.setAttribute('role', 'status');
+  organizeLive.setAttribute('aria-live', 'polite');
+
+  organizeSection.append(organizeHeader, organizeKeyboardHint, organizePointerHint, adminList);
+  organizeScroll.append(organizeSection);
+  organizeView.append(organizeScroll, organizeLive);
   blocks.forEach(block => {
     const el = renderBlock(block, state, modulesContainer);
     moduleElements.set(block.id, el);
@@ -611,23 +664,322 @@ export function mountUI({ root, state }) {
     return {
       category: ui.category || 'all',
       search: ui.search || '',
-      pinned: Array.isArray(ui.pinned) ? ui.pinned : [],
-      hidden: Array.isArray(ui.hidden) ? ui.hidden : [],
+      pinned: Array.isArray(ui.pinned) ? [...ui.pinned] : [],
+      hidden: Array.isArray(ui.hidden) ? [...ui.hidden] : [],
+      disabled: Array.isArray(ui.disabled) ? [...ui.disabled] : [],
+      moduleOrder: Array.isArray(ui.moduleOrder) ? [...ui.moduleOrder] : [],
       showHidden: !!ui.showHidden,
-      view: ui.view || 'modules'
+      view: ui.view || 'modules',
+      activeProfile: ui.activeProfile || 'custom'
     };
+  }
+
+  function getCurrentAdminOrder() {
+    return Array.from(adminList.querySelectorAll('.a11ytb-admin-item'))
+      .map(item => item.dataset.blockId)
+      .filter(Boolean);
+  }
+
+  function updateAdminPositions() {
+    const items = Array.from(adminList.querySelectorAll('.a11ytb-admin-item'));
+    const total = items.length;
+    items.forEach((item, index) => {
+      item.setAttribute('aria-posinset', String(index + 1));
+      item.setAttribute('aria-setsize', String(total));
+      const badge = item.querySelector('[data-ref="position"]');
+      if (badge) badge.textContent = String(index + 1);
+    });
+  }
+
+  function announceOrganize(message) {
+    if (!organizeLive) return;
+    organizeLive.textContent = '';
+    if (message) {
+      organizeLive.textContent = message;
+    }
+  }
+
+  function commitModuleOrder(nextOrder, { moduleId, position, total } = {}) {
+    const sanitized = Array.isArray(nextOrder) ? nextOrder.filter(id => allowedIds.has(id)) : [];
+    if (!sanitized.length) return false;
+    const prefs = getPreferences();
+    const storedOrder = Array.isArray(prefs.moduleOrder) ? prefs.moduleOrder : [];
+    const baseline = storedOrder.length ? storedOrder : blockIds;
+    if (arraysEqual(sanitized, baseline)) {
+      return false;
+    }
+    const defaultOrder = blockIds;
+    if (arraysEqual(sanitized, defaultOrder)) {
+      if (storedOrder.length) {
+        state.set('ui.moduleOrder', []);
+        logActivity('Ordre des modules réinitialisé', { tone: 'info', tags: ['organisation'] });
+        return true;
+      }
+      return false;
+    }
+    state.set('ui.moduleOrder', sanitized);
+    markProfileAsCustom();
+    if (moduleId) {
+      const block = blockInfo.get(moduleId);
+      const title = block?.title || moduleId;
+      const count = total ?? sanitized.length;
+      const pos = position ?? sanitized.indexOf(moduleId) + 1;
+      const message = `Module déplacé : ${title} (position ${pos}/${count})`;
+      logActivity(message, { tone: 'info', module: moduleId, tags: ['organisation'] });
+    } else {
+      logActivity('Ordre des modules mis à jour', { tone: 'info', tags: ['organisation'] });
+    }
+    return true;
+  }
+
+  let keyboardDragId = null;
+
+  function finishKeyboardDrag({ commit = false, silent = false } = {}) {
+    if (!keyboardDragId) return;
+    const currentId = keyboardDragId;
+    const item = adminItems.get(currentId);
+    keyboardDragId = null;
+    if (item) {
+      item.setAttribute('aria-grabbed', 'false');
+      item.classList.remove('is-grabbed');
+    }
+    adminList.classList.remove('is-keyboard-dragging');
+    if (commit) {
+      const order = getCurrentAdminOrder();
+      const index = order.indexOf(currentId);
+      const total = order.length;
+      const block = blockInfo.get(currentId);
+      const title = block?.title || currentId;
+      if (commitModuleOrder(order, { moduleId: currentId, position: index + 1, total })) {
+        if (!silent) announceOrganize(`${title} placé en position ${index + 1} sur ${total}.`);
+      } else {
+        syncAdminList();
+        if (!silent) announceOrganize('Ordre inchangé.');
+      }
+    } else {
+      syncAdminList();
+      if (!silent) announceOrganize('Réorganisation annulée.');
+    }
+    const refreshed = adminItems.get(currentId);
+    if (refreshed && typeof refreshed.focus === 'function') {
+      requestAnimationFrame(() => {
+        try {
+          refreshed.focus({ preventScroll: true });
+        } catch (error) {
+          refreshed.focus();
+        }
+      });
+    }
+  }
+
+  function cancelKeyboardDrag(options = {}) {
+    if (!keyboardDragId) return;
+    finishKeyboardDrag({ commit: false, ...options });
+  }
+
+  function startKeyboardDrag(item) {
+    if (!item?.dataset?.blockId) return;
+    if (keyboardDragId && keyboardDragId !== item.dataset.blockId) {
+      finishKeyboardDrag({ commit: false, silent: true });
+    }
+    keyboardDragId = item.dataset.blockId;
+    item.classList.add('is-grabbed');
+    item.setAttribute('aria-grabbed', 'true');
+    adminList.classList.add('is-keyboard-dragging');
+    const title = item.dataset.title || item.dataset.blockId;
+    announceOrganize(`${title} sélectionné. Utilisez les flèches pour déplacer, appuyez de nouveau sur Entrée pour déposer.`);
+  }
+
+  function moveKeyboardItem(direction) {
+    if (!keyboardDragId) return;
+    const item = adminItems.get(keyboardDragId);
+    if (!item) return;
+    const siblings = Array.from(adminList.querySelectorAll('.a11ytb-admin-item'));
+    const index = siblings.indexOf(item);
+    if (index === -1) return;
+    const targetIndex = direction < 0 ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= siblings.length) {
+      const block = blockInfo.get(keyboardDragId);
+      const title = block?.title || keyboardDragId;
+      announceOrganize(`${title} est déjà ${direction < 0 ? 'en première position' : 'en dernière position'}.`);
+      return;
+    }
+    const reference = siblings[targetIndex];
+    if (direction > 0) {
+      adminList.insertBefore(item, reference.nextSibling);
+    } else {
+      adminList.insertBefore(item, reference);
+    }
+    updateAdminPositions();
+    if (typeof item.focus === 'function') {
+      try {
+        item.focus({ preventScroll: true });
+      } catch (error) {
+        item.focus();
+      }
+    }
+    const total = siblings.length;
+    const newIndex = Array.from(adminList.children).indexOf(item);
+    const block = blockInfo.get(keyboardDragId);
+    const title = block?.title || keyboardDragId;
+    announceOrganize(`${title} position ${newIndex + 1} sur ${total}.`);
+  }
+
+  let pointerDragState = null;
+
+  function finalizePointerDrag({ cancelled = false, silent = false } = {}) {
+    if (!pointerDragState) return;
+    const { item, pointerId, id } = pointerDragState;
+    pointerDragState = null;
+    try {
+      item.releasePointerCapture?.(pointerId);
+    } catch (error) {
+      // ignore pointer capture release errors
+    }
+    item.classList.remove('is-grabbed');
+    item.setAttribute('aria-grabbed', 'false');
+    adminList.classList.remove('is-pointer-dragging');
+    updateAdminPositions();
+    if (cancelled) {
+      syncAdminList();
+      if (!silent) announceOrganize('Réorganisation annulée.');
+      return;
+    }
+    const order = getCurrentAdminOrder();
+    const index = order.indexOf(id);
+    const total = order.length;
+    const block = blockInfo.get(id);
+    const title = block?.title || id;
+    if (commitModuleOrder(order, { moduleId: id, position: index + 1, total })) {
+      if (!silent) announceOrganize(`${title} déplacé en position ${index + 1} sur ${total}.`);
+    } else {
+      syncAdminList();
+      if (!silent) announceOrganize('Ordre inchangé.');
+    }
+    const refreshed = adminItems.get(id);
+    if (refreshed && typeof refreshed.focus === 'function') {
+      requestAnimationFrame(() => {
+        try {
+          refreshed.focus({ preventScroll: true });
+        } catch (error) {
+          refreshed.focus();
+        }
+      });
+    }
+  }
+
+  function onAdminItemPointerDown(event) {
+    const item = event.currentTarget;
+    if (!item?.dataset?.blockId) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if (event.target.closest('input, button, select, textarea')) return;
+    event.preventDefault();
+    cancelKeyboardDrag({ silent: true });
+    pointerDragState = {
+      id: item.dataset.blockId,
+      item,
+      pointerId: event.pointerId
+    };
+    adminList.classList.add('is-pointer-dragging');
+    item.classList.add('is-grabbed');
+    item.setAttribute('aria-grabbed', 'true');
+    item.setPointerCapture?.(event.pointerId);
+    const title = item.dataset.title || item.dataset.blockId;
+    announceOrganize(`${title} sélectionné. Glissez pour modifier la position, relâchez pour déposer.`);
+  }
+
+  function onAdminItemPointerMove(event) {
+    if (!pointerDragState || event.pointerId !== pointerDragState.pointerId) return;
+    event.preventDefault();
+    const { item } = pointerDragState;
+    const siblings = Array.from(adminList.querySelectorAll('.a11ytb-admin-item')).filter(el => el !== item);
+    const clientY = event.clientY;
+    let inserted = false;
+    for (const sibling of siblings) {
+      const rect = sibling.getBoundingClientRect();
+      const midpoint = rect.top + (rect.height / 2);
+      if (clientY < midpoint) {
+        adminList.insertBefore(item, sibling);
+        inserted = true;
+        break;
+      }
+    }
+    if (!inserted) {
+      adminList.append(item);
+    }
+    updateAdminPositions();
+  }
+
+  function onAdminItemPointerUp(event) {
+    if (!pointerDragState || event.pointerId !== pointerDragState.pointerId) return;
+    event.preventDefault();
+    finalizePointerDrag({ cancelled: false });
+  }
+
+  function onAdminItemPointerCancel(event) {
+    if (!pointerDragState || event.pointerId !== pointerDragState.pointerId) return;
+    event.preventDefault();
+    finalizePointerDrag({ cancelled: true });
+  }
+
+  function onAdminItemKeydown(event) {
+    const item = event.currentTarget;
+    if (!item?.dataset?.blockId) return;
+    if (event.target !== item) {
+      if (event.key === 'Escape' && keyboardDragId === item.dataset.blockId) {
+        event.preventDefault();
+        finishKeyboardDrag({ commit: false });
+      }
+      return;
+    }
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault();
+      if (keyboardDragId === item.dataset.blockId) {
+        finishKeyboardDrag({ commit: true });
+      } else {
+        startKeyboardDrag(item);
+      }
+      return;
+    }
+    if (keyboardDragId !== item.dataset.blockId) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      finishKeyboardDrag({ commit: false });
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveKeyboardItem(-1);
+      return;
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveKeyboardItem(1);
+    }
   }
 
   function createAdminItem(block) {
     const li = document.createElement('li');
     li.className = 'a11ytb-admin-item';
     li.dataset.blockId = block.id;
-    li.draggable = true;
+    li.dataset.title = block.title || block.id;
+    if (block.category) {
+      li.dataset.category = block.category;
+    }
+    li.tabIndex = 0;
+    li.setAttribute('role', 'listitem');
+    li.setAttribute('aria-grabbed', 'false');
 
     const handle = document.createElement('span');
     handle.className = 'a11ytb-admin-handle';
     handle.setAttribute('aria-hidden', 'true');
     handle.innerHTML = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M10 4h4v2h-4V4zm0 7h4v2h-4v-2zm0 7h4v2h-4v-2z"/></svg>';
+
+    const order = document.createElement('span');
+    order.className = 'a11ytb-admin-order';
+    order.dataset.ref = 'position';
+    order.setAttribute('aria-hidden', 'true');
+    order.textContent = '1';
 
     const icon = document.createElement('span');
     icon.className = 'a11ytb-admin-icon';
@@ -643,6 +995,9 @@ export function mountUI({ root, state }) {
 
     const labelText = document.createElement('span');
     labelText.textContent = block.title || block.id;
+    const labelId = `a11ytb-admin-label-${block.id}`;
+    labelText.id = labelId;
+    li.setAttribute('aria-labelledby', labelId);
 
     label.append(checkbox, labelText);
 
@@ -651,7 +1006,13 @@ export function mountUI({ root, state }) {
     const categoryLabel = categories.find(cat => cat.id === block.category)?.label || 'Divers';
     meta.textContent = categoryLabel;
 
-    li.append(handle, icon, label, meta);
+    li.append(handle, order, icon, label, meta);
+
+    li.addEventListener('keydown', onAdminItemKeydown);
+    li.addEventListener('pointerdown', onAdminItemPointerDown);
+    li.addEventListener('pointermove', onAdminItemPointerMove);
+    li.addEventListener('pointerup', onAdminItemPointerUp);
+    li.addEventListener('pointercancel', onAdminItemPointerCancel);
 
     checkbox.addEventListener('change', () => {
       const prefs = getPreferences();
@@ -684,20 +1045,32 @@ export function mountUI({ root, state }) {
   function syncAdminList() {
     const prefs = getPreferences();
     const disabledSet = new Set(prefs.disabled);
-    const order = prefs.moduleOrder.length ? prefs.moduleOrder : blockIds;
-    order.forEach(id => {
+    const orderSource = prefs.moduleOrder.length ? prefs.moduleOrder : blockIds;
+    const seen = new Set();
+    orderSource.forEach((id) => {
+      if (!allowedIds.has(id) || seen.has(id)) return;
       const item = adminItems.get(id);
-      if (item) adminList.append(item);
+      if (item) {
+        adminList.append(item);
+        seen.add(id);
+      }
     });
     adminItems.forEach((item, id) => {
-      const checkbox = item.querySelector('input[type="checkbox"][data-ref="toggle"]');
+      if (seen.has(id)) return;
+      adminList.append(item);
+    });
+    const items = Array.from(adminList.querySelectorAll('.a11ytb-admin-item'));
+    items.forEach((item) => {
+      const id = item.dataset.blockId;
       const enabled = !disabledSet.has(id);
+      const checkbox = item.querySelector('input[type="checkbox"][data-ref="toggle"]');
       if (checkbox && checkbox.checked !== enabled) {
         checkbox.checked = enabled;
       }
       item.classList.toggle('is-disabled', !enabled);
       item.setAttribute('aria-disabled', String(!enabled));
     });
+    updateAdminPositions();
   }
 
   function applyPresetProfile(profileId, { viaUser = false } = {}) {
@@ -952,21 +1325,33 @@ export function mountUI({ root, state }) {
       btn.classList.toggle('is-active', active);
       btn.setAttribute('aria-pressed', String(active));
     });
+    viewElements.forEach((element, id) => {
+      const isActive = id === currentView;
+      if (isActive) {
+        element.removeAttribute('hidden');
+        element.setAttribute('aria-hidden', 'false');
+      } else {
+        element.setAttribute('hidden', '');
+        element.setAttribute('aria-hidden', 'true');
+      }
+    });
     if (currentView === 'options') {
-      modulesView.setAttribute('hidden', '');
-      modulesView.setAttribute('aria-hidden', 'true');
-      optionsView.removeAttribute('hidden');
-      optionsView.setAttribute('aria-hidden', 'false');
       if (activeViewId !== 'options') {
         setupOptionsFocusTrap();
       }
-    } else {
-      optionsView.setAttribute('hidden', '');
-      optionsView.setAttribute('aria-hidden', 'true');
-      modulesView.removeAttribute('hidden');
-      modulesView.setAttribute('aria-hidden', 'false');
-      if (activeViewId === 'options') {
-        teardownOptionsFocusTrap();
+    } else if (activeViewId === 'options') {
+      teardownOptionsFocusTrap();
+    }
+    if (currentView === 'organize' && activeViewId !== 'organize') {
+      const firstItem = adminList.querySelector('.a11ytb-admin-item');
+      if (firstItem && typeof firstItem.focus === 'function') {
+        requestAnimationFrame(() => {
+          try {
+            firstItem.focus({ preventScroll: true });
+          } catch (error) {
+            firstItem.focus();
+          }
+        });
       }
     }
     activeViewId = currentView;

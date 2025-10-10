@@ -356,6 +356,150 @@ body {
   min-height: 0;
 }
 
+.a11ytb-view--organize {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.a11ytb-organize-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: auto;
+  padding-right: 4px;
+  min-height: 0;
+}
+
+.a11ytb-admin-help {
+  margin: 0;
+  font-size: 12px;
+  color: rgb(255 255 255 / 72%);
+}
+
+.a11ytb-admin-help + .a11ytb-admin-help {
+  margin-top: -4px;
+}
+
+.a11ytb-admin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+}
+
+.a11ytb-admin-item {
+  display: grid;
+  grid-template-columns: auto auto auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--a11ytb-border);
+  background: linear-gradient(165deg, var(--a11ytb-surface-alt), var(--a11ytb-surface));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 5%);
+  cursor: grab;
+  transition: transform 0.18s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.a11ytb-admin-item:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.a11ytb-admin-item.is-grabbed,
+.a11ytb-admin-item[aria-grabbed="true"] {
+  border-color: var(--a11ytb-accent);
+  box-shadow: 0 0 0 1px rgb(76 139 245 / 40%), 0 12px 26px rgb(0 0 0 / 35%);
+  cursor: grabbing;
+}
+
+.a11ytb-admin-item.is-disabled {
+  opacity: 0.6;
+}
+
+.a11ytb-admin-handle {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  border: 1px solid var(--a11ytb-border);
+  background: rgb(255 255 255 / 6%);
+  display: grid;
+  place-items: center;
+  color: rgb(255 255 255 / 80%);
+}
+
+.a11ytb-admin-handle svg {
+  width: 18px;
+  height: 18px;
+  fill: currentcolor;
+}
+
+.a11ytb-admin-order {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 8%);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgb(255 255 255 / 85%);
+}
+
+.a11ytb-admin-icon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgb(255 255 255 / 85%);
+}
+
+.a11ytb-admin-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: currentcolor;
+}
+
+.a11ytb-admin-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.a11ytb-admin-label input {
+  width: 18px;
+  height: 18px;
+}
+
+.a11ytb-admin-meta {
+  font-size: 12px;
+  color: rgb(255 255 255 / 65%);
+  justify-self: end;
+}
+
+.a11ytb-admin-list.is-pointer-dragging .a11ytb-admin-item,
+.a11ytb-admin-list.is-keyboard-dragging .a11ytb-admin-item {
+  transition: none;
+}
+
+.a11ytb-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .a11ytb-profile-grid,
 .a11ytb-config-grid {
   display: grid;
