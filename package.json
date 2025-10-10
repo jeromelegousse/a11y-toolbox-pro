@@ -7,9 +7,13 @@
   "scripts": {
     "lint:js": "eslint src --max-warnings=0",
     "lint:css": "stylelint \"src/**/*.css\"",
-    "lint": "npm run lint:js && npm run lint:css"
+    "lint": "npm run lint:js && npm run lint:css",
+    "test:visual": "playwright test",
+    "test": "npm run lint && npm run test:visual"
   },
   "devDependencies": {
+    "@playwright/test": "^1.42.1",
+    "http-server": "^14.1.1",
     "eslint": "^8.57.0",
     "eslint-plugin-import": "^2.29.1",
     "stylelint": "^15.11.0",
