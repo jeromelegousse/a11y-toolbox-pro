@@ -11,11 +11,36 @@ Ce guide explique comment ajouter un module ou un bloc sans casser l'existant. I
 
 ## 2. Anatomy d'un module
 
+Chaque module se décrit désormais via un **manifest** validé par `src/module-manifest.js`. Exportez-le pour qu’il puisse être
+réutilisé :
+
+```js
+export const manifest = {
+  id: 'exemple',
+  name: 'Nom affiché',
+  version: '0.1.0',
+  description: 'Résumé court',
+  category: 'vision',
+  keywords: ['mot-clé'],
+  permissions: ['speechSynthesis'],
+  defaults: {
+    state: {
+      exemple: { enabled: false }
+    }
+  }
+};
+```
+
+`registerModule` normalise et enregistre ce manifest (dépendances, permissions, compatibilité…). Les champs inconnus sont
+ignorés avec un avertissement. Le manifest permet aussi d’injecter les valeurs par défaut du store via `defaults.state` :
+elles sont fusionnées automatiquement dans `src/main.js` grâce à `mergeManifestDefaults`.
+
 Un module est un objet enregistré via `registerModule`. Il doit au minimum fournir :
 
 ```js
 registerModule({
-  id: 'exemple',
+  id: manifest.id,
+  manifest,
   init({ state, registry, ui }) {
     // Votre code d'initialisation
   }
@@ -24,6 +49,8 @@ registerModule({
 
 - `id` : identifiant unique (slug). Préfixez si module expérimental (`exp-ttsplus`).
 - `init(context)` : appelé une seule fois au chargement. Utilisez-le pour exposer des API sur `window.a11ytb` ou pour inscrire des blocs.
+- `manifest` : obligatoire à terme. Pour l’instant, le système injecte un manifest minimal si le module ne fournit rien, mais
+  tout nouveau module doit l’exporter et le passer à `registerModule`.
 
 ### 2.1. Gestion de l'état
 

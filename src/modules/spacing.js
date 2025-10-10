@@ -1,7 +1,22 @@
 import { registerModule } from '../registry.js';
 
-const spacing = {
+export const manifest = {
   id: 'spacing',
+  name: 'Espacement du texte',
+  version: '0.1.0',
+  description: 'Injecte des variables CSS pour ajuster l’interlignage et l’espacement des lettres.',
+  category: 'vision',
+  keywords: ['espacement', 'typographie'],
+  defaults: {
+    state: {
+      spacing: { lineHeight: 1.5, letterSpacing: 0 }
+    }
+  }
+};
+
+const spacing = {
+  id: manifest.id,
+  manifest,
   init() {
     const style = document.createElement('style');
     style.textContent = `

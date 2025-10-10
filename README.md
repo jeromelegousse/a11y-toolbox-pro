@@ -13,6 +13,7 @@ Ouvrez `index.html` dans un navigateur moderne (Alt+Shift+A pour ouvrir).
 
 - [Comparatif et roadmap](docs/comparatif-et-roadmap.md) — synthèse des écarts avec les solutions professionnelles et priorisation des évolutions.
 - [Guide de modules](docs/module-guide.md) — conventions pour créer et maintenir des modules/blocs sans casser l'existant.
+- [Manifestes de modules](docs/module-manifest.md) — structure validée et injection automatique des valeurs par défaut.
 
 ## Qualité du code
 
