@@ -1,5 +1,7 @@
 import { listBlocks, renderBlock, listModuleManifests } from './registry.js';
 
+const DEFAULT_BLOCK_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h7v7H4V5zm9 0h7v7h-7V5zM4 12h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>';
+
 export function mountUI({ root, state }) {
   const categories = [
     { id: 'all', label: 'Tous' },
@@ -61,18 +63,6 @@ export function mountUI({ root, state }) {
     if (!arraysEqual(next, reference)) {
       state.set(path, next);
     }
-  }
-
-  function sanitizeList(list, allowedSet) {
-    if (!Array.isArray(list)) return [];
-    const seen = new Set();
-    const result = [];
-    list.forEach((id) => {
-      if (!allowedSet.has(id) || seen.has(id)) return;
-      seen.add(id);
-      result.push(id);
-    });
-    return result;
   }
 
   function markProfileAsCustom() {
@@ -179,6 +169,7 @@ export function mountUI({ root, state }) {
   optionsView.setAttribute('role', 'region');
   optionsView.setAttribute('aria-label', 'Profils et options avancées');
   optionsView.setAttribute('hidden', '');
+  optionsView.tabIndex = -1;
 
   const filters = document.createElement('div');
   filters.className = 'a11ytb-filters';
@@ -237,7 +228,7 @@ export function mountUI({ root, state }) {
   const initialProfile = profileMap.get(profileSelect.value) || profileMap.get('custom');
   profileDescription.textContent = initialProfile?.description || '';
   profileSelect.addEventListener('change', () => {
-    applyProfile(profileSelect.value, { viaUser: true });
+    applyPresetProfile(profileSelect.value, { viaUser: true });
   });
 
   profileWrapper.append(profileLabel, profileSelect, profileDescription);
@@ -326,9 +317,13 @@ export function mountUI({ root, state }) {
   const allowedIds = new Set(blockIds);
 
   const moduleElements = new Map();
+  const adminItems = new Map();
+  const adminList = document.createElement('div');
+  adminList.className = 'a11ytb-admin-list';
   blocks.forEach(block => {
     const el = renderBlock(block, state, modulesContainer);
     moduleElements.set(block.id, el);
+    adminItems.set(block.id, createAdminItem(block));
   });
 
   const optionBindings = [];
@@ -611,13 +606,6 @@ export function mountUI({ root, state }) {
     };
   }
 
-  function getModuleOrder() {
-    const stored = state.get('ui.moduleOrder');
-    const normalized = sanitizeList(stored, allowedIds);
-    const missing = blockIds.filter(id => !normalized.includes(id));
-    return [...normalized, ...missing];
-  }
-
   function getPreferences() {
     const ui = state.get('ui') || {};
     return {
@@ -712,29 +700,7 @@ export function mountUI({ root, state }) {
     });
   }
 
-  function readAdminOrder() {
-    return Array.from(adminList.querySelectorAll('.a11ytb-admin-item'))
-      .map(item => item.dataset.blockId)
-      .filter(id => allowedIds.has(id));
-  }
-
-  function finalizeAdminOrder({ silent = false } = {}) {
-    const prefs = getPreferences();
-    const currentOrder = readAdminOrder();
-    const merged = [
-      ...currentOrder,
-      ...blockIds.filter(id => !currentOrder.includes(id))
-    ];
-    if (!arraysEqual(merged, prefs.moduleOrder)) {
-      setListIfChanged('ui.moduleOrder', merged, prefs.moduleOrder);
-      markProfileAsCustom();
-      if (!silent) {
-        logActivity('Ordre des modules mis à jour', { tone: 'confirm' });
-      }
-    }
-  }
-
-  function applyProfile(profileId, { viaUser = false } = {}) {
+  function applyPresetProfile(profileId, { viaUser = false } = {}) {
     const profile = profileMap.get(profileId) || profileMap.get('custom');
     const targetId = profile?.id || 'custom';
     if (state.get('ui.activeProfile') !== targetId) {
@@ -888,6 +854,96 @@ export function mountUI({ root, state }) {
     });
   }
 
+  let lastOptionsFocus = null;
+  let releaseOptionsFocusTrap = null;
+  let activeViewId = null;
+
+  function focusFirstInOptions() {
+    const focusables = collectFocusable(optionsView);
+    const toggle = viewButtons.get('options');
+    const target = (lastOptionsFocus && optionsView.contains(lastOptionsFocus))
+      ? lastOptionsFocus
+      : (focusables[0] || toggle || optionsView);
+    if (target && typeof target.focus === 'function') {
+      requestAnimationFrame(() => {
+        target.focus();
+      });
+    }
+  }
+
+  function setupOptionsFocusTrap() {
+    const optionsToggle = viewButtons.get('options');
+
+    const getCycle = () => {
+      const members = [];
+      if (optionsToggle) members.push(optionsToggle);
+      members.push(...collectFocusable(optionsView));
+      return members;
+    };
+
+    const keydownHandler = (event) => {
+      if (event.key !== 'Tab') return;
+      const focusables = getCycle();
+      if (!focusables.length) {
+        event.preventDefault();
+        optionsView.focus();
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey) {
+        if (active === first) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    const focusInHandler = (event) => {
+      if (optionsView.contains(event.target)) {
+        lastOptionsFocus = event.target;
+        return;
+      }
+      if (optionsToggle && optionsToggle.contains(event.target)) {
+        lastOptionsFocus = optionsToggle;
+        return;
+      }
+      if (!body.contains(event.target)) return;
+      const cycle = getCycle();
+      const fallback = cycle[0] || optionsView;
+      if (fallback && typeof fallback.focus === 'function') {
+        fallback.focus();
+      }
+    };
+
+    optionsView.addEventListener('keydown', keydownHandler, true);
+    if (optionsToggle) {
+      optionsToggle.addEventListener('keydown', keydownHandler, true);
+    }
+    document.addEventListener('focusin', focusInHandler);
+
+    releaseOptionsFocusTrap = () => {
+      optionsView.removeEventListener('keydown', keydownHandler, true);
+      if (optionsToggle) {
+        optionsToggle.removeEventListener('keydown', keydownHandler, true);
+      }
+      document.removeEventListener('focusin', focusInHandler);
+    };
+
+    focusFirstInOptions();
+  }
+
+  function teardownOptionsFocusTrap() {
+    if (typeof releaseOptionsFocusTrap === 'function') {
+      releaseOptionsFocusTrap();
+    }
+    releaseOptionsFocusTrap = null;
+  }
+
   function syncView() {
     const prefs = getPreferences();
     const currentView = prefs.view || 'modules';
@@ -901,12 +957,19 @@ export function mountUI({ root, state }) {
       modulesView.setAttribute('aria-hidden', 'true');
       optionsView.removeAttribute('hidden');
       optionsView.setAttribute('aria-hidden', 'false');
+      if (activeViewId !== 'options') {
+        setupOptionsFocusTrap();
+      }
     } else {
       optionsView.setAttribute('hidden', '');
       optionsView.setAttribute('aria-hidden', 'true');
       modulesView.removeAttribute('hidden');
       modulesView.setAttribute('aria-hidden', 'false');
+      if (activeViewId === 'options') {
+        teardownOptionsFocusTrap();
+      }
     }
+    activeViewId = currentView;
   }
 
   function renderProfiles(snapshot) {
@@ -1151,17 +1214,23 @@ export function mountUI({ root, state }) {
 
   let lastFocusedElement = null;
 
+  const FOCUSABLE_SELECTORS = [
+    'a[href]',
+    'button:not([disabled])',
+    'textarea:not([disabled])',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])'
+  ].join(',');
+
+  function collectFocusable(container) {
+    if (!container) return [];
+    return Array.from(container.querySelectorAll(FOCUSABLE_SELECTORS))
+      .filter((el) => el.offsetParent !== null && !el.hasAttribute('hidden'));
+  }
+
   function getFocusableElements() {
-    const focusableSelectors = [
-      'a[href]',
-      'button:not([disabled])',
-      'textarea:not([disabled])',
-      'input:not([disabled])',
-      'select:not([disabled])',
-      '[tabindex]:not([tabindex="-1"])'
-    ];
-    return Array.from(panel.querySelectorAll(focusableSelectors.join(',')))
-      .filter(el => el.offsetParent !== null && !el.hasAttribute('hidden'));
+    return collectFocusable(panel);
   }
 
   function toggle(open) {

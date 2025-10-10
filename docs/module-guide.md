@@ -71,6 +71,7 @@ Le store observable se crée via `createStore` (`src/store.js`). Il expose `get`
   - `wire({ root, state })` attache les gestionnaires (`addEventListener`) et synchronise l'état.
 - Utilisez les classes utilitaires existantes (`a11ytb-module`, `a11ytb-module-content`, etc.) pour conserver le style.
 - Pour exposer des contrôles globaux, décrivez-les dans `manifest.config.fields` (le panneau Options & Profils les rend et synchronise le store automatiquement).
+- Référez-vous au kit Design System (`docs/design-system-workshop.md`) pour la palette et les composants de base (boutons, chips, champs) avant d'introduire de nouvelles variantes.
 
 ### 2.3. APIs globales
 
@@ -103,13 +104,14 @@ const metadata = {
 
 Exposez-les temporairement via `window.a11ytb.registry?.define(metadata)` ou ajoutez-les à `registerBlock` (propriété `keywords`).
 
-4. **Tests manuels** :
-   - `npm run lint`
-   - Vérifications clavier uniquement (navigation Tab/Shift+Tab).
-   - Tests narrateur (NVDA/VoiceOver) si possible.
+4. **Tests & automatisation** :
+   - `npm run lint` exécute ESLint et Stylelint (obligatoire avant commit, lancé en CI).
+  - `npm run test:visual` vérifie les captures Playwright. Utilisez `UPDATE_VISUAL_BASELINE=1 npm run test:visual` quand un changement visuel est volontaire et documentez-le.
+   - Vérifications clavier uniquement (navigation Tab/Shift+Tab) et narration (NVDA/VoiceOver) restent indispensables.
+   - Les stratégies détaillées sont décrites dans `docs/testing-strategy.md`.
 
 5. **PR checklist** :
-   - Captures d'écran avant/après si UI.
+   - Captures d'écran avant/après si UI + vérifier les snapshots Playwright.
    - Mise à jour des docs et du changelog (à ajouter).
    - Mention explicite des nouvelles clés d'état.
 
