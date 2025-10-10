@@ -252,12 +252,149 @@ body {
   outline-offset: 2px;
 }
 
+.a11ytb-profile-picker {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 16px;
+  background: rgb(6 9 18 / 55%);
+}
+
+.a11ytb-profile-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgb(255 255 255 / 80%);
+}
+
+.a11ytb-profile-select {
+  border-radius: 12px;
+  border: 1px solid var(--a11ytb-border);
+  padding: 8px 12px;
+  background: rgb(10 12 18 / 80%);
+  color: var(--a11ytb-fg);
+  font-size: 13px;
+}
+
+.a11ytb-profile-select:focus-visible {
+  outline: 2px solid var(--a11ytb-accent);
+  outline-offset: 2px;
+}
+
+.a11ytb-profile-description {
+  margin: 0;
+  font-size: 12px;
+  color: rgb(255 255 255 / 70%);
+  line-height: 1.4;
+}
+
 .a11ytb-modules {
   display: grid;
   gap: 14px;
   overflow: auto;
   padding-right: 4px;
   min-height: 0;
+}
+
+.a11ytb-admin-panel {
+  margin-top: 16px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 18px;
+  background: rgb(9 11 18 / 70%);
+  color: var(--a11ytb-fg);
+}
+
+.a11ytb-admin-content {
+  display: grid;
+  gap: 12px;
+  padding: 12px 16px 16px;
+}
+
+.a11ytb-admin-help {
+  margin: 0;
+  font-size: 12px;
+  color: rgb(255 255 255 / 70%);
+}
+
+.a11ytb-admin-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.a11ytb-admin-item {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  background: rgb(255 255 255 / 6%);
+  cursor: grab;
+}
+
+.a11ytb-admin-item:focus-within {
+  outline: 2px solid var(--a11ytb-accent);
+  outline-offset: 2px;
+}
+
+.a11ytb-admin-item.is-dragging {
+  opacity: 0.3;
+}
+
+.a11ytb-admin-item.is-disabled {
+  opacity: 0.55;
+}
+
+.a11ytb-admin-handle {
+  display: grid;
+  place-items: center;
+  color: rgb(255 255 255 / 55%);
+}
+
+.a11ytb-admin-handle svg {
+  width: 16px;
+  height: 16px;
+  fill: currentcolor;
+}
+
+.a11ytb-admin-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: rgb(76 139 245 / 18%);
+  color: var(--a11ytb-accent);
+}
+
+.a11ytb-admin-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: currentcolor;
+}
+
+.a11ytb-admin-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: var(--a11ytb-fg);
+}
+
+.a11ytb-admin-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--a11ytb-accent);
+}
+
+.a11ytb-admin-meta {
+  font-size: 12px;
+  color: rgb(255 255 255 / 68%);
+  font-weight: 600;
 }
 
 .a11ytb-module {
@@ -269,6 +406,7 @@ body {
   gap: 16px;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
   position: relative;
+  overflow: hidden;
 }
 
 .a11ytb-module:focus-within {
@@ -349,6 +487,56 @@ body {
 .a11ytb-module-content {
   display: grid;
   gap: 12px;
+}
+
+.a11ytb-module.is-disabled .a11ytb-module-content {
+  opacity: 0.5;
+  pointer-events: none;
+  filter: grayscale(0.3);
+}
+
+.a11ytb-module.is-disabled .a11ytb-icon-button,
+.a11ytb-module.is-disabled .a11ytb-button {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.a11ytb-module-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  background: rgb(5 8 16 / 82%);
+  color: rgb(255 255 255 / 80%);
+  padding: 16px;
+  pointer-events: auto;
+}
+
+.a11ytb-module-overlay[hidden] {
+  display: none;
+}
+
+.a11ytb-module-overlay-inner {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.a11ytb-module-overlay-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 12%);
+  color: inherit;
+}
+
+.a11ytb-module-overlay-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: currentcolor;
 }
 
 .a11ytb-row {
@@ -461,6 +649,25 @@ body {
 .a11ytb-activity summary {
   cursor: pointer;
   font-weight: 600;
+}
+
+.a11ytb-admin-panel > summary {
+  padding: 12px 16px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.a11ytb-admin-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.a11ytb-admin-panel > summary::marker {
+  display: none;
+}
+
+.a11ytb-admin-panel[open] > summary {
+  border-bottom: 1px solid rgb(255 255 255 / 12%);
 }
 
 .a11ytb-activity-list {
