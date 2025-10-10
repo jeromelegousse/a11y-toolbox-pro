@@ -67,6 +67,8 @@ const baseInitial = {
     search: '',
     pinned: [],
     hidden: [],
+    disabled: [],
+    moduleOrder: [],
     showHidden: false,
     activity: [],
     view: 'modules',
@@ -116,6 +118,8 @@ const ensureDefaults = [
   ['ui.search', initial.ui.search],
   ['ui.pinned', initial.ui.pinned],
   ['ui.hidden', initial.ui.hidden],
+  ['ui.disabled', initial.ui.disabled],
+  ['ui.moduleOrder', initial.ui.moduleOrder],
   ['ui.showHidden', initial.ui.showHidden],
   ['ui.activity', initial.ui.activity],
   ['ui.view', initial.ui.view],
@@ -139,6 +143,12 @@ state.on(s => {
 
 const root = document.getElementById('a11ytb-root');
 mountUI({ root, state });
+
+function markProfileCustom() {
+  if (state.get('ui.activeProfile') !== 'custom') {
+    state.set('ui.activeProfile', 'custom');
+  }
+}
 
 registerBlock({
   id: 'tts-controls',
@@ -347,6 +357,7 @@ registerBlock({
     btn.addEventListener('click', () => {
       const enabled = !(state.get('contrast.enabled'));
       state.set('contrast.enabled', enabled);
+      markProfileCustom();
       window.a11ytb?.feedback?.play('toggle');
       window.a11ytb?.logActivity?.(`Contraste élevé ${enabled ? 'activé' : 'désactivé'}`);
     });

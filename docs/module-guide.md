@@ -134,4 +134,15 @@ En attendant l'implémentation du manifest, adoptez ces conventions :
 - `src/store.js` : API d'état observable + persistance localStorage.
 - `src/modules/tts.js`, `src/modules/contrast.js` : exemples d'intégration de l'API globale (`window.a11ytb`).
 
+## 7. Réflexion sur l'auto-détection des modules
+
+Pour accélérer l'onboarding de nouveaux modules, nous visons une détection automatique des fichiers présents dans `src/modules/`. Les principes suivants guident cette évolution :
+
+- **Convention de nommage** : chaque module expose un `manifest` (voir §2) et exporte une fonction `registerModule`. Un script de démarrage pourrait scanner le répertoire, importer dynamiquement les modules et valider leurs manifestes via `validateModuleManifest`. Cela limite les oublis d'import manuel dans `src/main.js`.
+- **Activation déclarative** : l'état persistant (`ui.disabled`) garde la liste des modules désactivés. Une interface d’administration (voir le nouveau panneau « Administration des modules ») affiche automatiquement les entrées détectées et permet de les activer/désactiver par simple case à cocher. Côté runtime, `applyModuleLayout` masque les modules désactivés tout en laissant possible leur affichage lorsque « Afficher les modules masqués » est actif.
+- **Gestion des métadonnées** : le panneau d’administration affiche les icônes fournies par le bloc (avec un fallback automatique). Il serait possible d’étendre cette logique pour afficher la version du module ou ses dépendances. Une étape complémentaire consisterait à accepter un fichier `module.json` à côté du module JS pour importer les métadonnées sans exécuter la logique principale.
+- **Prévisualisation et drag-and-drop** : la hiérarchisation des modules est désormais persistée (`ui.moduleOrder`) et modifiable par glisser-déposer. Coupler cette fonctionnalité à l’auto-détection garantira que tout nouveau module apparaît immédiatement dans l’UI, où un administrateur pourra décider de son ordre et de son statut.
+
+Cette réflexion suppose de compléter le pipeline par un « loader » (script de build ou initialisation) qui importe automatiquement les modules détectés et signale les erreurs de manifest. À moyen terme, on pourra aussi envisager un dossier `modules-disabled/` pour stocker des modules non embarqués dans le bundle tout en conservant leurs manifestes.
+
 Gardez ce guide à jour à chaque nouveau module ou modification de framework.

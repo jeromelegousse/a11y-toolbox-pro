@@ -8,6 +8,79 @@ export function mountUI({ root, state }) {
     { id: 'interaction', label: 'Interaction' }
   ];
 
+  const accessibilityProfiles = [
+    {
+      id: 'custom',
+      label: 'Profil personnalisé',
+      description: 'Ajustez librement les modules et leurs paramètres.'
+    },
+    {
+      id: 'vision-low',
+      label: 'Vision basse',
+      description: 'Active le contraste renforcé, agrandit les espacements et met la lecture vocale en avant.',
+      apply({ state, ensureEnabled, ensurePinned, ensureVisible }) {
+        ensureEnabled(['contrast-controls', 'spacing-controls', 'tts-controls']);
+        ensureVisible(['contrast-controls', 'spacing-controls', 'tts-controls']);
+        ensurePinned(['contrast-controls', 'tts-controls']);
+        state.set('contrast.enabled', true);
+        state.set('spacing.lineHeight', 1.8);
+        state.set('spacing.letterSpacing', 0.05);
+        const currentRate = Number(state.get('tts.rate') ?? 1);
+        if (!Number.isNaN(currentRate) && currentRate < 1) {
+          state.set('tts.rate', 1);
+        }
+      }
+    },
+    {
+      id: 'reading-comfort',
+      label: 'Confort de lecture',
+      description: 'Optimise l’espacement des textes et ralentit légèrement la synthèse vocale.',
+      apply({ state, ensureEnabled, ensurePinned, ensureVisible }) {
+        ensureEnabled(['spacing-controls', 'tts-controls']);
+        ensureVisible(['spacing-controls', 'tts-controls']);
+        ensurePinned(['spacing-controls']);
+        state.set('contrast.enabled', false);
+        state.set('spacing.lineHeight', 1.7);
+        state.set('spacing.letterSpacing', 0.12);
+        state.set('tts.rate', 0.9);
+      }
+    }
+  ];
+  const profileMap = new Map(accessibilityProfiles.map(profile => [profile.id, profile]));
+
+  function arraysEqual(a = [], b = []) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }
+
+  function setListIfChanged(path, next, current = state.get(path)) {
+    const reference = Array.isArray(current) ? current : [];
+    if (!arraysEqual(next, reference)) {
+      state.set(path, next);
+    }
+  }
+
+  function sanitizeList(list, allowedSet) {
+    if (!Array.isArray(list)) return [];
+    const seen = new Set();
+    const result = [];
+    list.forEach((id) => {
+      if (!allowedSet.has(id) || seen.has(id)) return;
+      seen.add(id);
+      result.push(id);
+    });
+    return result;
+  }
+
+  function markProfileAsCustom() {
+    if (state.get('ui.activeProfile') !== 'custom') {
+      state.set('ui.activeProfile', 'custom');
+    }
+  }
+
   const fab = document.createElement('button');
   fab.className = 'a11ytb-fab';
   fab.setAttribute('aria-label', 'Ouvrir la boîte à outils d’accessibilité');
@@ -135,6 +208,40 @@ export function mountUI({ root, state }) {
     state.set('ui.search', search.value);
   });
 
+  const profileWrapper = document.createElement('div');
+  profileWrapper.className = 'a11ytb-profile-picker';
+
+  const profileLabel = document.createElement('label');
+  profileLabel.className = 'a11ytb-profile-label';
+  profileLabel.setAttribute('for', 'a11ytb-profile-select');
+  profileLabel.textContent = 'Profil';
+
+  const profileSelect = document.createElement('select');
+  profileSelect.className = 'a11ytb-profile-select';
+  profileSelect.id = 'a11ytb-profile-select';
+  accessibilityProfiles.forEach(profile => {
+    const option = document.createElement('option');
+    option.value = profile.id;
+    option.textContent = profile.label;
+    profileSelect.append(option);
+  });
+
+  const profileDescription = document.createElement('p');
+  profileDescription.className = 'a11ytb-profile-description';
+  profileDescription.id = 'a11ytb-profile-description';
+  profileDescription.setAttribute('aria-live', 'polite');
+
+  profileSelect.setAttribute('aria-describedby', profileDescription.id);
+  const initialProfileId = profileMap.has(state.get('ui.activeProfile')) ? state.get('ui.activeProfile') : 'custom';
+  profileSelect.value = initialProfileId || 'custom';
+  const initialProfile = profileMap.get(profileSelect.value) || profileMap.get('custom');
+  profileDescription.textContent = initialProfile?.description || '';
+  profileSelect.addEventListener('change', () => {
+    applyProfile(profileSelect.value, { viaUser: true });
+  });
+
+  profileWrapper.append(profileLabel, profileSelect, profileDescription);
+
   const hiddenToggle = document.createElement('button');
   hiddenToggle.type = 'button';
   hiddenToggle.className = 'a11ytb-chip a11ytb-chip--ghost';
@@ -146,7 +253,7 @@ export function mountUI({ root, state }) {
     state.set('ui.showHidden', !showHidden);
   });
 
-  filters.append(categoryBar, search, hiddenToggle);
+  filters.append(categoryBar, search, profileWrapper, hiddenToggle);
 
   const modulesContainer = document.createElement('div');
   modulesContainer.className = 'a11ytb-modules';
@@ -215,6 +322,9 @@ export function mountUI({ root, state }) {
 
   const blocks = listBlocks();
   const blockInfo = new Map(blocks.map(block => [block.id, block]));
+  const blockIds = blocks.map(block => block.id);
+  const allowedIds = new Set(blockIds);
+
   const moduleElements = new Map();
   blocks.forEach(block => {
     const el = renderBlock(block, state, modulesContainer);
@@ -501,6 +611,13 @@ export function mountUI({ root, state }) {
     };
   }
 
+  function getModuleOrder() {
+    const stored = state.get('ui.moduleOrder');
+    const normalized = sanitizeList(stored, allowedIds);
+    const missing = blockIds.filter(id => !normalized.includes(id));
+    return [...normalized, ...missing];
+  }
+
   function getPreferences() {
     const ui = state.get('ui') || {};
     return {
@@ -511,6 +628,179 @@ export function mountUI({ root, state }) {
       showHidden: !!ui.showHidden,
       view: ui.view || 'modules'
     };
+  }
+
+  function createAdminItem(block) {
+    const li = document.createElement('li');
+    li.className = 'a11ytb-admin-item';
+    li.dataset.blockId = block.id;
+    li.draggable = true;
+
+    const handle = document.createElement('span');
+    handle.className = 'a11ytb-admin-handle';
+    handle.setAttribute('aria-hidden', 'true');
+    handle.innerHTML = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M10 4h4v2h-4V4zm0 7h4v2h-4v-2zm0 7h4v2h-4v-2z"/></svg>';
+
+    const icon = document.createElement('span');
+    icon.className = 'a11ytb-admin-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.innerHTML = block.icon || DEFAULT_BLOCK_ICON;
+
+    const label = document.createElement('label');
+    label.className = 'a11ytb-admin-label';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.dataset.ref = 'toggle';
+
+    const labelText = document.createElement('span');
+    labelText.textContent = block.title || block.id;
+
+    label.append(checkbox, labelText);
+
+    const meta = document.createElement('span');
+    meta.className = 'a11ytb-admin-meta';
+    const categoryLabel = categories.find(cat => cat.id === block.category)?.label || 'Divers';
+    meta.textContent = categoryLabel;
+
+    li.append(handle, icon, label, meta);
+
+    checkbox.addEventListener('change', () => {
+      const prefs = getPreferences();
+      const disabledSet = new Set(prefs.disabled);
+      const hiddenSet = new Set(prefs.hidden);
+      const title = block.title || block.id;
+      if (checkbox.checked) {
+        if (disabledSet.delete(block.id)) {
+          setListIfChanged('ui.disabled', Array.from(disabledSet), prefs.disabled);
+        }
+        if (hiddenSet.delete(block.id)) {
+          setListIfChanged('ui.hidden', Array.from(hiddenSet), prefs.hidden);
+        }
+        logActivity(`Module activé : ${title}`, { tone: 'confirm' });
+      } else {
+        if (!disabledSet.has(block.id)) {
+          disabledSet.add(block.id);
+          setListIfChanged('ui.disabled', Array.from(disabledSet), prefs.disabled);
+        }
+        const pinned = prefs.pinned.filter(id => id !== block.id);
+        setListIfChanged('ui.pinned', pinned, prefs.pinned);
+        logActivity(`Module désactivé : ${title}`, { tone: 'toggle' });
+      }
+      markProfileAsCustom();
+    });
+
+    return li;
+  }
+
+  function syncAdminList() {
+    const prefs = getPreferences();
+    const disabledSet = new Set(prefs.disabled);
+    const order = prefs.moduleOrder.length ? prefs.moduleOrder : blockIds;
+    order.forEach(id => {
+      const item = adminItems.get(id);
+      if (item) adminList.append(item);
+    });
+    adminItems.forEach((item, id) => {
+      const checkbox = item.querySelector('input[type="checkbox"][data-ref="toggle"]');
+      const enabled = !disabledSet.has(id);
+      if (checkbox && checkbox.checked !== enabled) {
+        checkbox.checked = enabled;
+      }
+      item.classList.toggle('is-disabled', !enabled);
+      item.setAttribute('aria-disabled', String(!enabled));
+    });
+  }
+
+  function readAdminOrder() {
+    return Array.from(adminList.querySelectorAll('.a11ytb-admin-item'))
+      .map(item => item.dataset.blockId)
+      .filter(id => allowedIds.has(id));
+  }
+
+  function finalizeAdminOrder({ silent = false } = {}) {
+    const prefs = getPreferences();
+    const currentOrder = readAdminOrder();
+    const merged = [
+      ...currentOrder,
+      ...blockIds.filter(id => !currentOrder.includes(id))
+    ];
+    if (!arraysEqual(merged, prefs.moduleOrder)) {
+      setListIfChanged('ui.moduleOrder', merged, prefs.moduleOrder);
+      markProfileAsCustom();
+      if (!silent) {
+        logActivity('Ordre des modules mis à jour', { tone: 'confirm' });
+      }
+    }
+  }
+
+  function applyProfile(profileId, { viaUser = false } = {}) {
+    const profile = profileMap.get(profileId) || profileMap.get('custom');
+    const targetId = profile?.id || 'custom';
+    if (state.get('ui.activeProfile') !== targetId) {
+      state.set('ui.activeProfile', targetId);
+    }
+    if (!profile || targetId === 'custom') {
+      if (viaUser) {
+        logActivity('Profil personnalisé activé', { tone: 'toggle' });
+      }
+      return;
+    }
+
+    const prefs = getPreferences();
+    const working = {
+      disabled: new Set(prefs.disabled),
+      hidden: new Set(prefs.hidden),
+      pinned: [...prefs.pinned]
+    };
+
+    const ensureEnabled = (ids = []) => {
+      let changed = false;
+      ids.forEach(id => {
+        if (working.disabled.delete(id)) changed = true;
+      });
+      if (changed) {
+        const next = Array.from(working.disabled);
+        setListIfChanged('ui.disabled', next, prefs.disabled);
+        prefs.disabled = next;
+      }
+    };
+
+    const ensureVisible = (ids = []) => {
+      let changed = false;
+      ids.forEach(id => {
+        if (working.hidden.delete(id)) changed = true;
+      });
+      if (changed) {
+        const next = Array.from(working.hidden);
+        setListIfChanged('ui.hidden', next, prefs.hidden);
+        prefs.hidden = next;
+      }
+    };
+
+    const ensurePinned = (ids = []) => {
+      if (!ids?.length) return;
+      const ordered = [];
+      const seen = new Set();
+      ids.forEach(id => {
+        if (!allowedIds.has(id) || seen.has(id)) return;
+        seen.add(id);
+        ordered.push(id);
+      });
+      working.pinned.forEach(id => {
+        if (seen.has(id)) return;
+        seen.add(id);
+        ordered.push(id);
+      });
+      if (!arraysEqual(ordered, working.pinned)) {
+        working.pinned = ordered;
+        setListIfChanged('ui.pinned', ordered, prefs.pinned);
+        prefs.pinned = ordered;
+      }
+    };
+
+    profile.apply?.({ state, ensureEnabled, ensurePinned, ensureVisible });
+    logActivity(`Profil appliqué : ${profile.label}`, { tone: 'confirm' });
   }
 
   function syncFilters() {
@@ -527,6 +817,10 @@ export function mountUI({ root, state }) {
     hiddenToggle.setAttribute('aria-pressed', String(prefs.showHidden));
     hiddenToggle.classList.toggle('is-active', prefs.showHidden);
     hiddenToggle.textContent = prefs.showHidden ? 'Masquer les modules cachés' : 'Afficher les modules masqués';
+    const profileId = profileMap.has(prefs.activeProfile) ? prefs.activeProfile : 'custom';
+    if (profileSelect.value !== profileId) profileSelect.value = profileId;
+    const profile = profileMap.get(profileId) || profileMap.get('custom');
+    profileDescription.textContent = profile?.description || '';
   }
 
   function applyModuleLayout() {
@@ -534,10 +828,12 @@ export function mountUI({ root, state }) {
     const searchTerm = (prefs.search || '').trim().toLowerCase();
     const pinnedSet = new Set(prefs.pinned);
     const hiddenSet = new Set(prefs.hidden);
+    const disabledSet = new Set(prefs.disabled);
 
-    const baseOrder = blocks.map(block => block.id);
+    const baseOrder = prefs.moduleOrder.length ? prefs.moduleOrder : blockIds;
+    const orderedPinned = prefs.pinned.filter(id => moduleElements.has(id));
     const ordered = [
-      ...prefs.pinned.filter(id => moduleElements.has(id)),
+      ...orderedPinned,
       ...baseOrder.filter(id => !pinnedSet.has(id))
     ];
 
@@ -552,7 +848,8 @@ export function mountUI({ root, state }) {
       const matchesCategory = prefs.category === 'all' || el.dataset.category === prefs.category;
       const matchesSearch = !searchTerm || keywords.includes(searchTerm);
       const isHidden = hiddenSet.has(id);
-      const shouldShow = matchesCategory && matchesSearch && (!isHidden || prefs.showHidden);
+      const isDisabled = disabledSet.has(id);
+      const shouldShow = matchesCategory && matchesSearch && (!isHidden && !isDisabled || prefs.showHidden);
       if (shouldShow) {
         el.removeAttribute('hidden');
         el.setAttribute('aria-hidden', 'false');
@@ -561,6 +858,8 @@ export function mountUI({ root, state }) {
         el.setAttribute('aria-hidden', 'true');
       }
       el.classList.toggle('is-hidden', isHidden);
+      el.classList.toggle('is-disabled', isDisabled);
+      el.dataset.disabled = String(isDisabled);
       el.classList.toggle('is-pinned', pinnedSet.has(id));
       const pinBtn = el.querySelector('[data-module-action="toggle-pin"]');
       const hideBtn = el.querySelector('[data-module-action="toggle-hide"]');
@@ -573,6 +872,18 @@ export function mountUI({ root, state }) {
         const hidden = hiddenSet.has(id);
         hideBtn.setAttribute('aria-pressed', String(hidden));
         hideBtn.setAttribute('aria-label', `${hidden ? 'Afficher' : 'Masquer'} le module ${title}`.trim());
+      }
+      const overlay = el.querySelector('.a11ytb-module-overlay');
+      const content = el.querySelector('.a11ytb-module-content');
+      if (overlay) {
+        if (isDisabled && shouldShow) {
+          overlay.hidden = false;
+        } else {
+          overlay.hidden = true;
+        }
+      }
+      if (content) {
+        content.setAttribute('aria-hidden', String(isDisabled));
       }
     });
   }
@@ -948,6 +1259,7 @@ export function mountUI({ root, state }) {
         state.set('ui.pinned', pinned);
         logActivity(`Épingle retirée : ${title}`, { tone: 'toggle' });
       }
+      markProfileAsCustom();
     } else if (btn.dataset.moduleAction === 'toggle-hide') {
       const hidden = Array.isArray(prefs.hidden) ? [...prefs.hidden] : [];
       const index = hidden.indexOf(id);
@@ -962,6 +1274,7 @@ export function mountUI({ root, state }) {
         state.set('ui.hidden', hidden);
         logActivity(`Module affiché : ${title}`, { tone: 'confirm' });
       }
+      markProfileAsCustom();
     }
   });
 
@@ -1017,6 +1330,7 @@ export function mountUI({ root, state }) {
 
   state.on((snapshot) => {
     syncFilters();
+    syncAdminList();
     applyModuleLayout();
     updateActivityLog();
     syncView();
@@ -1026,6 +1340,7 @@ export function mountUI({ root, state }) {
 
   const initialSnapshot = state.get();
   syncFilters();
+  syncAdminList();
   applyModuleLayout();
   updateActivityLog();
   syncView();
