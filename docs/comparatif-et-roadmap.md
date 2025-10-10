@@ -60,7 +60,12 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
    - Mettre en place un **score de conformité** (WCAG niveau AA vs AAA) récapitulant l'état des modules activés.
    - Documenter les **bonnes pratiques d'usage** (notamment limites des modules, contextes recommandés) pour aligner expérience et attentes utilisateurs.
 
-## Étapes court terme
+## Vision produit modulaire (2025-2028)
+
+Cette feuille de route s'articule autour d'une interface d'administration ergonomique : un panneau configurateur drag & drop
+permettant de composer l'expérience utilisateur et de cocher/décocher dynamiquement les modules à charger.
+
+### Phase 0 – Socle (T1-T2 2025)
 
 1. ✅ Concevoir un format `module.json` facultatif pour documenter les métadonnées (implémenté via `src/module-manifest.js` et
    fusion automatique des `defaults`).
@@ -72,18 +77,69 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 7. Lancer un **atelier de design system** : définir palette + composants de base, livrer un kit Figma pour préparer l'implémentation.
 8. Ajouter un **focus trap** et la gestion explicite du cycle de focus pour le panneau d'options.
 
+### Phase 1 – Admin modulaire (T3 2025)
+
+- Développer un **builder drag & drop** pour ordonner les modules et blocs par simple glisser-déposer (support clavier inclus).
+- Introduire des **collections de modules** : regroupements thématiques (lecture, navigation, contraste) avec bascule globale.
+- Implémenter le **chargement conditionnel** : un panneau "Modules disponibles" affichant cases à cocher + état (actif, désactivé,
+  requis par un profil) et appliquant le lazy-loading côté client.
+- Ajouter une vue "Dépendances" dans l'admin, affichant les modules requis avant activation.
+- Versionner les manifestes (`semver`) et exposer un historique des changements dans l'interface.
+
+### Phase 2 – Observabilité et personnalisation avancée (T4 2025 - T1 2026)
+
+- Étendre l'admin avec un **journal temps réel** (filtres par module, export CSV) et notifications en cas d'erreur de chargement.
+- Proposer des **profils dynamiques** configurables par glisser-déposer : l'administrateur compose un profil, définit les options
+  par défaut et choisit quels modules sont cochés au démarrage.
+- Ajouter une **librairie de presets UI** (mises en page du panneau utilisateur) pouvant être activées/désactivées comme les modules.
+- Mettre en place des **tests de régression UX** automatisés (axe clavier, focus trap) intégrés à la CI.
+
+### Phase 3 – Ouverture écosystème (T2-T4 2026)
+
+- Ouvrir un **catalogue de modules** : listing filtrable, badges d'accessibilité, vérification de compatibilité automatique.
+- Autoriser l'installation de modules distants via URL signée, avec écran de revue (permissions, hooks, taille bundle).
+- Ajouter une **sandbox de test** dans l'admin pour prévisualiser un module avant activation globale.
+- Fournir une API d'extension pour configurer des **panneaux personnalisés** (UI slots) dans l'admin drag & drop.
+
+### Phase 4 – Gouvernance et multi-tenant (2027)
+
+- Introduire la notion d'**espaces d'organisation** : plusieurs équipes peuvent gérer leurs listes de modules/profils.
+- Intégrer un **workflow de validation** (brouillon → revue → publication) avec historique des versions.
+- Connecter des **services externes** (Jira, Linear, Slack) pour pousser les audits/access logs depuis l'admin.
+- Mettre à disposition un **SDK de packaging** facilitant la création/validation de modules tiers.
+
+### Phase 5 – Plateforme complète (2028)
+
+- Déployer un **marketplace certifié** et un système de notation communautaire.
+- Ajouter des **tableaux de bord analytics** (usage des modules, performance, conformité WCAG) avec segmentation par profil.
+- Publier un **design system public** synchronisé avec le builder drag & drop, incluant composants React/Web Components.
+- Offrir un **mode audit automatisé** orchestrant l'exécution sélective de modules (axe-core, contrastes, navigation) et
+  consolidant les rapports dans l'admin.
+
+## Étapes court terme
+
+1. Consolider la documentation module (exemples drag & drop, bonnes pratiques de lazy-loading) et la faire valider par les
+   premiers contributeurs externes.
+2. Déployer la première version de l'**interface drag & drop** (Phase 1) en se concentrant sur l'accessibilité clavier et les
+   préférences sauvegardées.
+3. Mettre en place des **tests contractuels** sur le manifest (validation JSON Schema, dépendances cycliques).
+4. Introduire un **switch de chargement différé** par module (coché/décoché) côté runtime pour mesurer l'impact performance.
+5. Documenter un **processus de contribution** pour les modules (template PR, checklist accessibilité, revue design system).
+
 ## Étapes moyen terme
 
-- Scanner d'accessibilité (intégration axe-core ou Pa11y) pour produire des rapports.
-- API plugin distants : charger des modules depuis un CDN signé.
-- Gestion multilingue (i18n) afin de couvrir les marchés ciblés.
+- Scanner d'accessibilité (intégration axe-core ou Pa11y) pour produire des rapports directement dans l'admin.
+- API plugin distants : charger des modules depuis un CDN signé avec mise en quarantaine si la vérification échoue.
+- Gestion multilingue (i18n) afin de couvrir les marchés ciblés et localiser l'interface drag & drop.
 - Parcours guidé d'audit rapide (FastPass-like) avec checklist, indicateurs de progression et export résumé.
 - Synchronisation des préférences utilisateurs via stockage cloud sécurisé pour fiabiliser l'expérience multi-supports.
+- Lancement d'un **programme bêta** pour les modules tiers, incluant audit de sécurité et validation RGPD.
 
 ## Étapes long terme
 
-- Intégration CI/CD (npm package + documentation d'intégration).
-- Tableau de bord analytics (statistiques d'usage des modules) dans le respect RGPD.
+- Intégration CI/CD (npm package + documentation d'intégration) avec scénarios de tests modulaires automatisés.
+- Tableau de bord analytics (statistiques d'usage des modules) dans le respect RGPD, interfaçable avec des outils BI.
 - Publication d'un **design system public** (documentation + composants web) pour favoriser l'écosystème de modules tiers.
+- Mise en place d'un **système de licences** et de partenariats pour les modules premium.
 
-Mise à jour : 2025-10-10
+Mise à jour : 2025-10-15
