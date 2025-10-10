@@ -6,10 +6,17 @@ export function createStore(key, initial) {
     try {
       const raw = localStorage.getItem(key);
       return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
+    } catch (error) {
+      console.warn('a11ytb: impossible de charger l’état depuis le stockage local.', error);
+      return null;
+    }
   }
   function persist() {
-    try { localStorage.setItem(key, JSON.stringify(state)); } catch {}
+    try {
+      localStorage.setItem(key, JSON.stringify(state));
+    } catch (error) {
+      console.warn('a11ytb: impossible d’enregistrer l’état.', error);
+    }
   }
 
   const api = {

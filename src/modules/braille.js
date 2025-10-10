@@ -1,5 +1,19 @@
 import { registerModule } from '../registry.js';
 
+export const manifest = {
+  id: 'braille',
+  name: 'Transcription braille',
+  version: '0.1.0',
+  description: 'Convertit un texte latin simplifié en caractères braille Unicode.',
+  category: 'conversion',
+  keywords: ['braille', 'transcription'],
+  defaults: {
+    state: {
+      braille: { output: '' }
+    }
+  }
+};
+
 const letters = {
   a: 0x2801, b: 0x2803, c: 0x2809, d: 0x2819, e: 0x2811,
   f: 0x280B, g: 0x281B, h: 0x2813, i: 0x280A, j: 0x281A,
@@ -37,7 +51,8 @@ function toBraille(text) {
 }
 
 const braille = {
-  id: 'braille',
+  id: manifest.id,
+  manifest,
   init({ state }) {
     const api = {
       transcribe(text) {

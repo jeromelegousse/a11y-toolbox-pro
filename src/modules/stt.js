@@ -1,9 +1,29 @@
 import { registerModule } from '../registry.js';
 
+export const manifest = {
+  id: 'stt',
+  name: 'Reconnaissance vocale',
+  version: '0.1.0',
+  description: 'Transcrit la voix de l’utilisateur en texte grâce à l’API Web Speech.',
+  category: 'interaction',
+  keywords: ['stt', 'dictée', 'micro'],
+  permissions: ['speechRecognition'],
+  compat: {
+    browsers: ['chrome >= 110', 'edge >= 110'],
+    features: ['SpeechRecognition']
+  },
+  defaults: {
+    state: {
+      stt: { status: 'idle', transcript: '' }
+    }
+  }
+};
+
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 const stt = {
-  id: 'stt',
+  id: manifest.id,
+  manifest,
   init({ state }) {
     let rec = null;
     if (SpeechRecognition) {
@@ -12,9 +32,20 @@ const stt = {
       rec.interimResults = true;
       rec.continuous = true;
 
-      rec.onstart = () => state.set('stt.status', 'listening');
-      rec.onend = () => state.set('stt.status', 'idle');
-      rec.onerror = () => state.set('stt.status', 'error');
+      rec.onstart = () => {
+        state.set('stt.status', 'listening');
+        window.a11ytb?.feedback?.play('confirm');
+        window.a11ytb?.logActivity?.('Reconnaissance vocale démarrée');
+      };
+      rec.onend = () => {
+        state.set('stt.status', 'idle');
+        window.a11ytb?.logActivity?.('Reconnaissance vocale terminée');
+      };
+      rec.onerror = () => {
+        state.set('stt.status', 'error');
+        window.a11ytb?.feedback?.play('alert');
+        window.a11ytb?.logActivity?.('Erreur de reconnaissance vocale', { tone: 'alert' });
+      };
       rec.onresult = (evt) => {
         let final = '';
         for (let i = evt.resultIndex; i < evt.results.length; ++i) {
@@ -26,10 +57,30 @@ const stt = {
 
     const api = {
       start() {
-        if (!rec) { alert('Reconnaissance vocale non disponible.'); return; }
-        try { rec.start(); } catch {}
+        if (!rec) {
+          state.set('stt.status', 'unsupported');
+          console.warn('a11ytb: reconnaissance vocale indisponible sur ce navigateur.');
+          window.a11ytb?.logActivity?.('Reconnaissance vocale indisponible', { tone: 'alert' });
+          return;
+        }
+        try {
+          rec.start();
+        } catch (error) {
+          console.warn('a11ytb: impossible de démarrer la reconnaissance vocale.', error);
+          window.a11ytb?.logActivity?.('Échec du démarrage STT', { tone: 'alert' });
+        }
       },
-      stop() { if (rec) try { rec.stop(); } catch {} }
+      stop() {
+        if (!rec) return;
+        try {
+          rec.stop();
+          window.a11ytb?.feedback?.play('toggle');
+          window.a11ytb?.logActivity?.('Reconnaissance vocale stoppée');
+        } catch (error) {
+          console.warn('a11ytb: impossible d’arrêter la reconnaissance vocale.', error);
+          window.a11ytb?.logActivity?.('Échec de l’arrêt STT', { tone: 'alert' });
+        }
+      }
     };
 
     if (!window.a11ytb) window.a11ytb = {};
