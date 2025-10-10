@@ -1,0 +1,41 @@
+{
+  "$metadata": {
+    "version": "0.1.0",
+    "generated": "2025-10-10",
+    "source": "docs/design-system-workshop.md"
+  },
+  "color": {
+    "bg": { "value": "#0F172A", "type": "color", "description": "Fond principal" },
+    "surface": { "value": "#111827", "type": "color", "description": "Panneau" },
+    "surface-alt": { "value": "#1F2937", "type": "color", "description": "Carte secondaire" },
+    "primary": { "value": "#38BDF8", "type": "color", "description": "Action principale" },
+    "primary-strong": { "value": "#0EA5E9", "type": "color", "description": "Hover/Focus" },
+    "accent": { "value": "#22C55E", "type": "color", "description": "Succès" },
+    "warning": { "value": "#F59E0B", "type": "color", "description": "Attention" },
+    "danger": { "value": "#F97316", "type": "color", "description": "Critique" },
+    "text": { "value": "#F8FAFC", "type": "color", "description": "Texte principal" },
+    "text-muted": { "value": "#CBD5F5", "type": "color", "description": "Texte secondaire" },
+    "border": { "value": "#334155", "type": "color", "description": "Séparateurs" }
+  },
+  "radius": {
+    "sm": { "value": "6", "type": "dimension" },
+    "lg": { "value": "12", "type": "dimension" }
+  },
+  "space": {
+    "unit": { "value": "8", "type": "dimension" },
+    "2x": { "value": "16", "type": "dimension" },
+    "3x": { "value": "24", "type": "dimension" }
+  },
+  "font": {
+    "family-sans": {
+      "type": "typography",
+      "value": {
+        "fontFamily": "Inter",
+        "fontWeight": "Regular",
+        "fontSize": 16,
+        "lineHeight": 1.5,
+        "letterSpacing": 0
+      }
+    }
+  }
+}
