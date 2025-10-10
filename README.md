@@ -9,6 +9,11 @@
 
 Ouvrez `index.html` dans un navigateur moderne (Alt+Shift+A pour ouvrir).
 
+## Documentation produit
+
+- [Comparatif et roadmap](docs/comparatif-et-roadmap.md) — synthèse des écarts avec les solutions professionnelles et priorisation des évolutions.
+- [Guide de modules](docs/module-guide.md) — conventions pour créer et maintenir des modules/blocs sans casser l'existant.
+
 ## Qualité du code
 
 Des scripts npm sont disponibles pour vérifier la qualité :
