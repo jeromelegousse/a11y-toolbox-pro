@@ -11,6 +11,15 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 | **Stark** | Vérifications contraste/couleurs, simulation Daltonisme, export Figma/Sketch, collaboration équipe | Outil design + produit |
 | **EqualWeb / accessiBe toolbars** | Barre flottante grand public, personnalisation UI (taille texte, espacement, curseurs, TTS), profils pré-configurés | Ciblent l'utilisateur final |
 
+### Analyse détaillée par axe
+
+| Axe | Forces des solutions pro | État actuel A11y Toolbox Pro | Pistes rapides |
+| --- | --- | --- | --- |
+| **UX / UI** | Parcours guidés, microcopie pédagogique, hiérarchie d'information claire (axe Insights, Stark) | Panneau unique avec options listées sans priorisation ni guidance | Prioriser les actions critiques, ajouter onboarding contextualisé et exemples d'usage |
+| **Ergonomie** | Navigation clavier fluide, focus trap dans les dialogues, raccourcis cohérents, feedback état chargement | Quelques raccourcis globaux, focus partiellement géré dans le panneau | Harmoniser les patterns clavier, afficher la liste des raccourcis, ajouter indicateurs de statut (chargement/sauvegarde) |
+| **Fiabilité** | Tests automatisés (axe core), reporting d'erreurs, synchronisation cloud, compatibilité multi-navigateurs | Démo locale sans pipeline de tests, journal local uniquement | Ajouter tests unitaires + e2e, gestion offline/erreurs, fallback progressif sur features vocales |
+| **Design** | Design systems documentés, tokens (couleurs, espace), mode sombre cohérent | Styles ad hoc par module, contraste variable, icônes hétérogènes | Définir tokens de base, bibliothèque d'icônes accessible, mode sombre clair | 
+
 ## Écarts actuels
 
 - **Portée fonctionnelle** : la démo couvre surtout quelques actions temps réel (TTS, STT, contraste, espacement) mais n'exécute ni audit automatique ni export de rapports comme axe DevTools ou Accessibility Insights.
@@ -36,13 +45,20 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
    - Options avancées : sélection voix TTS, vitesse par défaut, choix de dictionnaire braille, personnalisation raccourcis.
    - Paramétrage contextuel : permettre aux modules de déclarer leurs paramètres et d'afficher un panneau commun (comparable à Stark qui centralise la configuration contraste/vision).
 
-4. **Collaboration et observabilité**
+4. **Améliorer l'expérience utilisateur et la cohérence visuelle**
+   - Mettre en place des **parcours guidés** (checklist pas à pas) inspirés des FastPass d'Accessibility Insights pour aider les nouveaux utilisateurs à configurer la boîte à outils.
+   - Ajouter une **microcopie d'aide** (tooltips, exemples) pour chaque option critique afin de réduire la charge cognitive.
+   - Construire un **design system minimal** : palette accessible, échelles de spacing/typo, composants (boutons, input, toggles) mutualisés.
+   - Définir un **mode sombre** et garantir une cohérence icône/illustration (SVG optimisés, lignes de 1.5px, labels visibles).
+
+5. **Collaboration et observabilité**
    - Étendre `window.a11ytb.logActivity` pour exposer un journal exportable (JSON/CSV) et un système de tags (module, gravité).
    - Prévoir des connecteurs d'export (copie presse-papiers, webhook) pour se rapprocher des intégrations axe/Insights.
 
-5. **Conformité et UX**
+6. **Conformité et UX**
    - Ajouter une vérification de compatibilité navigateur (p. ex. fallback lorsqu'`speechSynthesis` est indisponible est déjà gérée mais pourrait être propagée sous forme d'état global `compat.features`).
-   - Définir un design system léger pour garantir la cohérence visuelle entre modules.
+   - Mettre en place un **score de conformité** (WCAG niveau AA vs AAA) récapitulant l'état des modules activés.
+   - Documenter les **bonnes pratiques d'usage** (notamment limites des modules, contextes recommandés) pour aligner expérience et attentes utilisateurs.
 
 ## Étapes court terme
 
@@ -53,16 +69,21 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 4. ✅ Étendre `window.a11ytb.logActivity` pour exposer un journal exportable (JSON/CSV) et des tags (module, gravité).
 5. Documenter le guide module (voir `docs/module-guide.md`).
 6. Mettre en place des tests automatisés (lint déjà dispo) et prévoir des tests visuels/screenshot pour les nouveaux blocs.
+7. Lancer un **atelier de design system** : définir palette + composants de base, livrer un kit Figma pour préparer l'implémentation.
+8. Ajouter un **focus trap** et la gestion explicite du cycle de focus pour le panneau d'options.
 
 ## Étapes moyen terme
 
 - Scanner d'accessibilité (intégration axe-core ou Pa11y) pour produire des rapports.
 - API plugin distants : charger des modules depuis un CDN signé.
 - Gestion multilingue (i18n) afin de couvrir les marchés ciblés.
+- Parcours guidé d'audit rapide (FastPass-like) avec checklist, indicateurs de progression et export résumé.
+- Synchronisation des préférences utilisateurs via stockage cloud sécurisé pour fiabiliser l'expérience multi-supports.
 
 ## Étapes long terme
 
-- Intégration CI/CD (npm package + documentation d'intégration). 
+- Intégration CI/CD (npm package + documentation d'intégration).
 - Tableau de bord analytics (statistiques d'usage des modules) dans le respect RGPD.
+- Publication d'un **design system public** (documentation + composants web) pour favoriser l'écosystème de modules tiers.
 
 Mise à jour : 2025-10-10
