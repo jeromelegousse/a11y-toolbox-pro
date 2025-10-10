@@ -28,6 +28,9 @@ objet `manifest` passé à `registerModule`. Les objectifs :
 
 Les champs inconnus sont ignorés avec un avertissement console pour éviter les fautes de frappe.
 
+> Astuce : `config.fields` accepte aujourd’hui les types `range`, `toggle` et `select`. Chaque champ doit définir `path` (clé du
+> store) et `label`. Les fonctions `format`, `onChange` et `getOptions` sont supportées pour personnaliser le rendu.
+
 ## Flux de validation
 
 1. Chaque module importe `registerModule` et lui passe `manifest` avec `id` identique.

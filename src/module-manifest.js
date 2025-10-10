@@ -79,6 +79,110 @@ function normalizeCompat(compat) {
   return Object.keys(normalized).length ? normalized : undefined;
 }
 
+function normalizeConfig(config, manifestId) {
+  if (!config || typeof config !== 'object') return undefined;
+
+  const normalized = {};
+  if (typeof config.group === 'string' && config.group.trim()) {
+    normalized.group = config.group.trim();
+  }
+  if (typeof config.description === 'string' && config.description.trim()) {
+    normalized.description = config.description.trim();
+  }
+
+  const fields = Array.isArray(config.fields) ? config.fields : [];
+  const normalizedFields = [];
+
+  fields.forEach((field, index) => {
+    if (!field || typeof field !== 'object') {
+      console.warn(`a11ytb: champ de configuration ignoré pour "${manifestId}" (index ${index}).`);
+      return;
+    }
+    const type = typeof field.type === 'string' ? field.type.trim() : '';
+    const path = typeof field.path === 'string' ? field.path.trim() : '';
+    if (!type || !path) {
+      console.warn(`a11ytb: champ de configuration invalide pour "${manifestId}" (index ${index}).`);
+      return;
+    }
+
+    const normalizedField = { type, path };
+    if (typeof field.label === 'string' && field.label.trim()) {
+      normalizedField.label = field.label.trim();
+    }
+    if (typeof field.description === 'string' && field.description.trim()) {
+      normalizedField.description = field.description.trim();
+    }
+    if (typeof field.format === 'function') {
+      normalizedField.format = field.format;
+    }
+    if (typeof field.onChange === 'function') {
+      normalizedField.onChange = field.onChange;
+    }
+    if (typeof field.getOptions === 'function') {
+      normalizedField.getOptions = field.getOptions;
+    }
+    if (typeof field.emptyLabel === 'string' && field.emptyLabel.trim()) {
+      normalizedField.emptyLabel = field.emptyLabel.trim();
+    }
+
+    switch (type) {
+      case 'range': {
+        const min = Number(field.min);
+        const max = Number(field.max);
+        if (Number.isNaN(min) || Number.isNaN(max)) {
+          console.warn(`a11ytb: champ de configuration "${path}" nécessite min/max numériques.`);
+          return;
+        }
+        normalizedField.min = min;
+        normalizedField.max = max;
+        if (field.step !== undefined) {
+          const step = Number(field.step);
+          if (!Number.isNaN(step) && step > 0) {
+            normalizedField.step = step;
+          }
+        }
+        if (typeof field.unit === 'string' && field.unit.trim()) {
+          normalizedField.unit = field.unit.trim();
+        }
+        break;
+      }
+      case 'toggle': {
+        if (field.trueValue !== undefined) normalizedField.trueValue = field.trueValue;
+        if (field.falseValue !== undefined) normalizedField.falseValue = field.falseValue;
+        break;
+      }
+      case 'select': {
+        if (!normalizedField.getOptions) {
+          const options = ensureArray(field.options, (option) => {
+            if (!option || typeof option !== 'object') return undefined;
+            const value = 'value' in option ? option.value : option.id;
+            if (value === undefined || value === null) return undefined;
+            const label = typeof option.label === 'string' ? option.label.trim() : String(value);
+            return { value, label };
+          });
+          if (options?.length) {
+            normalizedField.options = options;
+          } else {
+            console.warn(`a11ytb: champ de configuration "${path}" nécessite des options.`);
+            return;
+          }
+        }
+        break;
+      }
+      default: {
+        console.warn(`a11ytb: type de champ de configuration inconnu "${type}" pour "${manifestId}".`);
+        return;
+      }
+    }
+
+    normalizedFields.push(Object.freeze(normalizedField));
+  });
+
+  if (!normalizedFields.length) return undefined;
+  normalized.fields = Object.freeze(normalizedFields);
+  return Object.freeze(normalized);
+}
+
 export function validateModuleManifest(manifest, moduleId) {
   if (!manifest || typeof manifest !== 'object') {
     throw new Error('Module manifest must be an object.');
@@ -196,7 +300,8 @@ export function validateModuleManifest(manifest, moduleId) {
   }
 
   if (manifest.config && typeof manifest.config === 'object') {
-    normalized.config = structuredClone(manifest.config);
+    const config = normalizeConfig(manifest.config, id);
+    if (config) normalized.config = config;
   }
 
   const compat = normalizeCompat(manifest.compat);
