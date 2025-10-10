@@ -13,9 +13,10 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.42.1",
-    "http-server": "^14.1.1",
     "eslint": "^8.57.0",
     "eslint-plugin-import": "^2.29.1",
+    "http-server": "^14.1.1",
+    "iconv-lite": "^0.6.3",
     "stylelint": "^15.11.0",
     "stylelint-config-standard": "^34.0.0",
     "vitest": "^1.6.0"

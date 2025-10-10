@@ -82,7 +82,15 @@ test.describe('Panneau Options & Profils', () => {
   test('capture visuelle du panneau', async ({ page }) => {
     const panel = page.locator('.a11ytb-panel');
     await expect(panel).toBeVisible();
+    await page.evaluate(() => {
+      const active = document.activeElement;
+      if (active && 'blur' in active) {
+        active.blur();
+      }
+    });
+    await page.waitForTimeout(50);
     const screenshot = await panel.screenshot({
+      animations: 'disabled',
       mask: [page.locator('.a11ytb-activity-list')],
       maskColor: '#000'
     });
