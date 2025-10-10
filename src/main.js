@@ -16,8 +16,11 @@ const baseInitial = {
     search: '',
     pinned: [],
     hidden: [],
+    disabled: [],
+    moduleOrder: [],
     showHidden: false,
-    activity: []
+    activity: [],
+    activeProfile: 'custom'
   }
 };
 
@@ -55,8 +58,11 @@ const ensureDefaults = [
   ['ui.search', initial.ui.search],
   ['ui.pinned', initial.ui.pinned],
   ['ui.hidden', initial.ui.hidden],
+  ['ui.disabled', initial.ui.disabled],
+  ['ui.moduleOrder', initial.ui.moduleOrder],
   ['ui.showHidden', initial.ui.showHidden],
   ['ui.activity', initial.ui.activity],
+  ['ui.activeProfile', initial.ui.activeProfile],
   ['tts.progress', initial.tts.progress]
 ];
 
@@ -72,6 +78,12 @@ state.on(s => {
 
 const root = document.getElementById('a11ytb-root');
 mountUI({ root, state });
+
+function markProfileCustom() {
+  if (state.get('ui.activeProfile') !== 'custom') {
+    state.set('ui.activeProfile', 'custom');
+  }
+}
 
 registerBlock({
   id: 'tts-controls',
@@ -110,6 +122,7 @@ registerBlock({
     sliders.forEach(inp => {
       inp.addEventListener('input', () => {
         state.set(`tts.${inp.dataset.bind}`, inp.valueAsNumber || parseFloat(inp.value));
+        markProfileCustom();
       });
     });
     const statusNode = root.querySelector('[data-ref="status"]');
@@ -262,6 +275,7 @@ registerBlock({
     btn.addEventListener('click', () => {
       const enabled = !(state.get('contrast.enabled'));
       state.set('contrast.enabled', enabled);
+      markProfileCustom();
       window.a11ytb?.feedback?.play('toggle');
       window.a11ytb?.logActivity?.(`Contraste élevé ${enabled ? 'activé' : 'désactivé'}`);
     });
@@ -299,10 +313,12 @@ registerBlock({
         state.set(`spacing.${key}`, val);
         document.documentElement.style.setProperty('--a11ytb-lh', String(state.get('spacing.lineHeight')));
         document.documentElement.style.setProperty('--a11ytb-ls', String(state.get('spacing.letterSpacing')) + 'em');
+        markProfileCustom();
       });
       inp.addEventListener('change', () => {
         const val = inp.valueAsNumber || parseFloat(inp.value);
         state.set(`spacing.${key}`, val);
+        markProfileCustom();
         if (key === 'lineHeight') {
           window.a11ytb?.logActivity?.(`Interlignage ajusté à ${val.toFixed(1)}`);
         } else {

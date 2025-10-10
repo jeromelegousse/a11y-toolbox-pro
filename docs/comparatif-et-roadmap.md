@@ -48,8 +48,8 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 
 1. ✅ Concevoir un format `module.json` facultatif pour documenter les métadonnées (implémenté via `src/module-manifest.js` et
    fusion automatique des `defaults`).
-2. Ajouter des profils d'accessibilité préconfigurés au store initial (ex : `state.tx({ profiles: {...} })`).
-3. Centraliser la gestion des options (panneau dédié) et permettre à chaque module d'y injecter ses champs.
+2. ✅ Ajouter des profils d'accessibilité préconfigurés au store initial (ex : `state.tx({ profiles: {...} })`).
+3. ⏳ Centraliser la gestion des options (panneau dédié) et permettre à chaque module d'y injecter ses champs — premier jalon : panneau d’administration avec activation/désactivation des modules et profils appliqués depuis l’UI.
 4. Documenter le guide module (voir `docs/module-guide.md`).
 5. Mettre en place des tests automatisés (lint déjà dispo) et prévoir des tests visuels/screenshot pour les nouveaux blocs.
 

@@ -2,6 +2,8 @@ import { validateModuleManifest } from './module-manifest.js';
 
 const _modules = new Map();
 const _moduleManifests = new Map();
+const PLACEHOLDER_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 3a2 2 0 11-2 2 2 2 0 012-2zm0 4a1 1 0 011 1v8a1 1 0 01-2 0V10a1 1 0 011-1z"/></svg>';
+export const DEFAULT_BLOCK_ICON = PLACEHOLDER_ICON;
 
 export function registerModule(definition) {
   if (!definition || typeof definition !== 'object') {
@@ -66,9 +68,11 @@ export function renderBlock(block, state, root) {
 
   const header = document.createElement('header');
   header.className = 'a11ytb-module-header';
+  const iconMarkup = block.icon || PLACEHOLDER_ICON;
+
   header.innerHTML = `
     <div class="a11ytb-module-title">
-      ${block.icon ? `<span class="a11ytb-module-icon" aria-hidden="true">${block.icon}</span>` : ''}
+      <span class="a11ytb-module-icon" aria-hidden="true">${iconMarkup}</span>
       <span class="a11ytb-module-label">${block.title || ''}</span>
     </div>
     <div class="a11ytb-module-controls" role="group" aria-label="Actions du module">
@@ -85,7 +89,18 @@ export function renderBlock(block, state, root) {
   content.className = 'a11ytb-module-content';
   content.innerHTML = block.render(state);
 
-  el.append(header, content);
+  const disabledOverlay = document.createElement('div');
+  disabledOverlay.className = 'a11ytb-module-overlay';
+  disabledOverlay.innerHTML = `
+    <div class="a11ytb-module-overlay-inner">
+      <span class="a11ytb-module-overlay-icon" aria-hidden="true">${PLACEHOLDER_ICON}</span>
+      <span>Module désactivé</span>
+    </div>
+  `;
+  disabledOverlay.setAttribute('role', 'status');
+  disabledOverlay.hidden = true;
+
+  el.append(header, content, disabledOverlay);
 
   if (typeof block.wire === 'function') block.wire({ root: el, state });
   root.appendChild(el);
