@@ -1,6 +1,7 @@
 import { createStore } from './store.js';
 import { mountUI } from './ui.js';
 import { registerBlock } from './registry.js';
+import { createFeedback } from './feedback.js';
 import './modules/tts.js';
 import './modules/stt.js';
 import './modules/braille.js';
@@ -8,12 +9,32 @@ import './modules/contrast.js';
 import './modules/spacing.js';
 
 const initial = {
-  ui: { dock: 'right' },
-  tts: { rate: 1, pitch: 1, volume: 1, speaking: false, status: 'idle' },
+  ui: {
+    dock: 'right',
+    category: 'all',
+    search: '',
+    pinned: [],
+    hidden: [],
+    showHidden: false,
+    activity: []
+  },
+  tts: { rate: 1, pitch: 1, volume: 1, speaking: false, status: 'idle', progress: 0 },
   stt: { status: 'idle', transcript: '' },
   braille: { output: '' },
   contrast: { enabled: false },
   spacing: { lineHeight: 1.5, letterSpacing: 0 }
+};
+
+const feedback = createFeedback();
+if (!window.a11ytb) window.a11ytb = {};
+window.a11ytb.feedback = feedback;
+
+const moduleIcons = {
+  tts: '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 9v6h3l4 4V5L7 9H4zm13 3a3 3 0 00-3-3v6a3 3 0 003-3zm-3-6.9v2.07a5 5 0 010 9.66V18a7 7 0 000-13.9z"/></svg>',
+  stt: '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3zm5-3a1 1 0 012 0 7 7 0 01-6 6.92V21h3v1H8v-1h3v-3.08A7 7 0 015 11a1 1 0 012 0 5 5 0 0010 0z"/></svg>',
+  braille: '<svg viewBox="0 0 24 24" focusable="false"><path d="M6 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4zm12-14a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4z"/></svg>',
+  contrast: '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 2a10 10 0 100 20V2z"/></svg>',
+  spacing: '<svg viewBox="0 0 24 24" focusable="false"><path d="M7 4h10v2H7V4zm-2 5h14v2H5V9zm3 5h8v2H8v-2zm-3 5h14v2H5v-2z"/></svg>'
 };
 
 function ttsStatusMessage(status) {
@@ -28,6 +49,21 @@ function ttsStatusMessage(status) {
 }
 
 const state = createStore('a11ytb/v1', initial);
+const ensureDefaults = [
+  ['ui.category', initial.ui.category],
+  ['ui.search', initial.ui.search],
+  ['ui.pinned', initial.ui.pinned],
+  ['ui.hidden', initial.ui.hidden],
+  ['ui.showHidden', initial.ui.showHidden],
+  ['ui.activity', initial.ui.activity],
+  ['tts.progress', initial.tts.progress]
+];
+
+ensureDefaults.forEach(([path, fallback]) => {
+  if (state.get(path) === undefined) {
+    state.set(path, Array.isArray(fallback) ? [...fallback] : fallback);
+  }
+});
 document.documentElement.dataset.dock = state.get('ui.dock') || 'right';
 state.on(s => {
   if (s.ui?.dock) document.documentElement.dataset.dock = s.ui.dock;
@@ -38,20 +74,28 @@ mountUI({ root, state });
 
 registerBlock({
   id: 'tts-controls',
+  title: 'Lecture vocale (TTS)',
+  icon: moduleIcons.tts,
+  category: 'lecture',
+  keywords: ['voix', 'lecture', 'audio'],
   render: (state) => {
     const s = state.get();
     const statusMessage = ttsStatusMessage(s.tts.status);
-    const statusMarkup = `
-      <p class="a11ytb-note" role="status" data-ref="status"${statusMessage ? '' : ' hidden'}>${statusMessage}</p>
-    `;
+    const percent = Math.round((s.tts.progress || 0) * 100);
     return `
-      <h3>Lecture vocale (TTS)</h3>
-      <div class="row">
+      <div class="a11ytb-row">
         <button class="a11ytb-button" data-action="speak-selection">Lire la sélection</button>
         <button class="a11ytb-button" data-action="speak-page">Lire la page</button>
         <button class="a11ytb-button" data-action="stop">Stop</button>
       </div>
-      ${statusMarkup}
+      <div class="a11ytb-status-line">
+        <span class="a11ytb-badge" data-ref="badge"${s.tts.status === 'speaking' ? '' : ' hidden'}>Lecture en cours</span>
+        <div class="a11ytb-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}" data-ref="progress"${s.tts.status === 'speaking' ? '' : ' hidden'}>
+          <span class="a11ytb-progress-bar" style="width: ${percent}%"></span>
+        </div>
+        <span class="a11ytb-progress-label" data-ref="progress-label"${s.tts.status === 'speaking' ? '' : ' hidden'}>${percent}%</span>
+      </div>
+      <p class="a11ytb-note" role="status" data-ref="status"${statusMessage ? '' : ' hidden'}>${statusMessage}</p>
       <label>Vitesse <input type="range" min="0.5" max="2" step="0.1" value="${s.tts.rate}" data-bind="rate"></label>
       <label>Timbre <input type="range" min="0" max="2" step="0.1" value="${s.tts.pitch}" data-bind="pitch"></label>
       <label>Volume <input type="range" min="0" max="1" step="0.05" value="${s.tts.volume}" data-bind="volume"></label>
@@ -61,7 +105,8 @@ registerBlock({
     root.querySelector('[data-action="speak-selection"]').addEventListener('click', () => window.speakSelection());
     root.querySelector('[data-action="speak-page"]').addEventListener('click', () => window.speakPage());
     root.querySelector('[data-action="stop"]').addEventListener('click', () => window.stopSpeaking());
-    root.querySelectorAll('input[data-bind]').forEach(inp => {
+    const sliders = root.querySelectorAll('input[data-bind]');
+    sliders.forEach(inp => {
       inp.addEventListener('input', () => {
         state.set(`tts.${inp.dataset.bind}`, inp.valueAsNumber || parseFloat(inp.value));
       });
@@ -78,19 +123,65 @@ registerBlock({
         }
       });
     }
+    const badge = root.querySelector('[data-ref="badge"]');
+    const progress = root.querySelector('[data-ref="progress"]');
+    const progressLabel = root.querySelector('[data-ref="progress-label"]');
+    state.on(s => {
+      const speaking = s.tts.status === 'speaking';
+      const percent = Math.round((s.tts.progress || 0) * 100);
+      if (badge) {
+        if (speaking) {
+          badge.removeAttribute('hidden');
+        } else {
+          badge.setAttribute('hidden', '');
+        }
+      }
+      if (progress) {
+        if (speaking) {
+          progress.removeAttribute('hidden');
+          progress.setAttribute('aria-valuenow', String(percent));
+          progress.setAttribute('aria-valuetext', `${percent}%`);
+          const bar = progress.querySelector('.a11ytb-progress-bar');
+          if (bar) bar.style.width = `${percent}%`;
+        } else {
+          progress.setAttribute('hidden', '');
+        }
+      }
+      if (progressLabel) {
+        if (speaking) {
+          progressLabel.textContent = `${percent}%`;
+          progressLabel.removeAttribute('hidden');
+        } else {
+          progressLabel.setAttribute('hidden', '');
+        }
+      }
+      sliders.forEach(inp => {
+        const key = inp.dataset.bind;
+        const val = s.tts[key];
+        if (typeof val === 'number' && document.activeElement !== inp) {
+          inp.value = String(val);
+        }
+      });
+    });
   }
 });
 
 registerBlock({
   id: 'stt-controls',
+  title: 'Reconnaissance vocale (STT)',
+  icon: moduleIcons.stt,
+  category: 'interaction',
+  keywords: ['dictée', 'micro', 'voix'],
   render: (state) => {
     const s = state.get();
     return `
-      <h3>Reconnaissance vocale (STT)</h3>
-      <div class="row">
+      <div class="a11ytb-row">
         <button class="a11ytb-button" data-action="start">Démarrer</button>
         <button class="a11ytb-button" data-action="stop">Arrêter</button>
-        <span>Status&nbsp;: <strong data-ref="status">${s.stt.status}</strong></span>
+      </div>
+      <div class="a11ytb-status-line">
+        <span class="a11ytb-badge" data-ref="badge"${s.stt.status === 'listening' ? '' : ' hidden'}>Écoute en cours</span>
+        <span class="a11ytb-status-text">Statut&nbsp;: <strong data-ref="status">${s.stt.status}</strong></span>
       </div>
       <textarea rows="3" style="width:100%" placeholder="Transcription..." data-ref="txt">${s.stt.transcript}</textarea>
     `;
@@ -98,43 +189,70 @@ registerBlock({
   wire: ({ root, state }) => {
     const txt = root.querySelector('[data-ref="txt"]');
     const statusEl = root.querySelector('[data-ref="status"]');
+    const badge = root.querySelector('[data-ref="badge"]');
     root.querySelector('[data-action="start"]').addEventListener('click', () => window.a11ytb?.stt?.start?.());
     root.querySelector('[data-action="stop"]').addEventListener('click', () => window.a11ytb?.stt?.stop?.());
     state.on(s => {
       txt.value = s.stt.transcript || '';
       if (statusEl) statusEl.textContent = s.stt.status;
+      if (badge) {
+        if (s.stt.status === 'listening') {
+          badge.removeAttribute('hidden');
+        } else {
+          badge.setAttribute('hidden', '');
+        }
+      }
     });
   }
 });
 
 registerBlock({
   id: 'braille-controls',
+  title: 'Braille',
+  icon: moduleIcons.braille,
+  category: 'lecture',
+  keywords: ['braille', 'lecture tactile'],
   render: (state) => {
     const s = state.get();
     return `
-      <h3>Braille</h3>
-      <div class="row">
+      <div class="a11ytb-row">
         <button class="a11ytb-button" data-action="sel">Transcrire la sélection</button>
         <button class="a11ytb-button" data-action="clear">Effacer</button>
       </div>
-      <div aria-live="polite">Sortie&nbsp;:</div>
+      <div class="a11ytb-status-line">
+        <span class="a11ytb-badge" data-ref="badge"${s.braille.output ? '' : ' hidden'}>Sortie prête</span>
+        <span aria-live="polite" class="a11ytb-status-text">Sortie&nbsp;:</span>
+      </div>
       <textarea rows="3" style="width:100%" readonly data-ref="out">${s.braille.output || ''}</textarea>
     `;
   },
   wire: ({ root, state }) => {
     const out = root.querySelector('[data-ref="out"]');
+    const badge = root.querySelector('[data-ref="badge"]');
     root.querySelector('[data-action="sel"]').addEventListener('click', () => window.brailleSelection());
     root.querySelector('[data-action="clear"]').addEventListener('click', () => window.clearBraille());
-    state.on(s => { out.value = s.braille.output || ''; });
+    state.on(s => {
+      out.value = s.braille.output || '';
+      if (badge) {
+        if (s.braille.output) {
+          badge.removeAttribute('hidden');
+        } else {
+          badge.setAttribute('hidden', '');
+        }
+      }
+    });
   }
 });
 
 registerBlock({
   id: 'contrast-controls',
+  title: 'Contraste élevé',
+  icon: moduleIcons.contrast,
+  category: 'vision',
+  keywords: ['vision', 'contraste'],
   render: (state) => {
     const s = state.get();
     return `
-      <h3>Contraste élevé</h3>
       <button class="a11ytb-button" data-action="toggle" aria-pressed="${s.contrast.enabled}">${s.contrast.enabled ? 'Désactiver' : 'Activer'}</button>
     `;
   },
@@ -143,35 +261,65 @@ registerBlock({
     btn.addEventListener('click', () => {
       const enabled = !(state.get('contrast.enabled'));
       state.set('contrast.enabled', enabled);
+      window.a11ytb?.feedback?.play('toggle');
+      window.a11ytb?.logActivity?.(`Contraste élevé ${enabled ? 'activé' : 'désactivé'}`);
+    });
+    state.on(s => {
+      const enabled = !!s.contrast.enabled;
       document.documentElement.classList.toggle('a11ytb-contrast', enabled);
       btn.textContent = enabled ? 'Désactiver' : 'Activer';
       btn.setAttribute('aria-pressed', String(enabled));
     });
+    const initial = !!state.get('contrast.enabled');
+    document.documentElement.classList.toggle('a11ytb-contrast', initial);
+    btn.textContent = initial ? 'Désactiver' : 'Activer';
+    btn.setAttribute('aria-pressed', String(initial));
   }
 });
 
 registerBlock({
   id: 'spacing-controls',
+  title: 'Espacements',
+  icon: moduleIcons.spacing,
+  category: 'vision',
+  keywords: ['espacements', 'typographie'],
   render: (state) => {
     const s = state.get();
     return `
-      <h3>Espacements</h3>
       <label>Interlignage <input type="range" min="1" max="2.4" step="0.1" value="${s.spacing.lineHeight}" data-bind="lineHeight"></label>
       <label>Espacement des lettres <input type="range" min="0" max="0.2" step="0.01" value="${s.spacing.letterSpacing}" data-bind="letterSpacing"></label>
     `;
   },
   wire: ({ root, state }) => {
     root.querySelectorAll('input[data-bind]').forEach(inp => {
+      const key = inp.dataset.bind;
       inp.addEventListener('input', () => {
-        const key = inp.dataset.bind;
         const val = inp.valueAsNumber || parseFloat(inp.value);
         state.set(`spacing.${key}`, val);
         document.documentElement.style.setProperty('--a11ytb-lh', String(state.get('spacing.lineHeight')));
         document.documentElement.style.setProperty('--a11ytb-ls', String(state.get('spacing.letterSpacing')) + 'em');
       });
+      inp.addEventListener('change', () => {
+        const val = inp.valueAsNumber || parseFloat(inp.value);
+        state.set(`spacing.${key}`, val);
+        if (key === 'lineHeight') {
+          window.a11ytb?.logActivity?.(`Interlignage ajusté à ${val.toFixed(1)}`);
+        } else {
+          window.a11ytb?.logActivity?.(`Espacement des lettres ajusté à ${(val * 100).toFixed(0)}%`);
+        }
+        window.a11ytb?.feedback?.play('toggle');
+      });
     });
     document.documentElement.style.setProperty('--a11ytb-lh', String(state.get('spacing.lineHeight')));
     document.documentElement.style.setProperty('--a11ytb-ls', String(state.get('spacing.letterSpacing')) + 'em');
     document.documentElement.classList.add('a11ytb-spacing-ready');
+    state.on(s => {
+      const lh = root.querySelector('[data-bind="lineHeight"]');
+      const ls = root.querySelector('[data-bind="letterSpacing"]');
+      if (lh && document.activeElement !== lh) lh.value = s.spacing.lineHeight;
+      if (ls && document.activeElement !== ls) ls.value = s.spacing.letterSpacing;
+      document.documentElement.style.setProperty('--a11ytb-lh', String(s.spacing.lineHeight));
+      document.documentElement.style.setProperty('--a11ytb-ls', String(s.spacing.letterSpacing) + 'em');
+    });
   }
 });
