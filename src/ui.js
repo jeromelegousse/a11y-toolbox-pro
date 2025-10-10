@@ -1,6 +1,13 @@
 import { listBlocks, renderBlock } from './registry.js';
 
 export function mountUI({ root, state }) {
+  const categories = [
+    { id: 'all', label: 'Tous' },
+    { id: 'vision', label: 'Vision' },
+    { id: 'lecture', label: 'Lecture' },
+    { id: 'interaction', label: 'Interaction' }
+  ];
+
   const fab = document.createElement('button');
   fab.className = 'a11ytb-fab';
   fab.setAttribute('aria-label', 'Ouvrir la boîte à outils d’accessibilité');
@@ -66,13 +73,193 @@ export function mountUI({ root, state }) {
   const body = document.createElement('div');
   body.className = 'a11ytb-body';
 
+  const filters = document.createElement('div');
+  filters.className = 'a11ytb-filters';
+
+  const categoryBar = document.createElement('div');
+  categoryBar.className = 'a11ytb-category-bar';
+  categories.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'a11ytb-chip';
+    btn.dataset.category = cat.id;
+    btn.textContent = cat.label;
+    btn.setAttribute('aria-pressed', 'false');
+    btn.addEventListener('click', () => {
+      state.set('ui.category', cat.id);
+    });
+    categoryBar.append(btn);
+  });
+
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.className = 'a11ytb-search';
+  search.placeholder = 'Rechercher un module';
+  search.setAttribute('aria-label', 'Rechercher un module');
+  search.value = state.get('ui.search') || '';
+  search.addEventListener('input', () => {
+    state.set('ui.search', search.value);
+  });
+
+  const hiddenToggle = document.createElement('button');
+  hiddenToggle.type = 'button';
+  hiddenToggle.className = 'a11ytb-chip a11ytb-chip--ghost';
+  hiddenToggle.dataset.action = 'toggle-hidden';
+  hiddenToggle.setAttribute('aria-pressed', 'false');
+  hiddenToggle.textContent = 'Afficher les modules masqués';
+  hiddenToggle.addEventListener('click', () => {
+    const showHidden = !!state.get('ui.showHidden');
+    state.set('ui.showHidden', !showHidden);
+  });
+
+  filters.append(categoryBar, search, hiddenToggle);
+
   const footer = document.createElement('div');
   footer.className = 'a11ytb-header';
-  footer.innerHTML = `<div class="a11ytb-title">Raccourci&nbsp;: Alt+Shift+A</div>`;
+  const footerTitle = document.createElement('div');
+  footerTitle.className = 'a11ytb-title';
+  footerTitle.textContent = 'Raccourci : Alt+Shift+A';
+
+  const activity = document.createElement('details');
+  activity.className = 'a11ytb-activity';
+  activity.innerHTML = `
+    <summary>Activité récente</summary>
+    <ol class="a11ytb-activity-list" data-ref="activity-list"></ol>
+  `;
+
+  footer.append(footerTitle, activity);
+
+  const modulesContainer = document.createElement('div');
+  modulesContainer.className = 'a11ytb-modules';
+
+  body.append(filters, modulesContainer);
 
   panel.append(header, body, footer);
 
-  listBlocks().forEach(block => renderBlock(block, state, body));
+  const blocks = listBlocks();
+  const blockInfo = new Map(blocks.map(block => [block.id, block]));
+  const moduleElements = new Map();
+  blocks.forEach(block => {
+    const el = renderBlock(block, state, modulesContainer);
+    moduleElements.set(block.id, el);
+  });
+
+  const activityList = activity.querySelector('[data-ref="activity-list"]');
+
+  function getPreferences() {
+    const ui = state.get('ui') || {};
+    return {
+      category: ui.category || 'all',
+      search: ui.search || '',
+      pinned: Array.isArray(ui.pinned) ? ui.pinned : [],
+      hidden: Array.isArray(ui.hidden) ? ui.hidden : [],
+      showHidden: !!ui.showHidden
+    };
+  }
+
+  function syncFilters() {
+    const prefs = getPreferences();
+    categoryBar.querySelectorAll('button[data-category]').forEach(btn => {
+      const active = btn.dataset.category === prefs.category;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-pressed', String(active));
+    });
+    if (search !== document.activeElement) {
+      const value = prefs.search || '';
+      if (search.value !== value) search.value = value;
+    }
+    hiddenToggle.setAttribute('aria-pressed', String(prefs.showHidden));
+    hiddenToggle.classList.toggle('is-active', prefs.showHidden);
+    hiddenToggle.textContent = prefs.showHidden ? 'Masquer les modules cachés' : 'Afficher les modules masqués';
+  }
+
+  function applyModuleLayout() {
+    const prefs = getPreferences();
+    const searchTerm = (prefs.search || '').trim().toLowerCase();
+    const pinnedSet = new Set(prefs.pinned);
+    const hiddenSet = new Set(prefs.hidden);
+
+    const baseOrder = blocks.map(block => block.id);
+    const ordered = [
+      ...prefs.pinned.filter(id => moduleElements.has(id)),
+      ...baseOrder.filter(id => !pinnedSet.has(id))
+    ];
+
+    ordered.forEach(id => {
+      const el = moduleElements.get(id);
+      if (el) modulesContainer.append(el);
+    });
+
+    moduleElements.forEach((el, id) => {
+      const title = el.dataset.title || '';
+      const keywords = el.dataset.keywords || title.toLowerCase();
+      const matchesCategory = prefs.category === 'all' || el.dataset.category === prefs.category;
+      const matchesSearch = !searchTerm || keywords.includes(searchTerm);
+      const isHidden = hiddenSet.has(id);
+      const shouldShow = matchesCategory && matchesSearch && (!isHidden || prefs.showHidden);
+      if (shouldShow) {
+        el.removeAttribute('hidden');
+        el.setAttribute('aria-hidden', 'false');
+      } else {
+        el.setAttribute('hidden', '');
+        el.setAttribute('aria-hidden', 'true');
+      }
+      el.classList.toggle('is-hidden', isHidden);
+      el.classList.toggle('is-pinned', pinnedSet.has(id));
+      const pinBtn = el.querySelector('[data-module-action="toggle-pin"]');
+      const hideBtn = el.querySelector('[data-module-action="toggle-hide"]');
+      if (pinBtn) {
+        const pinned = pinnedSet.has(id);
+        pinBtn.setAttribute('aria-pressed', String(pinned));
+        pinBtn.setAttribute('aria-label', `${pinned ? 'Retirer l’épingle du' : 'Épingler le'} module ${title}`.trim());
+      }
+      if (hideBtn) {
+        const hidden = hiddenSet.has(id);
+        hideBtn.setAttribute('aria-pressed', String(hidden));
+        hideBtn.setAttribute('aria-label', `${hidden ? 'Afficher' : 'Masquer'} le module ${title}`.trim());
+      }
+    });
+  }
+
+  function formatTime(ts) {
+    const date = new Date(ts);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function updateActivityLog() {
+    if (!activityList) return;
+    const entries = state.get('ui.activity') || [];
+    activityList.innerHTML = '';
+    if (!entries.length) {
+      const empty = document.createElement('li');
+      empty.className = 'a11ytb-activity-empty';
+      empty.textContent = 'Aucune activité récente.';
+      activityList.append(empty);
+      return;
+    }
+    entries.slice(0, 6).forEach(entry => {
+      const li = document.createElement('li');
+      const date = new Date(entry.timestamp || entry.time || Date.now());
+      li.innerHTML = `<time datetime="${date.toISOString()}">${formatTime(date)}</time> — ${entry.message}`;
+      activityList.append(li);
+    });
+  }
+
+  function logActivity(message, options = {}) {
+    if (!message) return;
+    const current = state.get('ui.activity') || [];
+    const now = Date.now();
+    const entry = { id: `${now}-${Math.random().toString(16).slice(2)}`, message, timestamp: now };
+    const next = [entry, ...current].slice(0, 12);
+    state.set('ui.activity', next);
+    if (options.tone) {
+      window.a11ytb?.feedback?.play(options.tone);
+    }
+  }
+
+  if (!window.a11ytb) window.a11ytb = {};
+  window.a11ytb.logActivity = logActivity;
 
   root.append(overlay, fab, panel);
 
@@ -112,7 +299,11 @@ export function mountUI({ root, state }) {
 
   fab.addEventListener('click', () => toggle(true));
   header.querySelector('[data-action="close"]').addEventListener('click', () => toggle(false));
-  header.querySelector('[data-action="reset"]').addEventListener('click', () => state.reset());
+  header.querySelector('[data-action="reset"]').addEventListener('click', () => {
+    state.reset();
+    window.a11ytb?.feedback?.play('alert');
+    logActivity('Préférences réinitialisées');
+  });
   header.querySelector('[data-action="dock-left"]').addEventListener('click', () => state.set('ui.dock', 'left'));
   header.querySelector('[data-action="dock-right"]').addEventListener('click', () => state.set('ui.dock', 'right'));
   header.querySelector('[data-action="dock-bottom"]').addEventListener('click', () => state.set('ui.dock', 'bottom'));
@@ -125,6 +316,45 @@ export function mountUI({ root, state }) {
   });
 
   overlay.addEventListener('click', () => toggle(false));
+
+  modulesContainer.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-module-action]');
+    if (!btn) return;
+    const moduleEl = btn.closest('.a11ytb-module');
+    if (!moduleEl) return;
+    const id = moduleEl.dataset.blockId;
+    if (!id) return;
+    const block = blockInfo.get(id);
+    const title = block?.title || 'module';
+    const prefs = getPreferences();
+    if (btn.dataset.moduleAction === 'toggle-pin') {
+      const pinned = Array.isArray(prefs.pinned) ? [...prefs.pinned] : [];
+      const index = pinned.indexOf(id);
+      if (index === -1) {
+        pinned.unshift(id);
+        state.set('ui.pinned', pinned);
+        logActivity(`Module épinglé : ${title}`, { tone: 'confirm' });
+      } else {
+        pinned.splice(index, 1);
+        state.set('ui.pinned', pinned);
+        logActivity(`Épingle retirée : ${title}`, { tone: 'toggle' });
+      }
+    } else if (btn.dataset.moduleAction === 'toggle-hide') {
+      const hidden = Array.isArray(prefs.hidden) ? [...prefs.hidden] : [];
+      const index = hidden.indexOf(id);
+      if (index === -1) {
+        hidden.push(id);
+        state.set('ui.hidden', hidden);
+        const pinned = Array.isArray(prefs.pinned) ? prefs.pinned.filter(x => x !== id) : [];
+        state.set('ui.pinned', pinned);
+        logActivity(`Module masqué : ${title}`, { tone: 'toggle' });
+      } else {
+        hidden.splice(index, 1);
+        state.set('ui.hidden', hidden);
+        logActivity(`Module affiché : ${title}`, { tone: 'confirm' });
+      }
+    }
+  });
 
   panel.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -164,9 +394,25 @@ export function mountUI({ root, state }) {
   window.stopSpeaking = () => window.a11ytb?.tts?.stop?.();
   window.speakPage = () => window.a11ytb?.tts?.speakPage?.();
   window.speakSelection = () => window.a11ytb?.tts?.speakSelection?.();
-  window.brailleSelection = () => window.a11ytb?.braille?.transcribeSelection?.();
-  window.clearBraille = () => window.a11ytb?.braille?.clear?.();
+  window.brailleSelection = () => {
+    window.a11ytb?.braille?.transcribeSelection?.();
+    logActivity('Transcription braille demandée', { tone: 'confirm' });
+  };
+  window.clearBraille = () => {
+    window.a11ytb?.braille?.clear?.();
+    logActivity('Sortie braille effacée', { tone: 'toggle' });
+  };
 
   Object.defineProperty(window, 'sttStatus', { get() { return state.get('stt.status'); } });
   Object.defineProperty(window, 'brailleOut', { get() { return state.get('braille.output'); } });
+
+  state.on(() => {
+    syncFilters();
+    applyModuleLayout();
+    updateActivityLog();
+  });
+
+  syncFilters();
+  applyModuleLayout();
+  updateActivityLog();
 }
