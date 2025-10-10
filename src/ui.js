@@ -1,4 +1,4 @@
-import { listBlocks, renderBlock, DEFAULT_BLOCK_ICON } from './registry.js';
+import { listBlocks, renderBlock, listModuleManifests } from './registry.js';
 
 export function mountUI({ root, state }) {
   const categories = [
@@ -146,6 +146,40 @@ export function mountUI({ root, state }) {
   const body = document.createElement('div');
   body.className = 'a11ytb-body';
 
+  const viewToggle = document.createElement('div');
+  viewToggle.className = 'a11ytb-view-toggle';
+  const viewButtons = new Map();
+  [
+    { id: 'modules', label: 'Modules' },
+    { id: 'options', label: 'Options & Profils' }
+  ].forEach((view) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'a11ytb-chip a11ytb-chip--view';
+    btn.dataset.view = view.id;
+    btn.textContent = view.label;
+    btn.setAttribute('aria-pressed', 'false');
+    btn.addEventListener('click', () => {
+      state.set('ui.view', view.id);
+    });
+    viewButtons.set(view.id, btn);
+    viewToggle.append(btn);
+  });
+
+  const viewContainer = document.createElement('div');
+  viewContainer.className = 'a11ytb-view-container';
+
+  const modulesView = document.createElement('div');
+  modulesView.className = 'a11ytb-view a11ytb-view--modules';
+  modulesView.setAttribute('role', 'region');
+  modulesView.setAttribute('aria-label', 'Modules d’accessibilité');
+
+  const optionsView = document.createElement('div');
+  optionsView.className = 'a11ytb-view a11ytb-view--options';
+  optionsView.setAttribute('role', 'region');
+  optionsView.setAttribute('aria-label', 'Profils et options avancées');
+  optionsView.setAttribute('hidden', '');
+
   const filters = document.createElement('div');
   filters.className = 'a11ytb-filters';
 
@@ -221,6 +255,50 @@ export function mountUI({ root, state }) {
 
   filters.append(categoryBar, search, profileWrapper, hiddenToggle);
 
+  const modulesContainer = document.createElement('div');
+  modulesContainer.className = 'a11ytb-modules';
+
+  modulesView.append(filters, modulesContainer);
+
+  const optionsScroll = document.createElement('div');
+  optionsScroll.className = 'a11ytb-options-scroll';
+
+  const profilesSection = document.createElement('section');
+  profilesSection.className = 'a11ytb-options-section';
+  const profilesHeader = document.createElement('div');
+  profilesHeader.className = 'a11ytb-section-header';
+  const profilesTitle = document.createElement('h3');
+  profilesTitle.className = 'a11ytb-section-title';
+  profilesTitle.textContent = 'Profils d’accessibilité';
+  const profilesDescription = document.createElement('p');
+  profilesDescription.className = 'a11ytb-section-description';
+  profilesDescription.textContent = 'Appliquez des réglages combinés en un clic pour différents besoins (vision basse, dyslexie, etc.).';
+  profilesHeader.append(profilesTitle, profilesDescription);
+  const profilesList = document.createElement('div');
+  profilesList.className = 'a11ytb-profile-grid';
+  profilesSection.append(profilesHeader, profilesList);
+
+  const configSection = document.createElement('section');
+  configSection.className = 'a11ytb-options-section';
+  const configHeader = document.createElement('div');
+  configHeader.className = 'a11ytb-section-header';
+  const configTitle = document.createElement('h3');
+  configTitle.className = 'a11ytb-section-title';
+  configTitle.textContent = 'Réglages des modules';
+  const configDescription = document.createElement('p');
+  configDescription.className = 'a11ytb-section-description';
+  configDescription.textContent = 'Ajustez finement les options exposées par chaque module.';
+  configHeader.append(configTitle, configDescription);
+  const configList = document.createElement('div');
+  configList.className = 'a11ytb-config-grid';
+  configSection.append(configHeader, configList);
+
+  optionsScroll.append(profilesSection, configSection);
+  optionsView.append(optionsScroll);
+
+  viewContainer.append(modulesView, optionsView);
+  body.append(viewToggle, viewContainer);
+
   const footer = document.createElement('div');
   footer.className = 'a11ytb-header';
   const footerTitle = document.createElement('div');
@@ -231,35 +309,14 @@ export function mountUI({ root, state }) {
   activity.className = 'a11ytb-activity';
   activity.innerHTML = `
     <summary>Activité récente</summary>
+    <div class="a11ytb-activity-actions" role="group" aria-label="Exports du journal">
+      <button type="button" class="a11ytb-btn-link" data-action="activity-export-json">Copier JSON</button>
+      <button type="button" class="a11ytb-btn-link" data-action="activity-export-csv">Exporter CSV</button>
+    </div>
     <ol class="a11ytb-activity-list" data-ref="activity-list"></ol>
   `;
 
   footer.append(footerTitle, activity);
-
-  const adminDetails = document.createElement('details');
-  adminDetails.className = 'a11ytb-admin-panel';
-  adminDetails.open = false;
-
-  const adminSummary = document.createElement('summary');
-  adminSummary.textContent = 'Administration des modules';
-
-  const adminContent = document.createElement('div');
-  adminContent.className = 'a11ytb-admin-content';
-
-  const adminHelp = document.createElement('p');
-  adminHelp.className = 'a11ytb-admin-help';
-  adminHelp.textContent = 'Glissez-déposez pour réordonner, cochez pour activer ou désactiver les modules.';
-
-  const adminList = document.createElement('ul');
-  adminList.className = 'a11ytb-admin-list';
-
-  adminContent.append(adminHelp, adminList);
-  adminDetails.append(adminSummary, adminContent);
-
-  const modulesContainer = document.createElement('div');
-  modulesContainer.className = 'a11ytb-modules';
-
-  body.append(filters, adminDetails, modulesContainer);
 
   panel.append(header, body, footer);
 
@@ -274,66 +331,285 @@ export function mountUI({ root, state }) {
     moduleElements.set(block.id, el);
   });
 
-  const adminItems = new Map();
-  blocks.forEach(block => {
-    const item = createAdminItem(block);
-    adminItems.set(block.id, item);
-    adminList.append(item);
-  });
+  const optionBindings = [];
+  const manifestsWithConfig = listModuleManifests().filter((manifest) => manifest?.config?.fields?.length);
 
-  let draggedItem = null;
-  adminList.addEventListener('dragstart', (event) => {
-    const item = event.target.closest('.a11ytb-admin-item');
-    if (!item) return;
-    draggedItem = item;
-    item.classList.add('is-dragging');
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', item.dataset.blockId || '');
-    }
-  });
-
-  adminList.addEventListener('dragover', (event) => {
-    if (!draggedItem) return;
-    event.preventDefault();
-    const target = event.target.closest('.a11ytb-admin-item');
-    if (!target || target === draggedItem) return;
-    const rect = target.getBoundingClientRect();
-    const shouldPlaceAfter = event.clientY > rect.top + rect.height / 2;
-    adminList.insertBefore(draggedItem, shouldPlaceAfter ? target.nextSibling : target);
-  });
-
-  adminList.addEventListener('drop', (event) => {
-    if (!draggedItem) return;
-    event.preventDefault();
-    draggedItem.classList.remove('is-dragging');
-    draggedItem = null;
-    finalizeAdminOrder();
-  });
-
-  adminList.addEventListener('dragend', () => {
-    if (draggedItem) {
-      draggedItem.classList.remove('is-dragging');
-      draggedItem = null;
-      finalizeAdminOrder();
-    }
-  });
-
-  const normalizedOrder = getModuleOrder();
-  const storedOrder = Array.isArray(state.get('ui.moduleOrder')) ? state.get('ui.moduleOrder') : [];
-  if (!arraysEqual(normalizedOrder, storedOrder)) {
-    state.set('ui.moduleOrder', normalizedOrder);
+  if (manifestsWithConfig.length) {
+    manifestsWithConfig.forEach((manifest) => {
+      const section = document.createElement('article');
+      section.className = 'a11ytb-config-card';
+      const title = document.createElement('h4');
+      title.className = 'a11ytb-config-title';
+      title.textContent = manifest.config?.group || manifest.name || manifest.id;
+      section.append(title);
+      const descText = manifest.config?.description || manifest.description;
+      if (descText) {
+        const desc = document.createElement('p');
+        desc.className = 'a11ytb-config-description';
+        desc.textContent = descText;
+        section.append(desc);
+      }
+      const fieldsContainer = document.createElement('div');
+      fieldsContainer.className = 'a11ytb-config-fields';
+      manifest.config.fields.forEach((field) => {
+        const { element, update } = createOptionField(manifest, field);
+        fieldsContainer.append(element);
+        optionBindings.push(update);
+      });
+      section.append(fieldsContainer);
+      configList.append(section);
+    });
+  } else {
+    const empty = document.createElement('p');
+    empty.className = 'a11ytb-empty-state';
+    empty.textContent = 'Aucun module ne propose encore de réglages avancés.';
+    configList.append(empty);
   }
 
-  const initialUi = state.get('ui') || {};
-  const sanitizedPinned = sanitizeList(initialUi.pinned, allowedIds);
-  const sanitizedHidden = sanitizeList(initialUi.hidden, allowedIds);
-  const sanitizedDisabled = sanitizeList(initialUi.disabled, allowedIds);
-  setListIfChanged('ui.pinned', sanitizedPinned, initialUi.pinned);
-  setListIfChanged('ui.hidden', sanitizedHidden, initialUi.hidden);
-  setListIfChanged('ui.disabled', sanitizedDisabled, initialUi.disabled);
-
   const activityList = activity.querySelector('[data-ref="activity-list"]');
+  const exportJsonBtn = activity.querySelector('[data-action="activity-export-json"]');
+  const exportCsvBtn = activity.querySelector('[data-action="activity-export-csv"]');
+
+  const SEVERITY_LABELS = {
+    success: 'Succès',
+    alert: 'Alerte',
+    warning: 'Avertissement',
+    info: 'Info'
+  };
+
+  function toneToSeverity(tone) {
+    if (!tone) return null;
+    const normalized = tone.toLowerCase();
+    if (normalized === 'confirm') return 'success';
+    if (normalized === 'alert') return 'alert';
+    if (normalized === 'warning') return 'warning';
+    return 'info';
+  }
+
+  function normalizeSeverity(severity, tone) {
+    if (typeof severity === 'string' && SEVERITY_LABELS[severity.toLowerCase()]) {
+      return severity.toLowerCase();
+    }
+    return toneToSeverity(tone) || 'info';
+  }
+
+  function normalizeTags(tags, moduleId) {
+    const list = Array.isArray(tags) ? tags.filter(Boolean).map(String) : [];
+    if (moduleId && !list.some(tag => tag.startsWith('module:'))) {
+      return [`module:${moduleId}`, ...list];
+    }
+    return list;
+  }
+
+  function normalizeActivityEntry(entry) {
+    if (!entry || typeof entry !== 'object') return null;
+    const timestamp = typeof entry.timestamp === 'number'
+      ? entry.timestamp
+      : typeof entry.time === 'number'
+        ? entry.time
+        : Date.now();
+    const tone = entry.tone || entry.sound || null;
+    const moduleId = entry.module || entry.moduleId || null;
+    const severity = normalizeSeverity(entry.severity, tone);
+    const tags = normalizeTags(entry.tags, moduleId);
+    return {
+      id: entry.id || `${timestamp}-${Math.random().toString(16).slice(2)}`,
+      message: entry.message || '',
+      timestamp,
+      tone,
+      severity,
+      module: moduleId,
+      tags
+    };
+  }
+
+  function getActivityEntries() {
+    const current = state.get('ui.activity') || [];
+    return current
+      .map(normalizeActivityEntry)
+      .filter(Boolean);
+  }
+
+  function readValue(source, path) {
+    if (!source || !path) return undefined;
+    return path.split('.').reduce((acc, key) => (acc && typeof acc === 'object' ? acc[key] : undefined), source);
+  }
+
+  function formatFieldValue(field, value) {
+    if (typeof field.format === 'function') {
+      try {
+        return field.format(value);
+      } catch (error) {
+        console.warn('a11ytb: format de champ invalide.', error);
+      }
+    }
+    if (field.type === 'range') {
+      return typeof value === 'number' ? value.toFixed(2) : value ?? '';
+    }
+    if (field.type === 'toggle') {
+      return value ? 'Activé' : 'Désactivé';
+    }
+    return value ?? '';
+  }
+
+  function createOptionField(manifest, field) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'a11ytb-option';
+    let update = () => {};
+
+    if (field.type === 'range') {
+      const label = document.createElement('label');
+      label.className = 'a11ytb-option-label';
+      const title = document.createElement('span');
+      title.className = 'a11ytb-option-title';
+      title.textContent = field.label || field.path;
+      const valueNode = document.createElement('span');
+      valueNode.className = 'a11ytb-option-value';
+      label.append(title, valueNode);
+
+      const input = document.createElement('input');
+      input.type = 'range';
+      if (field.min !== undefined) input.min = String(field.min);
+      if (field.max !== undefined) input.max = String(field.max);
+      if (field.step !== undefined) input.step = String(field.step);
+      input.setAttribute('aria-label', field.label || field.path);
+
+      input.addEventListener('input', () => {
+        const raw = input.valueAsNumber;
+        const safe = Number.isNaN(raw) ? Number(field.min ?? 0) : raw;
+        state.set(field.path, safe);
+        valueNode.textContent = formatFieldValue(field, safe);
+      });
+      input.addEventListener('change', () => {
+        const raw = input.valueAsNumber;
+        const safe = Number.isNaN(raw) ? Number(field.min ?? 0) : raw;
+        state.set(field.path, safe);
+        if (typeof field.onChange === 'function') {
+          field.onChange(safe, { state: state.get(), field, manifest });
+        }
+      });
+
+      wrapper.append(label, input);
+      if (field.description) {
+        const hint = document.createElement('p');
+        hint.className = 'a11ytb-option-description';
+        hint.textContent = field.description;
+        wrapper.append(hint);
+      }
+
+      update = (snapshot) => {
+        const current = readValue(snapshot, field.path);
+        const value = typeof current === 'number' ? current : Number(field.min ?? 0);
+        if (document.activeElement !== input) {
+          input.value = String(value);
+        }
+        valueNode.textContent = formatFieldValue(field, value);
+      };
+    } else if (field.type === 'toggle') {
+      const trueValue = field.trueValue !== undefined ? field.trueValue : true;
+      const falseValue = field.falseValue !== undefined ? field.falseValue : false;
+      const label = document.createElement('label');
+      label.className = 'a11ytb-option-toggle';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.setAttribute('aria-label', field.label || field.path);
+      const title = document.createElement('span');
+      title.className = 'a11ytb-option-title';
+      title.textContent = field.label || field.path;
+
+      input.addEventListener('change', () => {
+        const value = input.checked ? trueValue : falseValue;
+        state.set(field.path, value);
+        if (typeof field.onChange === 'function') {
+          field.onChange(value, { state: state.get(), field, manifest });
+        }
+      });
+
+      label.append(input, title);
+      wrapper.append(label);
+      if (field.description) {
+        const hint = document.createElement('p');
+        hint.className = 'a11ytb-option-description';
+        hint.textContent = field.description;
+        wrapper.append(hint);
+      }
+
+      update = (snapshot) => {
+        const current = readValue(snapshot, field.path);
+        const checked = current === trueValue;
+        input.checked = checked;
+        label.setAttribute('data-value', formatFieldValue(field, current));
+      };
+    } else if (field.type === 'select') {
+      const label = document.createElement('label');
+      label.className = 'a11ytb-option-label';
+      const title = document.createElement('span');
+      title.className = 'a11ytb-option-title';
+      title.textContent = field.label || field.path;
+      label.append(title);
+
+      const select = document.createElement('select');
+      select.className = 'a11ytb-option-select';
+      select.setAttribute('aria-label', field.label || field.path);
+      label.append(select);
+
+      const emptyMessage = document.createElement('p');
+      emptyMessage.className = 'a11ytb-option-empty';
+      emptyMessage.textContent = field.emptyLabel || 'Aucune option disponible pour le moment.';
+      emptyMessage.hidden = true;
+
+      select.addEventListener('change', () => {
+        const value = select.value;
+        state.set(field.path, value);
+        if (typeof field.onChange === 'function') {
+          field.onChange(value, { state: state.get(), field, manifest });
+        }
+      });
+
+      wrapper.append(label, emptyMessage);
+      if (field.description) {
+        const hint = document.createElement('p');
+        hint.className = 'a11ytb-option-description';
+        hint.textContent = field.description;
+        wrapper.append(hint);
+      }
+
+      let optionSignature = '';
+      update = (snapshot) => {
+        const options = typeof field.getOptions === 'function'
+          ? (field.getOptions(snapshot) || [])
+          : (field.options || []);
+        const signature = JSON.stringify(options.map((opt) => [opt.value, opt.label]));
+        if (signature !== optionSignature) {
+          optionSignature = signature;
+          select.innerHTML = '';
+          options.forEach((opt) => {
+            const option = document.createElement('option');
+            option.value = opt.value ?? '';
+            option.textContent = opt.label ?? opt.value ?? '';
+            select.append(option);
+          });
+        }
+        if (!options.length) {
+          select.disabled = true;
+          emptyMessage.hidden = false;
+        } else {
+          select.disabled = false;
+          emptyMessage.hidden = true;
+        }
+        const current = readValue(snapshot, field.path);
+        const currentValue = current ?? (options[0]?.value ?? '');
+        if (document.activeElement !== select) {
+          select.value = String(currentValue ?? '');
+        }
+      };
+    }
+
+    return {
+      element: wrapper,
+      update
+    };
+  }
 
   function getModuleOrder() {
     const stored = state.get('ui.moduleOrder');
@@ -347,12 +623,10 @@ export function mountUI({ root, state }) {
     return {
       category: ui.category || 'all',
       search: ui.search || '',
-      pinned: sanitizeList(ui.pinned, allowedIds),
-      hidden: sanitizeList(ui.hidden, allowedIds),
-      disabled: sanitizeList(ui.disabled, allowedIds),
-      moduleOrder: getModuleOrder(),
+      pinned: Array.isArray(ui.pinned) ? ui.pinned : [],
+      hidden: Array.isArray(ui.hidden) ? ui.hidden : [],
       showHidden: !!ui.showHidden,
-      activeProfile: ui.activeProfile || 'custom'
+      view: ui.view || 'modules'
     };
   }
 
@@ -614,6 +888,112 @@ export function mountUI({ root, state }) {
     });
   }
 
+  function syncView() {
+    const prefs = getPreferences();
+    const currentView = prefs.view || 'modules';
+    viewButtons.forEach((btn, id) => {
+      const active = id === currentView;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-pressed', String(active));
+    });
+    if (currentView === 'options') {
+      modulesView.setAttribute('hidden', '');
+      modulesView.setAttribute('aria-hidden', 'true');
+      optionsView.removeAttribute('hidden');
+      optionsView.setAttribute('aria-hidden', 'false');
+    } else {
+      optionsView.setAttribute('hidden', '');
+      optionsView.setAttribute('aria-hidden', 'true');
+      modulesView.removeAttribute('hidden');
+      modulesView.setAttribute('aria-hidden', 'false');
+    }
+  }
+
+  function renderProfiles(snapshot) {
+    if (!profilesList) return;
+    const data = snapshot?.profiles ?? state.get('profiles') ?? {};
+    const lastProfile = snapshot?.ui?.lastProfile ?? state.get('ui.lastProfile');
+    const entries = Object.entries(data);
+    profilesList.innerHTML = '';
+    if (!entries.length) {
+      const empty = document.createElement('p');
+      empty.className = 'a11ytb-empty-state';
+      empty.textContent = 'Aucun profil préconfiguré pour le moment.';
+      profilesList.append(empty);
+      return;
+    }
+    entries.forEach(([id, profile]) => {
+      const card = document.createElement('article');
+      card.className = 'a11ytb-profile-card';
+      card.dataset.profileId = id;
+      if (id === lastProfile) {
+        card.classList.add('is-active');
+      }
+      const header = document.createElement('div');
+      header.className = 'a11ytb-profile-header';
+      const title = document.createElement('h4');
+      title.className = 'a11ytb-profile-title';
+      title.textContent = profile?.name || id;
+      header.append(title);
+      if (id === lastProfile) {
+        const badge = document.createElement('span');
+        badge.className = 'a11ytb-profile-badge';
+        badge.textContent = 'Dernier profil appliqué';
+        header.append(badge);
+      }
+      card.append(header);
+
+      if (Array.isArray(profile?.tags) && profile.tags.length) {
+        const tags = document.createElement('div');
+        tags.className = 'a11ytb-profile-tags';
+        profile.tags.forEach((tag) => {
+          const chip = document.createElement('span');
+          chip.className = 'a11ytb-profile-tag';
+          chip.textContent = tag;
+          tags.append(chip);
+        });
+        card.append(tags);
+      }
+
+      if (profile?.summary) {
+        const summary = document.createElement('p');
+        summary.className = 'a11ytb-profile-summary';
+        summary.textContent = profile.summary;
+        card.append(summary);
+      }
+
+      if (profile?.description) {
+        const description = document.createElement('p');
+        description.className = 'a11ytb-profile-description';
+        description.textContent = profile.description;
+        card.append(description);
+      }
+
+      const applyBtn = document.createElement('button');
+      applyBtn.type = 'button';
+      applyBtn.className = 'a11ytb-button a11ytb-button--ghost';
+      applyBtn.dataset.profile = id;
+      applyBtn.textContent = id === lastProfile ? 'Réappliquer le profil' : 'Appliquer ce profil';
+      card.append(applyBtn);
+
+      profilesList.append(card);
+    });
+  }
+
+  function applyProfile(profileId) {
+    const profiles = state.get('profiles') || {};
+    const profile = profiles?.[profileId];
+    if (!profile) return;
+    const settings = profile.settings || {};
+    Object.entries(settings).forEach(([path, value]) => {
+      state.set(path, value);
+    });
+    const tone = profile.tone || 'confirm';
+    const message = profile.activity || `Profil appliqué : ${profile.name || profileId}`;
+    state.set('ui.lastProfile', profileId);
+    logActivity(message, { tone });
+  }
+
   function formatTime(ts) {
     const date = new Date(ts);
     if (Number.isNaN(date.getTime())) return '';
@@ -622,7 +1002,10 @@ export function mountUI({ root, state }) {
 
   function updateActivityLog() {
     if (!activityList) return;
-    const entries = state.get('ui.activity') || [];
+    const entries = getActivityEntries();
+    const hasEntries = entries.length > 0;
+    if (exportJsonBtn) exportJsonBtn.disabled = !hasEntries;
+    if (exportCsvBtn) exportCsvBtn.disabled = !hasEntries;
     activityList.innerHTML = '';
     if (!entries.length) {
       const empty = document.createElement('li');
@@ -633,26 +1016,136 @@ export function mountUI({ root, state }) {
     }
     entries.slice(0, 6).forEach(entry => {
       const li = document.createElement('li');
-      const date = new Date(entry.timestamp || entry.time || Date.now());
-      li.innerHTML = `<time datetime="${date.toISOString()}">${formatTime(date)}</time> — ${entry.message}`;
+      const date = new Date(entry.timestamp || Date.now());
+      const line = document.createElement('div');
+      line.className = 'a11ytb-activity-line';
+      const timeEl = document.createElement('time');
+      timeEl.setAttribute('datetime', date.toISOString());
+      timeEl.textContent = formatTime(date);
+      const message = document.createElement('span');
+      message.className = 'a11ytb-activity-message';
+      message.textContent = entry.message;
+      line.append(timeEl, message);
+      li.append(line);
+
+      const meta = document.createElement('div');
+      meta.className = 'a11ytb-activity-meta';
+      const severity = normalizeSeverity(entry.severity, entry.tone);
+      if (severity && SEVERITY_LABELS[severity]) {
+        const badge = document.createElement('span');
+        badge.className = `a11ytb-activity-badge a11ytb-activity-badge--${severity}`;
+        badge.textContent = SEVERITY_LABELS[severity];
+        meta.append(badge);
+      }
+      if (entry.module) {
+        const moduleTag = document.createElement('span');
+        moduleTag.className = 'a11ytb-activity-badge';
+        moduleTag.textContent = `Module : ${entry.module}`;
+        meta.append(moduleTag);
+      }
+      const tags = normalizeTags(entry.tags, entry.module).filter(tag => !tag.startsWith('module:'));
+      tags.forEach(tag => {
+        const tagEl = document.createElement('span');
+        tagEl.className = 'a11ytb-activity-badge';
+        tagEl.textContent = tag;
+        meta.append(tagEl);
+      });
+      if (meta.childNodes.length) {
+        li.append(meta);
+      }
       activityList.append(li);
     });
   }
 
   function logActivity(message, options = {}) {
     if (!message) return;
-    const current = state.get('ui.activity') || [];
+    const current = getActivityEntries();
     const now = Date.now();
-    const entry = { id: `${now}-${Math.random().toString(16).slice(2)}`, message, timestamp: now };
-    const next = [entry, ...current].slice(0, 12);
+    const moduleId = options.module || options.moduleId || null;
+    const tone = options.tone || null;
+    const severity = normalizeSeverity(options.severity, tone);
+    const tags = normalizeTags(options.tags, moduleId);
+    const entry = {
+      id: `${now}-${Math.random().toString(16).slice(2)}`,
+      message,
+      timestamp: now,
+      tone,
+      severity,
+      module: moduleId,
+      tags
+    };
+    const next = [entry, ...current].slice(0, 50);
     state.set('ui.activity', next);
-    if (options.tone) {
+    if (tone) {
       window.a11ytb?.feedback?.play(options.tone);
+    }
+    return entry;
+  }
+
+  function serializeActivityToJSON(entries) {
+    return JSON.stringify(entries.map(entry => ({
+      id: entry.id,
+      message: entry.message,
+      timestamp: entry.timestamp,
+      module: entry.module,
+      severity: entry.severity,
+      tone: entry.tone,
+      tags: entry.tags
+    })), null, 2);
+  }
+
+  function escapeCsvValue(value) {
+    const stringValue = Array.isArray(value) ? value.join('|') : value ?? '';
+    const text = String(stringValue);
+    if (text.includes('"') || text.includes(',') || text.includes('\n')) {
+      return `"${text.replace(/"/g, '""')}"`;
+    }
+    return text;
+  }
+
+  function serializeActivityToCSV(entries) {
+    const header = ['timestamp', 'message', 'module', 'severity', 'tone', 'tags'];
+    const rows = entries.map(entry => [
+      new Date(entry.timestamp || Date.now()).toISOString(),
+      entry.message,
+      entry.module || '',
+      entry.severity || '',
+      entry.tone || '',
+      Array.isArray(entry.tags) ? entry.tags.join('|') : ''
+    ]);
+    return [header.join(','), ...rows.map(row => row.map(escapeCsvValue).join(','))].join('\n');
+  }
+
+  function downloadText(filename, text, mime = 'text/plain') {
+    const blob = new Blob([text], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function copyToClipboard(text) {
+    if (!navigator?.clipboard?.writeText) return false;
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (error) {
+      console.warn('a11ytb: échec de copie presse-papiers', error);
+      return false;
     }
   }
 
   if (!window.a11ytb) window.a11ytb = {};
   window.a11ytb.logActivity = logActivity;
+  window.a11ytb.activity = {
+    getEntries: () => getActivityEntries().map(entry => ({ ...entry })),
+    toJSON: () => serializeActivityToJSON(getActivityEntries()),
+    toCSV: () => serializeActivityToCSV(getActivityEntries())
+  };
 
   root.append(overlay, fab, panel);
 
@@ -710,7 +1203,41 @@ export function mountUI({ root, state }) {
 
   overlay.addEventListener('click', () => toggle(false));
 
+  profilesList.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-profile]');
+    if (!btn) return;
+    applyProfile(btn.dataset.profile);
+  });
+
+  activity.addEventListener('click', async (event) => {
+    const action = event.target.closest('[data-action]');
+    if (!action) return;
+    if (action.dataset.action === 'activity-export-json') {
+      const entries = getActivityEntries();
+      if (!entries.length) return;
+      const payload = serializeActivityToJSON(entries);
+      const copied = await copyToClipboard(payload);
+      if (copied) {
+        logActivity('Journal copié au presse-papiers (JSON)', { tone: 'confirm', module: 'activity', tags: ['export', 'json'] });
+      } else {
+        downloadText('a11ytb-activity.json', payload, 'application/json');
+        logActivity('Journal téléchargé (JSON)', { tone: 'warning', module: 'activity', tags: ['export', 'json'] });
+      }
+    } else if (action.dataset.action === 'activity-export-csv') {
+      const entries = getActivityEntries();
+      if (!entries.length) return;
+      const payload = serializeActivityToCSV(entries);
+      downloadText('a11ytb-activity.csv', payload, 'text/csv');
+      logActivity('Journal exporté (CSV)', { tone: 'confirm', module: 'activity', tags: ['export', 'csv'] });
+    }
+  });
+
   modulesContainer.addEventListener('click', (event) => {
+    const openOptions = event.target.closest('[data-action="open-options"]');
+    if (openOptions) {
+      state.set('ui.view', 'options');
+      return;
+    }
     const btn = event.target.closest('[data-module-action]');
     if (!btn) return;
     const moduleEl = btn.closest('.a11ytb-module');
@@ -801,21 +1328,22 @@ export function mountUI({ root, state }) {
   Object.defineProperty(window, 'sttStatus', { get() { return state.get('stt.status'); } });
   Object.defineProperty(window, 'brailleOut', { get() { return state.get('braille.output'); } });
 
-  if (!window.a11ytb) window.a11ytb = {};
-  window.a11ytb.profiles = {
-    list: () => accessibilityProfiles.map(({ id, label, description }) => ({ id, label, description })),
-    apply: (id) => applyProfile(id)
-  };
-
-  state.on(() => {
+  state.on((snapshot) => {
     syncFilters();
     syncAdminList();
     applyModuleLayout();
     updateActivityLog();
+    syncView();
+    renderProfiles(snapshot);
+    optionBindings.forEach((binding) => binding(snapshot));
   });
 
+  const initialSnapshot = state.get();
   syncFilters();
   syncAdminList();
   applyModuleLayout();
   updateActivityLog();
+  syncView();
+  renderProfiles(initialSnapshot);
+  optionBindings.forEach((binding) => binding(initialSnapshot));
 }

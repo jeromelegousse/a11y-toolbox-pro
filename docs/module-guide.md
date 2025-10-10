@@ -7,7 +7,7 @@ Ce guide explique comment ajouter un module ou un bloc sans casser l'existant. I
 1. **Isolation** : un module ne doit modifier que ses propres clés d'état (`state.set('moduleId.*')`) et DOM. Pas d'effets globaux non documentés.
 2. **Pureté UI** : utilisez le système de blocs (`registerBlock`) pour le rendu afin d'avoir un markup homogène (`renderBlock`).
 3. **Accessibilité native** : chaque contrôle doit disposer d'un libellé (`aria-label`, `aria-describedby`) et suivre les patrons WAI-ARIA.
-4. **Observabilité** : journalisez les actions côté utilisateur via `window.a11ytb.logActivity` lorsque pertinent.
+4. **Observabilité** : journalisez les actions côté utilisateur via `window.a11ytb.logActivity` lorsque pertinent (`window.a11ytb.logActivity('Lecture terminée', { module: manifest.id, tone: 'confirm', tags: ['tts'], severity: 'success' })`). Les entrées sont exportables en JSON/CSV via `window.a11ytb.activity`.
 
 ## 2. Anatomy d'un module
 
@@ -34,6 +34,10 @@ export const manifest = {
 `registerModule` normalise et enregistre ce manifest (dépendances, permissions, compatibilité…). Les champs inconnus sont
 ignorés avec un avertissement. Le manifest permet aussi d’injecter les valeurs par défaut du store via `defaults.state` :
 elles sont fusionnées automatiquement dans `src/main.js` grâce à `mergeManifestDefaults`.
+
+Depuis l’introduction du panneau « Options & Profils », un manifest peut également déclarer un tableau `config.fields`.
+Chaque champ (type `range`, `toggle`, `select`…) est rendu automatiquement dans le panneau et relié au store (`state.set`).
+Voir `src/modules/tts.js` pour un exemple complet.
 
 Un module est un objet enregistré via `registerModule`. Il doit au minimum fournir :
 
@@ -66,7 +70,7 @@ Le store observable se crée via `createStore` (`src/store.js`). Il expose `get`
   - `render(state)` doit retourner une string HTML. Les templates littéraux commentés (`/* html */` au-dessus de la string) améliorent la lisibilité.
   - `wire({ root, state })` attache les gestionnaires (`addEventListener`) et synchronise l'état.
 - Utilisez les classes utilitaires existantes (`a11ytb-module`, `a11ytb-module-content`, etc.) pour conserver le style.
-- Pour les contrôles partagés (options globales), exposez une fonction `exportConfig()` qui renverra la configuration et pourra être agrégée par le futur panneau d'options.
+- Pour exposer des contrôles globaux, décrivez-les dans `manifest.config.fields` (le panneau Options & Profils les rend et synchronise le store automatiquement).
 
 ### 2.3. APIs globales
 

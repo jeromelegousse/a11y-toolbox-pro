@@ -15,7 +15,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 
 - **Portée fonctionnelle** : la démo couvre surtout quelques actions temps réel (TTS, STT, contraste, espacement) mais n'exécute ni audit automatique ni export de rapports comme axe DevTools ou Accessibility Insights.
 - **Personnalisation** : il manque des profils prêts à l'emploi (dyslexie, vision basse, etc.) et des options fines (voix TTS, raccourcis personnalisables) présentes chez Stark ou les toolbars commerciales.
-- **Collaboration** : aucun historique ou export n'est prévu alors que les solutions professionnelles proposent des logs partageables et des intégrations outils.
+- **Collaboration** : un journal exportable (JSON/CSV) est disponible mais il manque encore le partage multi-utilisateurs et les intégrations outils présentes dans les solutions professionnelles.
 - **Gouvernance modules** : le registre est simple (`registerModule`, `registerBlock`) mais n'intègre pas de gestion de versions ou de dépendances, ce qui limite la scalabilité face aux bibliothèques modulaires plus matures.
 
 ## Recommandations stratégiques
@@ -48,10 +48,11 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 
 1. ✅ Concevoir un format `module.json` facultatif pour documenter les métadonnées (implémenté via `src/module-manifest.js` et
    fusion automatique des `defaults`).
-2. ✅ Ajouter des profils d'accessibilité préconfigurés au store initial (ex : `state.tx({ profiles: {...} })`).
-3. ⏳ Centraliser la gestion des options (panneau dédié) et permettre à chaque module d'y injecter ses champs — premier jalon : panneau d’administration avec activation/désactivation des modules et profils appliqués depuis l’UI.
-4. Documenter le guide module (voir `docs/module-guide.md`).
-5. Mettre en place des tests automatisés (lint déjà dispo) et prévoir des tests visuels/screenshot pour les nouveaux blocs.
+2. ✅ Ajouter des profils d'accessibilité préconfigurés au store initial (Vision basse, Dyslexie, Lecture vocale rapide).
+3. ✅ Centraliser la gestion des options (panneau dédié Options & Profils avec champs déclarés dans les manifestes).
+4. ✅ Étendre `window.a11ytb.logActivity` pour exposer un journal exportable (JSON/CSV) et des tags (module, gravité).
+5. Documenter le guide module (voir `docs/module-guide.md`).
+6. Mettre en place des tests automatisés (lint déjà dispo) et prévoir des tests visuels/screenshot pour les nouveaux blocs.
 
 ## Étapes moyen terme
 

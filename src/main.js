@@ -1,6 +1,6 @@
 import { createStore } from './store.js';
 import { mountUI } from './ui.js';
-import { registerBlock, listModuleManifests } from './registry.js';
+import { registerBlock, listModuleManifests, listModules } from './registry.js';
 import { createFeedback } from './feedback.js';
 import { mergeManifestDefaults } from './module-manifest.js';
 import './modules/tts.js';
@@ -8,6 +8,57 @@ import './modules/stt.js';
 import './modules/braille.js';
 import './modules/contrast.js';
 import './modules/spacing.js';
+
+const profilePresets = {
+  'vision-basse': {
+    name: 'Vision basse',
+    summary: 'Renforce le contraste et augmente les espacements pour limiter la fatigue visuelle.',
+    description: 'Active le thème à fort contraste, agrandit l’interlignage et ralentit légèrement la lecture vocale.',
+    tags: ['Vision', 'Lecture'],
+    tone: 'confirm',
+    activity: 'Profil Vision basse appliqué',
+    settings: {
+      'contrast.enabled': true,
+      'spacing.lineHeight': 1.9,
+      'spacing.letterSpacing': 0.08,
+      'tts.rate': 0.9,
+      'tts.pitch': 0.9,
+      'tts.volume': 1
+    }
+  },
+  dyslexie: {
+    name: 'Confort dyslexie',
+    summary: 'Espacements accentués et rythme vocal apaisé pour la lecture suivie.',
+    description: 'Optimise les espacements et réduit la vitesse TTS afin de faciliter le décodage des mots.',
+    tags: ['Lecture', 'Focus'],
+    tone: 'confirm',
+    activity: 'Profil Confort dyslexie appliqué',
+    settings: {
+      'contrast.enabled': true,
+      'spacing.lineHeight': 1.8,
+      'spacing.letterSpacing': 0.12,
+      'tts.rate': 0.85,
+      'tts.pitch': 1,
+      'tts.volume': 0.95
+    }
+  },
+  'lecture-rapide': {
+    name: 'Lecture vocale rapide',
+    summary: 'Accélère légèrement la voix pour survoler les contenus textuels.',
+    description: 'Ajuste la vitesse de lecture, garde un espacement confortable et conserve la mise en page d’origine.',
+    tags: ['Voix', 'Productivité'],
+    tone: 'confirm',
+    activity: 'Profil Lecture vocale rapide appliqué',
+    settings: {
+      'contrast.enabled': false,
+      'spacing.lineHeight': 1.6,
+      'spacing.letterSpacing': 0.05,
+      'tts.rate': 1.25,
+      'tts.pitch': 1,
+      'tts.volume': 1
+    }
+  }
+};
 
 const baseInitial = {
   ui: {
@@ -20,8 +71,10 @@ const baseInitial = {
     moduleOrder: [],
     showHidden: false,
     activity: [],
-    activeProfile: 'custom'
-  }
+    view: 'modules',
+    lastProfile: null
+  },
+  profiles: profilePresets
 };
 
 const initial = listModuleManifests().reduce(
@@ -53,6 +106,13 @@ function ttsStatusMessage(status) {
 }
 
 const state = createStore('a11ytb/v1', initial);
+listModules().forEach((mod) => {
+  try {
+    mod.init?.({ state });
+  } catch (error) {
+    console.error(`a11ytb: échec de l’initialisation du module ${mod.id}`, error);
+  }
+});
 const ensureDefaults = [
   ['ui.category', initial.ui.category],
   ['ui.search', initial.ui.search],
@@ -62,13 +122,18 @@ const ensureDefaults = [
   ['ui.moduleOrder', initial.ui.moduleOrder],
   ['ui.showHidden', initial.ui.showHidden],
   ['ui.activity', initial.ui.activity],
-  ['ui.activeProfile', initial.ui.activeProfile],
+  ['ui.view', initial.ui.view],
+  ['ui.lastProfile', initial.ui.lastProfile],
+  ['profiles', initial.profiles],
   ['tts.progress', initial.tts.progress]
 ];
 
 ensureDefaults.forEach(([path, fallback]) => {
   if (state.get(path) === undefined) {
-    state.set(path, Array.isArray(fallback) ? [...fallback] : fallback);
+    const clone = Array.isArray(fallback)
+      ? [...fallback]
+      : (typeof fallback === 'object' && fallback !== null ? structuredClone(fallback) : fallback);
+    state.set(path, clone);
   }
 });
 document.documentElement.dataset.dock = state.get('ui.dock') || 'right';
@@ -95,6 +160,9 @@ registerBlock({
     const s = state.get();
     const statusMessage = ttsStatusMessage(s.tts.status);
     const percent = Math.round((s.tts.progress || 0) * 100);
+    const voices = s.tts?.availableVoices ?? [];
+    const selectedVoice = voices.find((voice) => voice.voiceURI === s.tts.voice);
+    const voiceLabel = selectedVoice ? `${selectedVoice.name} (${selectedVoice.lang})` : 'Voix du navigateur';
     return `
       <div class="a11ytb-row">
         <button class="a11ytb-button" data-action="speak-selection">Lire la sélection</button>
@@ -109,23 +177,39 @@ registerBlock({
         <span class="a11ytb-progress-label" data-ref="progress-label"${s.tts.status === 'speaking' ? '' : ' hidden'}>${percent}%</span>
       </div>
       <p class="a11ytb-note" role="status" data-ref="status"${statusMessage ? '' : ' hidden'}>${statusMessage}</p>
-      <label>Vitesse <input type="range" min="0.5" max="2" step="0.1" value="${s.tts.rate}" data-bind="rate"></label>
-      <label>Timbre <input type="range" min="0" max="2" step="0.1" value="${s.tts.pitch}" data-bind="pitch"></label>
-      <label>Volume <input type="range" min="0" max="1" step="0.05" value="${s.tts.volume}" data-bind="volume"></label>
+      <dl class="a11ytb-summary">
+        <div>
+          <dt>Voix</dt>
+          <dd data-ref="voice">${voiceLabel}</dd>
+        </div>
+        <div>
+          <dt>Vitesse</dt>
+          <dd data-ref="rate">${(s.tts.rate ?? 1).toFixed(1)}×</dd>
+        </div>
+        <div>
+          <dt>Timbre</dt>
+          <dd data-ref="pitch">${(s.tts.pitch ?? 1).toFixed(1)}</dd>
+        </div>
+        <div>
+          <dt>Volume</dt>
+          <dd data-ref="volume">${Math.round((s.tts.volume ?? 1) * 100)} %</dd>
+        </div>
+      </dl>
+      <button class="a11ytb-button a11ytb-button--ghost" data-action="open-options">Ajuster dans Options &amp; Profils</button>
     `;
   },
   wire: ({ root, state }) => {
     root.querySelector('[data-action="speak-selection"]').addEventListener('click', () => window.speakSelection());
     root.querySelector('[data-action="speak-page"]').addEventListener('click', () => window.speakPage());
     root.querySelector('[data-action="stop"]').addEventListener('click', () => window.stopSpeaking());
-    const sliders = root.querySelectorAll('input[data-bind]');
-    sliders.forEach(inp => {
-      inp.addEventListener('input', () => {
-        state.set(`tts.${inp.dataset.bind}`, inp.valueAsNumber || parseFloat(inp.value));
-        markProfileCustom();
-      });
-    });
     const statusNode = root.querySelector('[data-ref="status"]');
+    const badge = root.querySelector('[data-ref="badge"]');
+    const progress = root.querySelector('[data-ref="progress"]');
+    const progressLabel = root.querySelector('[data-ref="progress-label"]');
+    const voiceNode = root.querySelector('[data-ref="voice"]');
+    const rateNode = root.querySelector('[data-ref="rate"]');
+    const pitchNode = root.querySelector('[data-ref="pitch"]');
+    const volumeNode = root.querySelector('[data-ref="volume"]');
     if (statusNode) {
       state.on(s => {
         const message = ttsStatusMessage(s.tts.status);
@@ -137,9 +221,6 @@ registerBlock({
         }
       });
     }
-    const badge = root.querySelector('[data-ref="badge"]');
-    const progress = root.querySelector('[data-ref="progress"]');
-    const progressLabel = root.querySelector('[data-ref="progress-label"]');
     state.on(s => {
       const speaking = s.tts.status === 'speaking';
       const percent = Math.round((s.tts.progress || 0) * 100);
@@ -169,13 +250,14 @@ registerBlock({
           progressLabel.setAttribute('hidden', '');
         }
       }
-      sliders.forEach(inp => {
-        const key = inp.dataset.bind;
-        const val = s.tts[key];
-        if (typeof val === 'number' && document.activeElement !== inp) {
-          inp.value = String(val);
-        }
-      });
+      if (voiceNode) {
+        const voices = s.tts?.availableVoices ?? [];
+        const selectedVoice = voices.find((voice) => voice.voiceURI === s.tts.voice);
+        voiceNode.textContent = selectedVoice ? `${selectedVoice.name} (${selectedVoice.lang})` : 'Voix du navigateur';
+      }
+      if (rateNode) rateNode.textContent = `${(s.tts.rate ?? 1).toFixed(1)}×`;
+      if (pitchNode) pitchNode.textContent = `${(s.tts.pitch ?? 1).toFixed(1)}`;
+      if (volumeNode) volumeNode.textContent = `${Math.round((s.tts.volume ?? 1) * 100)} %`;
     });
   }
 });
@@ -301,42 +383,38 @@ registerBlock({
   render: (state) => {
     const s = state.get();
     return `
-      <label>Interlignage <input type="range" min="1" max="2.4" step="0.1" value="${s.spacing.lineHeight}" data-bind="lineHeight"></label>
-      <label>Espacement des lettres <input type="range" min="0" max="0.2" step="0.01" value="${s.spacing.letterSpacing}" data-bind="letterSpacing"></label>
+      <p class="a11ytb-note">Réglez précisément les espacements dans l’onglet Options &amp; Profils.</p>
+      <dl class="a11ytb-summary">
+        <div>
+          <dt>Interlignage</dt>
+          <dd data-ref="lineHeight">${(s.spacing.lineHeight ?? 1.5).toFixed(1)}×</dd>
+        </div>
+        <div>
+          <dt>Lettres</dt>
+          <dd data-ref="letterSpacing">${Math.round((s.spacing.letterSpacing ?? 0) * 100)} %</dd>
+        </div>
+      </dl>
+      <button class="a11ytb-button a11ytb-button--ghost" data-action="open-options">Ouvrir Options &amp; Profils</button>
     `;
   },
   wire: ({ root, state }) => {
-    root.querySelectorAll('input[data-bind]').forEach(inp => {
-      const key = inp.dataset.bind;
-      inp.addEventListener('input', () => {
-        const val = inp.valueAsNumber || parseFloat(inp.value);
-        state.set(`spacing.${key}`, val);
-        document.documentElement.style.setProperty('--a11ytb-lh', String(state.get('spacing.lineHeight')));
-        document.documentElement.style.setProperty('--a11ytb-ls', String(state.get('spacing.letterSpacing')) + 'em');
-        markProfileCustom();
-      });
-      inp.addEventListener('change', () => {
-        const val = inp.valueAsNumber || parseFloat(inp.value);
-        state.set(`spacing.${key}`, val);
-        markProfileCustom();
-        if (key === 'lineHeight') {
-          window.a11ytb?.logActivity?.(`Interlignage ajusté à ${val.toFixed(1)}`);
-        } else {
-          window.a11ytb?.logActivity?.(`Espacement des lettres ajusté à ${(val * 100).toFixed(0)}%`);
-        }
-        window.a11ytb?.feedback?.play('toggle');
-      });
-    });
-    document.documentElement.style.setProperty('--a11ytb-lh', String(state.get('spacing.lineHeight')));
-    document.documentElement.style.setProperty('--a11ytb-ls', String(state.get('spacing.letterSpacing')) + 'em');
-    document.documentElement.classList.add('a11ytb-spacing-ready');
+    const lineNode = root.querySelector('[data-ref="lineHeight"]');
+    const letterNode = root.querySelector('[data-ref="letterSpacing"]');
+    function applyToDocument(spacingState) {
+      document.documentElement.style.setProperty('--a11ytb-lh', String(spacingState.spacing.lineHeight));
+      document.documentElement.style.setProperty('--a11ytb-ls', String(spacingState.spacing.letterSpacing) + 'em');
+      document.documentElement.classList.add('a11ytb-spacing-ready');
+    }
+    function updateSummary(spacingState) {
+      if (lineNode) lineNode.textContent = `${(spacingState.spacing.lineHeight ?? 1.5).toFixed(1)}×`;
+      if (letterNode) letterNode.textContent = `${Math.round((spacingState.spacing.letterSpacing ?? 0) * 100)} %`;
+    }
+    const initial = state.get();
+    applyToDocument(initial);
+    updateSummary(initial);
     state.on(s => {
-      const lh = root.querySelector('[data-bind="lineHeight"]');
-      const ls = root.querySelector('[data-bind="letterSpacing"]');
-      if (lh && document.activeElement !== lh) lh.value = s.spacing.lineHeight;
-      if (ls && document.activeElement !== ls) ls.value = s.spacing.letterSpacing;
-      document.documentElement.style.setProperty('--a11ytb-lh', String(s.spacing.lineHeight));
-      document.documentElement.style.setProperty('--a11ytb-ls', String(s.spacing.letterSpacing) + 'em');
+      applyToDocument(s);
+      updateSummary(s);
     });
   }
 });
