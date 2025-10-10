@@ -80,9 +80,18 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
 ### Phase 1 – Admin modulaire (T3 2025)
 
 - Développer un **builder drag & drop** pour ordonner les modules et blocs par simple glisser-déposer (support clavier inclus).
+  - Composant "liste réordonnable" avec `aria-grabbed`, gestion focus et annonces live pour refléter la nouvelle position.
+  - Interaction souris + tactile + clavier (touches `Space`/`Enter` pour saisir, `↑`/`↓` pour déplacer, `Esc` pour annuler).
+  - Sauvegarde optimiste + rollback si un module échoue à se repositionner (ex : dépendance non satisfaite).
 - Introduire des **collections de modules** : regroupements thématiques (lecture, navigation, contraste) avec bascule globale.
+  - Définir un modèle `collection.json` (id, label, description, modules inclus, dépendances).
+  - Afficher la collection comme un bloc repliable avec un switch maître qui active/désactive tous les modules compatibles.
+  - Permettre les collections imbriquées (p. ex. "Lecture" > "Lecture immersive") avec héritage de priorités.
 - Implémenter le **chargement conditionnel** : un panneau "Modules disponibles" affichant cases à cocher + état (actif, désactivé,
   requis par un profil) et appliquant le lazy-loading côté client.
+  - Statut temps réel (badges "Actif", "Requis", "En conflit") + filtre par collection/profil.
+  - Chargement via `import()` différé : précharger le manifest, charger le bundle uniquement à l'activation.
+  - Gestion mémoire : déchargement (`unmount`) lors d'une désactivation manuelle avec sauvegarde de l'état utilisateur.
 - Ajouter une vue "Dépendances" dans l'admin, affichant les modules requis avant activation.
 - Versionner les manifestes (`semver`) et exposer un historique des changements dans l'interface.
 
