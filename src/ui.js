@@ -333,11 +333,11 @@ export function mountUI({ root, state }) {
       if (index === -1) {
         pinned.unshift(id);
         state.set('ui.pinned', pinned);
-        logActivity(`Module épinglé : ${title}`, { tone: 'confirm' });
+        logActivity(`Module épinglé : ${title}`, { tone: 'confirm' });
       } else {
         pinned.splice(index, 1);
         state.set('ui.pinned', pinned);
-        logActivity(`Épingle retirée : ${title}`, { tone: 'toggle' });
+        logActivity(`Épingle retirée : ${title}`, { tone: 'toggle' });
       }
     } else if (btn.dataset.moduleAction === 'toggle-hide') {
       const hidden = Array.isArray(prefs.hidden) ? [...prefs.hidden] : [];
@@ -347,11 +347,11 @@ export function mountUI({ root, state }) {
         state.set('ui.hidden', hidden);
         const pinned = Array.isArray(prefs.pinned) ? prefs.pinned.filter(x => x !== id) : [];
         state.set('ui.pinned', pinned);
-        logActivity(`Module masqué : ${title}`, { tone: 'toggle' });
+        logActivity(`Module masqué : ${title}`, { tone: 'toggle' });
       } else {
         hidden.splice(index, 1);
         state.set('ui.hidden', hidden);
-        logActivity(`Module affiché : ${title}`, { tone: 'confirm' });
+        logActivity(`Module affiché : ${title}`, { tone: 'confirm' });
       }
     }
   });

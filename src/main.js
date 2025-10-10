@@ -1,14 +1,15 @@
 import { createStore } from './store.js';
 import { mountUI } from './ui.js';
-import { registerBlock } from './registry.js';
+import { registerBlock, listModuleManifests } from './registry.js';
 import { createFeedback } from './feedback.js';
+import { mergeManifestDefaults } from './module-manifest.js';
 import './modules/tts.js';
 import './modules/stt.js';
 import './modules/braille.js';
 import './modules/contrast.js';
 import './modules/spacing.js';
 
-const initial = {
+const baseInitial = {
   ui: {
     dock: 'right',
     category: 'all',
@@ -17,13 +18,13 @@ const initial = {
     hidden: [],
     showHidden: false,
     activity: []
-  },
-  tts: { rate: 1, pitch: 1, volume: 1, speaking: false, status: 'idle', progress: 0 },
-  stt: { status: 'idle', transcript: '' },
-  braille: { output: '' },
-  contrast: { enabled: false },
-  spacing: { lineHeight: 1.5, letterSpacing: 0 }
+  }
 };
+
+const initial = listModuleManifests().reduce(
+  (acc, manifest) => mergeManifestDefaults(acc, manifest),
+  baseInitial
+);
 
 const feedback = createFeedback();
 if (!window.a11ytb) window.a11ytb = {};

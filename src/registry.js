@@ -1,8 +1,31 @@
-const _modules = new Map();
+import { validateModuleManifest } from './module-manifest.js';
 
-export function registerModule(def) {
-  if (!def || !def.id) throw new Error('Module definition requires an id');
-  _modules.set(def.id, def);
+const _modules = new Map();
+const _moduleManifests = new Map();
+
+export function registerModule(definition) {
+  if (!definition || typeof definition !== 'object') {
+    throw new Error('Module definition must be an object.');
+  }
+  const id = definition.id;
+  if (!id || typeof id !== 'string') {
+    throw new Error('Module definition requires an id');
+  }
+  if (_modules.has(id)) {
+    throw new Error(`Module with id "${id}" is already registered.`);
+  }
+
+  const manifest = validateModuleManifest(definition.manifest ?? { id }, id);
+  _moduleManifests.set(id, manifest);
+
+  const normalized = {
+    ...definition,
+    id,
+    manifest
+  };
+  Object.freeze(normalized);
+  _modules.set(id, normalized);
+  return normalized;
 }
 
 export function listModules() {
@@ -11,6 +34,14 @@ export function listModules() {
 
 export function getModule(id) {
   return _modules.get(id);
+}
+
+export function listModuleManifests() {
+  return Array.from(_moduleManifests.values());
+}
+
+export function getModuleManifest(id) {
+  return _moduleManifests.get(id);
 }
 
 const _blocks = new Map();
@@ -59,4 +90,16 @@ export function renderBlock(block, state, root) {
   if (typeof block.wire === 'function') block.wire({ root: el, state });
   root.appendChild(el);
   return el;
+}
+
+if (!window.a11ytb) window.a11ytb = {};
+if (!window.a11ytb.registry) {
+  window.a11ytb.registry = {
+    listModules,
+    getModule,
+    listBlocks,
+    getBlock,
+    listModuleManifests,
+    getModuleManifest
+  };
 }

@@ -1,5 +1,23 @@
 import { registerModule } from '../registry.js';
 
+export const manifest = {
+  id: 'tts',
+  name: 'Synthèse vocale',
+  version: '0.1.0',
+  description: 'Lit le contenu sélectionné ou la page complète via l’API SpeechSynthesis.',
+  category: 'lecture',
+  keywords: ['tts', 'lecture', 'audio', 'speech'],
+  permissions: ['speechSynthesis'],
+  compat: {
+    browsers: ['chrome >= 100', 'edge >= 100', 'safari >= 16']
+  },
+  defaults: {
+    state: {
+      tts: { rate: 1, pitch: 1, volume: 1, speaking: false, status: 'idle', progress: 0 }
+    }
+  }
+};
+
 let abortedByStop = false;
 
 function getSelectionText() {
@@ -55,7 +73,8 @@ function speak(text, { rate = 1, pitch = 1, volume = 1 } = {}, state) {
 }
 
 const tts = {
-  id: 'tts',
+  id: manifest.id,
+  manifest,
   init({ state }) {
     const api = {
       speakSelection() {
