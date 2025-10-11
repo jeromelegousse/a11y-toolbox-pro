@@ -241,7 +241,7 @@ export function mountUI({ root, state }) {
   const statusCenter = document.createElement('section');
   statusCenter.className = 'a11ytb-status-center';
   statusCenter.setAttribute('role', 'region');
-  statusCenter.setAttribute('aria-label', 'État en temps réel des modules vocaux et braille');
+  statusCenter.setAttribute('aria-label', 'État en temps réel des modules vocaux, braille et vision');
 
   const statusHeader = document.createElement('div');
   statusHeader.className = 'a11ytb-status-header';
@@ -250,7 +250,7 @@ export function mountUI({ root, state }) {
   statusTitle.textContent = 'État en temps réel';
   const statusDescription = document.createElement('p');
   statusDescription.className = 'a11ytb-status-description';
-  statusDescription.textContent = 'Suivez la disponibilité des modules Lecture vocale, Dictée et Braille.';
+  statusDescription.textContent = 'Suivez la disponibilité des modules Lecture vocale, Dictée, Braille, Contraste et Espacements.';
   statusHeader.append(statusTitle, statusDescription);
 
   const statusGrid = document.createElement('div');
