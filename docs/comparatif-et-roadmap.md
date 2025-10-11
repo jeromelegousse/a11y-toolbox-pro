@@ -27,6 +27,23 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 - **Collaboration** : un journal exportable (JSON/CSV) est disponible mais il manque encore le partage multi-utilisateurs et les intégrations outils présentes dans les solutions professionnelles.
 - **Gouvernance modules** : le registre est simple (`registerModule`, `registerBlock`) mais n'intègre pas de gestion de versions ou de dépendances, ce qui limite la scalabilité face aux bibliothèques modulaires plus matures.
 
+## Manques par rapport à la feuille de route
+
+- **Phase 0** :
+  - Les tests automatisés restent à industrialiser (unitaires + visuels, point 6).
+  - Le focus trap complet du panneau d’options n’est pas encore généralisé (point 8).
+  - L’atelier design system doit encore fournir les exports CSS/tokens prêts à l’emploi (point 7).
+- **Phase 1** : aucun chantier sur le builder drag & drop, les collections de modules ou le chargement conditionnel n’a démarré.
+- **Phase 2 et suivantes** : observabilité temps réel, profils dynamiques, catalogue de modules et multi-tenant restent entièrement à concevoir.
+
+## Manques face à la concurrence
+
+- **Audit automatisé** : absence d’analyse WCAG intégrée (axe DevTools, Accessibility Insights).
+- **Guidage** : pas de parcours FastPass ou de checklists interactives.
+- **Personnalisation avancée** : profils dynamiques, raccourcis personnalisables et réglages voix étendus manquent face à Stark.
+- **Collaboration** : aucune intégration Jira/Linear/Slack ni partage multi-utilisateurs, contrairement aux suites professionnelles.
+- **Observabilité** : pas de score de conformité ni d’analytics consolidés comme sur les plateformes enterprise.
+
 ## Recommandations stratégiques
 
 1. **Clarifier les cas d'usage**

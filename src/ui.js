@@ -10,6 +10,36 @@ export function mountUI({ root, state }) {
     { id: 'interaction', label: 'Interaction' }
   ];
 
+  const PRIORITY_DEFAULT_WEIGHT = 2;
+  const PRIORITY_DEFAULT_DESCRIPTION = 'Utilise l’ordre actuel (ordre + épingles).';
+  const PRIORITY_LEVELS = [
+    {
+      id: 'critical',
+      label: 'Critique',
+      shortLabel: 'Critique',
+      description: 'Toujours afficher en premier et éviter de masquer le module.',
+      weight: 0,
+      tone: 'alert'
+    },
+    {
+      id: 'focus',
+      label: 'À privilégier',
+      shortLabel: 'Priorité',
+      description: 'Mettre le module en avant dans le panneau principal.',
+      weight: 1,
+      tone: 'confirm'
+    },
+    {
+      id: 'later',
+      label: 'À explorer plus tard',
+      shortLabel: 'Secondaire',
+      description: 'Module non critique pouvant rester en bas de liste.',
+      weight: 3,
+      tone: 'info'
+    }
+  ];
+  const PRIORITY_LOOKUP = new Map(PRIORITY_LEVELS.map((level) => [level.id, level]));
+
   const accessibilityProfiles = [
     {
       id: 'custom',
@@ -49,6 +79,44 @@ export function mountUI({ root, state }) {
     }
   ];
   const profileMap = new Map(accessibilityProfiles.map(profile => [profile.id, profile]));
+
+  function getPriorityEntry(priorityId) {
+    if (!priorityId) return null;
+    return PRIORITY_LOOKUP.get(priorityId) || null;
+  }
+
+  function getPriorityWeight(priorityId) {
+    const entry = getPriorityEntry(priorityId);
+    return typeof entry?.weight === 'number' ? entry.weight : PRIORITY_DEFAULT_WEIGHT;
+  }
+
+  function getPriorityDescription(priorityId) {
+    const entry = getPriorityEntry(priorityId);
+    return entry?.description || PRIORITY_DEFAULT_DESCRIPTION;
+  }
+
+  function getPriorityShortLabel(priorityId) {
+    const entry = getPriorityEntry(priorityId);
+    return entry?.shortLabel || '';
+  }
+
+  function normalizePriorityObject(input) {
+    if (!input || typeof input !== 'object') return {};
+    const normalized = {};
+    Object.entries(input).forEach(([id, priority]) => {
+      if (typeof priority === 'string' && PRIORITY_LOOKUP.has(priority)) {
+        normalized[id] = priority;
+      }
+    });
+    return normalized;
+  }
+
+  function shallowEqualObjects(a = {}, b = {}) {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    return keysA.every((key) => Object.is(a[key], b[key]));
+  }
 
   function arraysEqual(a = [], b = []) {
     if (a.length !== b.length) return false;
@@ -330,6 +398,7 @@ export function mountUI({ root, state }) {
   const blockInfo = new Map(blocks.map(block => [block.id, block]));
   const blockIds = blocks.map(block => block.id);
   const allowedIds = new Set(blockIds);
+  const blockIndex = new Map(blockIds.map((id, index) => [id, index]));
 
   const moduleElements = new Map();
   const adminItems = new Map();
@@ -670,8 +739,13 @@ export function mountUI({ root, state }) {
       moduleOrder: Array.isArray(ui.moduleOrder) ? [...ui.moduleOrder] : [],
       showHidden: !!ui.showHidden,
       view: ui.view || 'modules',
-      activeProfile: ui.activeProfile || 'custom'
+      activeProfile: ui.activeProfile || 'custom',
+      priorities: normalizePriorityObject(ui.priorities)
     };
+  }
+
+  function getCurrentPriorities() {
+    return normalizePriorityObject(state.get('ui.priorities'));
   }
 
   function getCurrentAdminOrder() {
@@ -1001,10 +1075,72 @@ export function mountUI({ root, state }) {
 
     label.append(checkbox, labelText);
 
-    const meta = document.createElement('span');
+    const meta = document.createElement('div');
     meta.className = 'a11ytb-admin-meta';
-    const categoryLabel = categories.find(cat => cat.id === block.category)?.label || 'Divers';
-    meta.textContent = categoryLabel;
+
+    const categoryBadge = document.createElement('span');
+    categoryBadge.className = 'a11ytb-admin-category';
+    categoryBadge.textContent = categories.find(cat => cat.id === block.category)?.label || 'Divers';
+    meta.append(categoryBadge);
+
+    const priorityWrapper = document.createElement('div');
+    priorityWrapper.className = 'a11ytb-admin-priority';
+
+    const prioritySelectId = `a11ytb-priority-select-${block.id}`;
+    const priorityLabel = document.createElement('label');
+    priorityLabel.className = 'a11ytb-admin-priority-label';
+    priorityLabel.setAttribute('for', prioritySelectId);
+    priorityLabel.textContent = 'Priorité';
+
+    const prioritySelect = document.createElement('select');
+    prioritySelect.className = 'a11ytb-admin-priority-select';
+    prioritySelect.dataset.ref = 'priority';
+    prioritySelect.id = prioritySelectId;
+    prioritySelect.setAttribute('aria-label', `Définir la priorité du module ${block.title || block.id}`);
+
+    const autoOption = document.createElement('option');
+    autoOption.value = '';
+    autoOption.textContent = 'Automatique';
+    prioritySelect.append(autoOption);
+
+    PRIORITY_LEVELS.forEach((level) => {
+      const option = document.createElement('option');
+      option.value = level.id;
+      option.textContent = level.label;
+      prioritySelect.append(option);
+    });
+
+    const priorityHint = document.createElement('p');
+    priorityHint.className = 'a11ytb-admin-priority-hint';
+    priorityHint.dataset.ref = 'priority-hint';
+    priorityHint.id = `a11ytb-priority-hint-${block.id}`;
+    priorityHint.textContent = PRIORITY_DEFAULT_DESCRIPTION;
+    prioritySelect.setAttribute('aria-describedby', priorityHint.id);
+
+    priorityWrapper.append(priorityLabel, prioritySelect, priorityHint);
+    meta.append(priorityWrapper);
+
+    prioritySelect.addEventListener('change', () => {
+      const raw = prioritySelect.value;
+      const normalized = PRIORITY_LOOKUP.has(raw) ? raw : '';
+      const current = getCurrentPriorities();
+      const next = { ...current };
+      if (normalized) {
+        next[block.id] = normalized;
+      } else {
+        delete next[block.id];
+      }
+      if (!shallowEqualObjects(current, next)) {
+        state.set('ui.priorities', next);
+        markProfileAsCustom();
+        const entry = getPriorityEntry(normalized);
+        const tone = entry?.tone || 'info';
+        const title = block.title || block.id;
+        const labelText = entry?.label || 'automatique';
+        logActivity(`Priorité ${labelText} pour ${title}`, { tone, module: block.id, tags: ['organisation', 'priorites'] });
+      }
+      priorityHint.textContent = getPriorityDescription(normalized || null);
+    });
 
     li.append(handle, order, icon, label, meta);
 
@@ -1045,7 +1181,20 @@ export function mountUI({ root, state }) {
   function syncAdminList() {
     const prefs = getPreferences();
     const disabledSet = new Set(prefs.disabled);
-    const orderSource = prefs.moduleOrder.length ? prefs.moduleOrder : blockIds;
+    const validPriorities = {};
+    Object.entries(prefs.priorities || {}).forEach(([id, priority]) => {
+      if (allowedIds.has(id) && PRIORITY_LOOKUP.has(priority)) {
+        validPriorities[id] = priority;
+      }
+    });
+    const hasCustomOrder = prefs.moduleOrder.length > 0;
+    const orderSource = hasCustomOrder
+      ? prefs.moduleOrder
+      : [...blockIds].sort((a, b) => {
+          const diff = getPriorityWeight(validPriorities[a]) - getPriorityWeight(validPriorities[b]);
+          if (diff !== 0) return diff;
+          return (blockIndex.get(a) ?? 0) - (blockIndex.get(b) ?? 0);
+        });
     const seen = new Set();
     orderSource.forEach((id) => {
       if (!allowedIds.has(id) || seen.has(id)) return;
@@ -1069,6 +1218,15 @@ export function mountUI({ root, state }) {
       }
       item.classList.toggle('is-disabled', !enabled);
       item.setAttribute('aria-disabled', String(!enabled));
+      const prioritySelect = item.querySelector('select[data-ref="priority"]');
+      const priorityHint = item.querySelector('[data-ref="priority-hint"]');
+      const priorityId = validPriorities[id] || '';
+      if (prioritySelect && prioritySelect.value !== priorityId) {
+        prioritySelect.value = priorityId;
+      }
+      if (priorityHint) {
+        priorityHint.textContent = getPriorityDescription(priorityId || null);
+      }
     });
     updateAdminPositions();
   }
@@ -1169,8 +1327,24 @@ export function mountUI({ root, state }) {
     const hiddenSet = new Set(prefs.hidden);
     const disabledSet = new Set(prefs.disabled);
 
-    const baseOrder = prefs.moduleOrder.length ? prefs.moduleOrder : blockIds;
-    const orderedPinned = prefs.pinned.filter(id => moduleElements.has(id));
+    const validPriorities = {};
+    Object.entries(prefs.priorities || {}).forEach(([id, priority]) => {
+      if (allowedIds.has(id) && PRIORITY_LOOKUP.has(priority)) {
+        validPriorities[id] = priority;
+      }
+    });
+    const hasCustomOrder = prefs.moduleOrder.length > 0;
+    const comparator = (a, b) => {
+      const diff = getPriorityWeight(validPriorities[a]) - getPriorityWeight(validPriorities[b]);
+      if (diff !== 0) return diff;
+      return (blockIndex.get(a) ?? 0) - (blockIndex.get(b) ?? 0);
+    };
+
+    const baseOrder = hasCustomOrder
+      ? prefs.moduleOrder
+      : [...blockIds].sort(comparator);
+    const orderedPinned = (hasCustomOrder ? prefs.pinned : [...prefs.pinned].sort(comparator))
+      .filter(id => moduleElements.has(id));
     const ordered = [
       ...orderedPinned,
       ...baseOrder.filter(id => !pinnedSet.has(id))
@@ -1184,6 +1358,28 @@ export function mountUI({ root, state }) {
     moduleElements.forEach((el, id) => {
       const title = el.dataset.title || '';
       const keywords = el.dataset.keywords || title.toLowerCase();
+      const priorityId = validPriorities[id] || '';
+      const priorityEntry = getPriorityEntry(priorityId);
+      if (priorityEntry) {
+        el.dataset.priority = priorityEntry.id;
+      } else {
+        el.removeAttribute('data-priority');
+      }
+      const badge = el.querySelector('[data-ref="priority-badge"]');
+      if (badge) {
+        if (priorityEntry) {
+          badge.hidden = false;
+          badge.dataset.priorityLevel = priorityEntry.id;
+          badge.textContent = getPriorityShortLabel(priorityEntry.id) || priorityEntry.label;
+          badge.setAttribute('aria-label', `Priorité : ${priorityEntry.label}`);
+          badge.title = priorityEntry.description;
+        } else {
+          badge.hidden = true;
+          badge.removeAttribute('data-priority-level');
+          badge.removeAttribute('aria-label');
+          badge.removeAttribute('title');
+        }
+      }
       const matchesCategory = prefs.category === 'all' || el.dataset.category === prefs.category;
       const matchesSearch = !searchTerm || keywords.includes(searchTerm);
       const isHidden = hiddenSet.has(id);
