@@ -205,11 +205,127 @@ function buildBrailleSummary(snapshot = {}) {
   return summary;
 }
 
+function buildContrastSummary(snapshot = {}) {
+  const contrast = snapshot.contrast ?? {};
+  const runtime = getRuntimeInfo(snapshot, 'contrast');
+  const enabled = runtime.enabled ?? true;
+  const moduleState = runtime.state ?? 'idle';
+  const summary = {
+    id: 'contrast',
+    label: 'Contraste renforcé',
+    badge: '',
+    value: '',
+    detail: '',
+    tone: STATUS_TONE_DEFAULT,
+    live: 'polite'
+  };
+
+  if (!enabled) {
+    summary.badge = 'Module désactivé';
+    summary.value = 'Contraste désactivé';
+    summary.detail = 'Activez la carte « Contraste élevé » pour appliquer le thème renforcé.';
+    summary.tone = STATUS_TONE_MUTED;
+    return summary;
+  }
+
+  if (moduleState === 'loading') {
+    summary.badge = 'Chargement…';
+    summary.value = 'Initialisation du thème';
+    summary.detail = 'Le module de contraste se charge.';
+    return summary;
+  }
+
+  if (moduleState === 'error') {
+    summary.badge = 'Erreur de chargement';
+    summary.value = 'Contraste indisponible';
+    summary.detail = runtime.error || 'Impossible de charger le module de contraste.';
+    summary.tone = STATUS_TONE_ALERT;
+    return summary;
+  }
+
+  const isActive = contrast.enabled === true;
+  summary.badge = isActive ? 'Actif' : 'Module prêt';
+  summary.value = isActive ? 'Thème actif' : 'En veille';
+  summary.detail = isActive
+    ? 'Contraste élevé appliqué sur la page.'
+    : 'Prêt à renforcer le contraste.';
+  if (isActive) {
+    summary.tone = STATUS_TONE_ACTIVE;
+    summary.live = 'assertive';
+  }
+
+  return summary;
+}
+
+function buildSpacingSummary(snapshot = {}) {
+  const spacing = snapshot.spacing ?? {};
+  const runtime = getRuntimeInfo(snapshot, 'spacing');
+  const enabled = runtime.enabled ?? true;
+  const moduleState = runtime.state ?? 'idle';
+  const summary = {
+    id: 'spacing',
+    label: 'Espacements typographiques',
+    badge: '',
+    value: '',
+    detail: '',
+    tone: STATUS_TONE_DEFAULT,
+    live: 'polite'
+  };
+
+  if (!enabled) {
+    summary.badge = 'Module désactivé';
+    summary.value = 'Espacements désactivés';
+    summary.detail = 'Réactivez la carte « Espacements » pour ajuster interlignage et lettres.';
+    summary.tone = STATUS_TONE_MUTED;
+    return summary;
+  }
+
+  if (moduleState === 'loading') {
+    summary.badge = 'Chargement…';
+    summary.value = 'Initialisation des espacements';
+    summary.detail = 'Le module d’espacements se charge.';
+    return summary;
+  }
+
+  if (moduleState === 'error') {
+    summary.badge = 'Erreur de chargement';
+    summary.value = 'Espacements indisponibles';
+    summary.detail = runtime.error || 'Impossible de charger le module d’espacements.';
+    summary.tone = STATUS_TONE_ALERT;
+    return summary;
+  }
+
+  const lineHeight = Number(spacing.lineHeight ?? 1.5);
+  const letterSpacing = Number(spacing.letterSpacing ?? 0);
+  const hasCustomLineHeight = Number.isFinite(lineHeight) && Math.abs(lineHeight - 1.5) > 0.05;
+  const hasCustomLetterSpacing = Number.isFinite(letterSpacing) && Math.abs(letterSpacing - 0) > 0.01;
+  const hasCustomSettings = hasCustomLineHeight || hasCustomLetterSpacing;
+
+  if (hasCustomSettings) {
+    const readableLineHeight = Number.isFinite(lineHeight) ? `${lineHeight.toFixed(1)}×` : '—';
+    const readableLetterSpacing = Number.isFinite(letterSpacing)
+      ? `${Math.round(letterSpacing * 100)} %`
+      : '—';
+    summary.badge = 'Réglages personnalisés';
+    summary.value = 'Espacements ajustés';
+    summary.detail = `Interlignage ${readableLineHeight} • Lettres ${readableLetterSpacing}`;
+    summary.tone = STATUS_TONE_ACTIVE;
+  } else {
+    summary.badge = 'Module prêt';
+    summary.value = 'Réglages standards';
+    summary.detail = 'Utilise les valeurs par défaut, prêtes à personnaliser.';
+  }
+
+  return summary;
+}
+
 export function summarizeStatuses(snapshot = {}) {
   return [
     buildTtsSummary(snapshot),
     buildSttSummary(snapshot),
-    buildBrailleSummary(snapshot)
+    buildBrailleSummary(snapshot),
+    buildContrastSummary(snapshot),
+    buildSpacingSummary(snapshot)
   ];
 }
 
