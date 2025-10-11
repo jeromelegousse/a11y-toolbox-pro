@@ -4,3 +4,9 @@ playwright-report/
 tests/visual/report/
 tests/visual/**/*.png
 *.fig
+.env*
+!.env.example
+data/samples/*
+!data/samples/README.md
+credentials/
+!docs/credentials/
