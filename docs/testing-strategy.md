@@ -7,10 +7,21 @@ Ce document précise comment nous automatisons les vérifications et comment ajo
 | Commande | Description |
 | --- | --- |
 | `npm run lint` | Exécute ESLint (`src/**/*.js`) puis Stylelint (`src/**/*.css`). Le script échoue sur le moindre avertissement. |
+| `npm run test:unit` | Exécute les tests Vitest (store, manifest, logique métier). |
 | `npm run test:visual` | Lance Playwright (Chromium) et vérifie les snapshots du panneau Options & Profils. |
-| `npm run test` | Chaîne `npm run lint` puis `npm run test:visual`. Utilisée par la CI. |
+| `npm run test` | Chaîne `npm run lint`, `npm run test:unit` puis `npm run test:visual`. Utilisée par la CI. |
 
-## 2. Tests visuels (Playwright)
+## 2. Tests unitaires (Vitest)
+
+- Les scénarios unitaires résident dans `tests/*.test.js` et `tests/**/*.test.js` (hors `visual/`).
+- `tests/inert.test.js` couvre l’isolation `inert` appliquée au panneau pour sécuriser le focus trap.
+- `tests/status-center.test.js` vérifie les synthèses d’état temps réel (TTS, STT, Braille) exposées dans le panneau.
+- `tests/guided-checklists.test.js` valide le calcul d’avancement des checklists Guides et la persistance des étapes manuelles.
+- Utilisez `vitest` en mode watch (`npx vitest`) pendant le développement pour profiter du rechargement à chaud.
+- Mockez les APIs navigateur via des helpers simples (ex. `MemoryStorage` dans `tests/store.test.js`) afin de conserver des tests déterministes.
+- Ajoutez un test dédié pour chaque régression corrigée au niveau des modules ou du store.
+
+## 3. Tests visuels (Playwright)
 
 - Les tests résident dans `tests/visual/`.
 - Après `npm install`, exécutez `npx playwright install` pour récupérer les navigateurs locaux (non requis en CI GitHub Actions).
@@ -25,7 +36,7 @@ Ce document précise comment nous automatisons les vérifications et comment ajo
   - simuler la navigation clavier,
   - documenter les attentes en commentaire.
 
-## 3. Règles pour les nouveaux blocs/modules
+## 4. Règles pour les nouveaux blocs/modules
 
 1. Ajouter un test Playwright minimal qui :
    - charge `index.html`,
@@ -35,13 +46,13 @@ Ce document précise comment nous automatisons les vérifications et comment ajo
 2. Masquer les éléments dynamiques (`mask`) ou stabiliser l’état via le store pour éviter les faux positifs.
 3. Documenter le scénario dans la PR (section « Tests ») et compléter cette page si un nouveau pattern est requis.
 
-## 4. Intégration continue
+## 5. Intégration continue
 
 - Le workflow `CI` (GitHub Actions) installe les dépendances, exécute `npm run test` et publie le rapport Playwright en artefact.
 - Tout échec (lint ou visual) bloque la PR.
 - Les rapports Playwright HTML sont générés dans `tests/visual/report/` et ignorés par Git (`.gitignore`).
 
-## 5. Résolution des échecs fréquents
+## 6. Résolution des échecs fréquents
 
 - **Snap différent** : inspectez `test-results/.../error-context.md` et relancez `UPDATE_VISUAL_BASELINE=1 npm run test:visual` si le changement est souhaité.
 - **Focus non trouvé** : vérifiez les attributs ARIA/focusable du composant et synchronisez-vous avec le focus trap (voir `src/ui.js`).

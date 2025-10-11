@@ -51,6 +51,7 @@ Ce document synthétise la palette, les composants prioritaires et la livraison 
 | Bouton ghost | Fond transparent, bord `--color-border`, texte `--color-text` | repos / hover (fond `--color-surface-alt`) / focus |
 | Chip (filtre) | Capsule avec outline `--color-border`, texte `--color-text-muted`, version active : fond `--color-primary-strong` | repos / active / focus |
 | Carte module | Surface `--color-surface`, padding `2 * --space-unit`, ombre `0 8px 24px rgba(15,23,42,.24)` | repos / disabled (overlay + `--color-surface-alt`) |
+| Carte d’état | Résumé (badge + valeur) pour le centre d’état | repos / actif (`--color-accent`) / alerte (`--color-danger`) / désactivé (opacité réduite) |
 | Form field (toggle, select) | Label 14px, description 12px, fond `--color-surface-alt`, focus ring `--color-primary-strong` | repos / focus / disabled |
 | Barre d’activités | Texte 14px, séparateurs `--color-border`, badges tonalités (success/danger) | normal / vide |
 
@@ -64,6 +65,7 @@ Chaque composant est documenté dans le kit Figma avec ses variantes (Auto Layou
   - Page `🧱 Composants` avec les variants (boutons, chips, cartes, champs).
   - Page `📐 Layout` proposant une grille 8pt et exemples de panneaux.
 - Les tokens sont également disponibles en JSON (`assets/design-system/figma-kit.tokens.json`) pour intégration via le plugin *Tokens Studio*.
+- Un export CSS vivant (`src/css/design-tokens.css`) expose les mêmes variables pour l’interface web ; il est importé par `src/css/styles.css` et doit rester synchronisé avec le kit.
 - À chaque évolution : mettre à jour le `.fig` + JSON, incrémenter la version en commentaire et noter la date.
 
 ## 6. Prochaines étapes atelier

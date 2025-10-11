@@ -1,4 +1,7 @@
 import { listBlocks, renderBlock, listModuleManifests } from './registry.js';
+import { applyInertToSiblings } from './utils/inert.js';
+import { summarizeStatuses } from './status-center.js';
+import { buildGuidedChecklists, toggleManualChecklistStep } from './guided-checklists.js';
 
 const DEFAULT_BLOCK_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h7v7H4V5zm9 0h7v7h-7V5zM4 12h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>';
 
@@ -204,13 +207,105 @@ export function mountUI({ root, state }) {
   const body = document.createElement('div');
   body.className = 'a11ytb-body';
 
+  const statusCenter = document.createElement('section');
+  statusCenter.className = 'a11ytb-status-center';
+  statusCenter.setAttribute('role', 'region');
+  statusCenter.setAttribute('aria-label', 'État en temps réel des modules vocaux et braille');
+
+  const statusHeader = document.createElement('div');
+  statusHeader.className = 'a11ytb-status-header';
+  const statusTitle = document.createElement('h2');
+  statusTitle.className = 'a11ytb-status-title';
+  statusTitle.textContent = 'État en temps réel';
+  const statusDescription = document.createElement('p');
+  statusDescription.className = 'a11ytb-status-description';
+  statusDescription.textContent = 'Suivez la disponibilité des modules Lecture vocale, Dictée et Braille.';
+  statusHeader.append(statusTitle, statusDescription);
+
+  const statusGrid = document.createElement('div');
+  statusGrid.className = 'a11ytb-status-grid';
+
+  statusCenter.append(statusHeader, statusGrid);
+
+  const statusCards = new Map();
+
+  function ensureStatusCard(summary) {
+    let entry = statusCards.get(summary.id);
+    if (!entry) {
+      const card = document.createElement('article');
+      card.className = 'a11ytb-status-card';
+      card.dataset.statusId = summary.id;
+      card.setAttribute('role', 'group');
+
+      const headerRow = document.createElement('div');
+      headerRow.className = 'a11ytb-status-card-header';
+
+      const label = document.createElement('span');
+      label.className = 'a11ytb-status-label';
+      label.id = `a11ytb-status-label-${summary.id}`;
+      label.textContent = summary.label;
+
+      const badge = document.createElement('span');
+      badge.className = 'a11ytb-badge';
+
+      headerRow.append(label, badge);
+
+      const value = document.createElement('p');
+      value.className = 'a11ytb-status-value';
+      value.dataset.ref = 'value';
+      value.setAttribute('role', 'status');
+      value.setAttribute('aria-live', summary.live || 'polite');
+      value.setAttribute('aria-labelledby', label.id);
+
+      const detail = document.createElement('p');
+      detail.className = 'a11ytb-status-detail';
+      detail.dataset.ref = 'detail';
+
+      card.append(headerRow, value, detail);
+      statusGrid.append(card);
+      entry = { card, badge, value, detail, label };
+      statusCards.set(summary.id, entry);
+    }
+    return entry;
+  }
+
+  function updateStatusCards(snapshot) {
+    const summaries = summarizeStatuses(snapshot || state.get());
+    summaries.forEach((summary) => {
+      const entry = ensureStatusCard(summary);
+      entry.card.dataset.tone = summary.tone || 'info';
+      if (summary.badge) {
+        entry.badge.textContent = summary.badge;
+        entry.badge.hidden = false;
+      } else {
+        entry.badge.textContent = '';
+        entry.badge.hidden = true;
+      }
+      entry.value.textContent = summary.value || '';
+      entry.value.setAttribute('aria-live', summary.live || 'polite');
+      entry.value.setAttribute('aria-labelledby', entry.label.id);
+      if (summary.detail) {
+        entry.detail.textContent = summary.detail;
+        entry.detail.hidden = false;
+      } else {
+        entry.detail.textContent = '';
+        entry.detail.hidden = true;
+      }
+    });
+  }
+
+  updateStatusCards(state.get());
+  state.on(updateStatusCards);
+
   const viewToggle = document.createElement('div');
   viewToggle.className = 'a11ytb-view-toggle';
   const viewButtons = new Map();
   const viewDefinitions = [
     { id: 'modules', label: 'Modules' },
     { id: 'options', label: 'Options & Profils' },
-    { id: 'organize', label: 'Organisation' }
+    { id: 'organize', label: 'Organisation' },
+    { id: 'guides', label: 'Guides' },
+    { id: 'shortcuts', label: 'Raccourcis' }
   ];
   viewDefinitions.forEach((view) => {
     const btn = document.createElement('button');
@@ -248,10 +343,26 @@ export function mountUI({ root, state }) {
   organizeView.setAttribute('hidden', '');
   organizeView.tabIndex = -1;
 
+  const guidesView = document.createElement('div');
+  guidesView.className = 'a11ytb-view a11ytb-view--guides';
+  guidesView.setAttribute('role', 'region');
+  guidesView.setAttribute('aria-label', 'Parcours guidés et checklists');
+  guidesView.setAttribute('hidden', '');
+  guidesView.tabIndex = -1;
+
+  const shortcutsView = document.createElement('div');
+  shortcutsView.className = 'a11ytb-view a11ytb-view--shortcuts';
+  shortcutsView.setAttribute('role', 'region');
+  shortcutsView.setAttribute('aria-label', 'Raccourcis clavier et navigation');
+  shortcutsView.setAttribute('hidden', '');
+  shortcutsView.tabIndex = -1;
+
   const viewElements = new Map([
     ['modules', modulesView],
     ['options', optionsView],
-    ['organize', organizeView]
+    ['organize', organizeView],
+    ['guides', guidesView],
+    ['shortcuts', shortcutsView]
   ]);
 
   const filters = document.createElement('div');
@@ -336,9 +447,11 @@ export function mountUI({ root, state }) {
 
   const optionsScroll = document.createElement('div');
   optionsScroll.className = 'a11ytb-options-scroll';
+  optionsScroll.classList.add('a11ytb-options-scroll--panel');
 
   const profilesSection = document.createElement('section');
   profilesSection.className = 'a11ytb-options-section';
+  profilesSection.classList.add('a11ytb-options-section--profiles');
   const profilesHeader = document.createElement('div');
   profilesHeader.className = 'a11ytb-section-header';
   const profilesTitle = document.createElement('h3');
@@ -354,6 +467,7 @@ export function mountUI({ root, state }) {
 
   const configSection = document.createElement('section');
   configSection.className = 'a11ytb-options-section';
+  configSection.classList.add('a11ytb-options-section--config');
   const configHeader = document.createElement('div');
   configHeader.className = 'a11ytb-section-header';
   const configTitle = document.createElement('h3');
@@ -370,14 +484,278 @@ export function mountUI({ root, state }) {
   optionsScroll.append(profilesSection, configSection);
   optionsView.append(optionsScroll);
 
-  viewContainer.append(modulesView, optionsView, organizeView);
-  body.append(viewToggle, viewContainer);
+  const guidesScroll = document.createElement('div');
+  guidesScroll.className = 'a11ytb-options-scroll';
+  const guidesSection = document.createElement('section');
+  guidesSection.className = 'a11ytb-options-section';
+  guidesSection.classList.add('a11ytb-options-section--guides');
+  const guidesHeader = document.createElement('div');
+  guidesHeader.className = 'a11ytb-section-header';
+  const guidesTitle = document.createElement('h3');
+  guidesTitle.className = 'a11ytb-section-title';
+  guidesTitle.textContent = 'Parcours guidés';
+  const guidesDescription = document.createElement('p');
+  guidesDescription.className = 'a11ytb-section-description';
+  guidesDescription.textContent = 'Suivez les checklists d’onboarding pour valider les réglages essentiels et surveiller vos services.';
+  guidesHeader.append(guidesTitle, guidesDescription);
+  const guidesGrid = document.createElement('div');
+  guidesGrid.className = 'a11ytb-guides-grid';
+  guidesSection.append(guidesHeader, guidesGrid);
+  guidesScroll.append(guidesSection);
+  guidesView.append(guidesScroll);
+
+  function renderGuidedChecklists(snapshot) {
+    if (!guidesGrid) return;
+    const checklists = buildGuidedChecklists(snapshot || state.get());
+    guidesGrid.innerHTML = '';
+    if (!checklists.length) {
+      const empty = document.createElement('p');
+      empty.className = 'a11ytb-empty-state';
+      empty.textContent = 'Aucune checklist disponible pour le moment.';
+      guidesGrid.append(empty);
+      return;
+    }
+    checklists.forEach((checklist) => {
+      const card = document.createElement('article');
+      card.className = 'a11ytb-config-card a11ytb-guide-card';
+      if (checklist.tone) {
+        card.dataset.tone = checklist.tone;
+      }
+
+      const header = document.createElement('div');
+      header.className = 'a11ytb-guide-card-header';
+      const title = document.createElement('h4');
+      title.className = 'a11ytb-guide-title';
+      title.textContent = checklist.title;
+      header.append(title);
+
+      const progress = document.createElement('div');
+      progress.className = 'a11ytb-guide-progress';
+      const progressLabel = document.createElement('span');
+      progressLabel.className = 'a11ytb-guide-progress-label';
+      progressLabel.textContent = `${checklist.completedCount}/${checklist.total} terminées`;
+      const progressTrack = document.createElement('div');
+      progressTrack.className = 'a11ytb-guide-progress-track';
+      const progressFill = document.createElement('span');
+      progressFill.className = 'a11ytb-guide-progress-fill';
+      const percent = Math.round(checklist.progress * 100);
+      progressFill.style.width = `${percent}%`;
+      progressFill.setAttribute('aria-hidden', 'true');
+      progressTrack.append(progressFill);
+      progress.append(progressLabel, progressTrack);
+      header.append(progress);
+
+      card.append(header);
+
+      if (checklist.description) {
+        const intro = document.createElement('p');
+        intro.className = 'a11ytb-guide-description';
+        intro.textContent = checklist.description;
+        card.append(intro);
+      }
+
+      if (checklist.nextStep) {
+        const next = document.createElement('p');
+        next.className = 'a11ytb-guide-next-step';
+        next.innerHTML = `<span class="a11ytb-guide-next-label">Prochaine étape :</span> ${checklist.nextStep.label}`;
+        card.append(next);
+      }
+
+      const list = document.createElement('ol');
+      list.className = 'a11ytb-guide-steps';
+      list.setAttribute('aria-label', `Étapes pour ${checklist.title}`);
+
+      checklist.steps.forEach((step) => {
+        const item = document.createElement('li');
+        item.className = 'a11ytb-guide-step';
+        item.dataset.state = step.completed ? 'done' : 'todo';
+        item.dataset.mode = step.state;
+
+        const status = document.createElement('span');
+        status.className = 'a11ytb-guide-step-status';
+        status.setAttribute('aria-hidden', 'true');
+        status.textContent = step.completed ? '✓' : '';
+
+        const body = document.createElement('div');
+        body.className = 'a11ytb-guide-step-body';
+
+        const label = document.createElement('span');
+        label.className = 'a11ytb-guide-step-label';
+        label.textContent = step.label;
+        body.append(label);
+
+        if (step.detail) {
+          const detail = document.createElement('p');
+          detail.className = 'a11ytb-guide-step-detail';
+          detail.textContent = step.detail;
+          body.append(detail);
+        }
+
+        item.append(status, body);
+
+        if (step.state === 'manual') {
+          const toggle = document.createElement('button');
+          toggle.type = 'button';
+          toggle.className = 'a11ytb-guide-step-toggle';
+          toggle.dataset.guideAction = 'toggle-step';
+          toggle.dataset.stepId = step.id;
+          toggle.dataset.stepLabel = step.label;
+          toggle.setAttribute('aria-pressed', String(step.completed));
+          toggle.textContent = step.completed ? 'Marquer à refaire' : 'Marquer comme fait';
+          item.append(toggle);
+        } else {
+          const badge = document.createElement('span');
+          badge.className = 'a11ytb-guide-step-tag';
+          badge.textContent = 'Suivi automatique';
+          item.append(badge);
+        }
+
+        list.append(item);
+      });
+
+      card.append(list);
+      guidesGrid.append(card);
+    });
+  }
+
+  renderGuidedChecklists(state.get());
+  state.on(renderGuidedChecklists);
+
+  guidesGrid.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-guide-action="toggle-step"]');
+    if (!button) return;
+    const stepId = button.dataset.stepId;
+    if (!stepId) return;
+    const wasCompleted = button.getAttribute('aria-pressed') === 'true';
+    const changed = toggleManualChecklistStep(state, stepId);
+    if (!changed) return;
+    const nowCompleted = !wasCompleted;
+    const label = button.dataset.stepLabel || stepId;
+    button.setAttribute('aria-pressed', String(nowCompleted));
+    button.textContent = nowCompleted ? 'Marquer à refaire' : 'Marquer comme fait';
+    const tone = nowCompleted ? 'confirm' : 'info';
+    logActivity(`${nowCompleted ? 'Étape validée' : 'Étape réinitialisée'} : ${label}`, {
+      tone,
+      tags: ['guides', stepId]
+    });
+  });
+
+  function createShortcutComboElement(variants) {
+    const container = document.createElement('span');
+    container.className = 'a11ytb-shortcut-combo';
+    variants.forEach((keys, variantIndex) => {
+      keys.forEach((key, keyIndex) => {
+        const kbd = document.createElement('kbd');
+        kbd.className = 'a11ytb-shortcut-key';
+        kbd.textContent = key;
+        container.append(kbd);
+        if (keyIndex < keys.length - 1) {
+          const join = document.createElement('span');
+          join.className = 'a11ytb-shortcut-join';
+          join.setAttribute('aria-hidden', 'true');
+          join.textContent = '+';
+          container.append(join);
+        }
+      });
+      if (variantIndex < variants.length - 1) {
+        const or = document.createElement('span');
+        or.className = 'a11ytb-shortcut-or';
+        or.textContent = 'ou';
+        container.append(or);
+      }
+    });
+    return container;
+  }
+
+  const shortcutsScroll = document.createElement('div');
+  shortcutsScroll.className = 'a11ytb-options-scroll';
+  const shortcutsSection = document.createElement('section');
+  shortcutsSection.className = 'a11ytb-options-section';
+  const shortcutsHeader = document.createElement('div');
+  shortcutsHeader.className = 'a11ytb-section-header';
+  const shortcutsTitle = document.createElement('h3');
+  shortcutsTitle.className = 'a11ytb-section-title';
+  shortcutsTitle.textContent = 'Raccourcis clavier';
+  const shortcutsDescription = document.createElement('p');
+  shortcutsDescription.className = 'a11ytb-section-description';
+  shortcutsDescription.textContent = 'Accédez rapidement aux vues du panneau et maîtrisez les déplacements au clavier.';
+  shortcutsHeader.append(shortcutsTitle, shortcutsDescription);
+
+  const shortcutsGrid = document.createElement('div');
+  shortcutsGrid.className = 'a11ytb-shortcuts-grid';
+
+  const shortcutGroups = [
+    {
+      title: 'Navigation du panneau',
+      description: 'Raccourcis globaux accessibles depuis toute la page.',
+      shortcuts: [
+        { combo: [['Alt', 'Shift', 'A']], description: 'Ouvrir ou fermer la boîte à outils.' },
+        { combo: [['Alt', 'Shift', 'M']], description: 'Afficher la vue Modules.' },
+        { combo: [['Alt', 'Shift', 'O']], description: 'Afficher la vue Options & Profils.' },
+        { combo: [['Alt', 'Shift', 'G']], description: 'Afficher la vue Organisation.' },
+        { combo: [['Alt', 'Shift', 'P']], description: 'Afficher la vue Guides.' },
+        { combo: [['Alt', 'Shift', 'H']], description: 'Afficher cette vue Raccourcis.' }
+      ]
+    },
+    {
+      title: 'Gestion du panneau',
+      description: 'Disponible lorsque la boîte à outils est ouverte.',
+      shortcuts: [
+        { combo: [['Tab'], ['Shift', 'Tab']], description: 'Parcourir les commandes disponibles.' },
+        { combo: [['Échap']], description: 'Fermer le panneau en conservant le focus précédent.' }
+      ]
+    },
+    {
+      title: 'Réorganisation des modules',
+      description: 'Raccourcis utilisables dans la vue Organisation.',
+      shortcuts: [
+        { combo: [['Entrée'], ['Espace']], description: 'Saisir ou déposer la carte sélectionnée.' },
+        { combo: [['↑'], ['↓']], description: 'Déplacer la carte saisie vers le haut ou vers le bas.' },
+        { combo: [['Échap']], description: 'Annuler la saisie et replacer la carte.' }
+      ]
+    }
+  ];
+
+  shortcutGroups.forEach((group) => {
+    const card = document.createElement('article');
+    card.className = 'a11ytb-config-card a11ytb-shortcuts-card';
+    const heading = document.createElement('h4');
+    heading.className = 'a11ytb-shortcuts-heading';
+    heading.textContent = group.title;
+    card.append(heading);
+    if (group.description) {
+      const copy = document.createElement('p');
+      copy.className = 'a11ytb-shortcuts-description';
+      copy.textContent = group.description;
+      card.append(copy);
+    }
+    const list = document.createElement('dl');
+    list.className = 'a11ytb-shortcuts-list';
+    group.shortcuts.forEach((shortcut) => {
+      const dt = document.createElement('dt');
+      dt.className = 'a11ytb-shortcut-keys';
+      dt.append(createShortcutComboElement(shortcut.combo));
+      const dd = document.createElement('dd');
+      dd.className = 'a11ytb-shortcut-description';
+      dd.textContent = shortcut.description;
+      list.append(dt, dd);
+    });
+    card.append(list);
+    shortcutsGrid.append(card);
+  });
+
+  shortcutsSection.append(shortcutsHeader, shortcutsGrid);
+  shortcutsScroll.append(shortcutsSection);
+  shortcutsView.append(shortcutsScroll);
+
+  viewContainer.append(modulesView, optionsView, organizeView, guidesView, shortcutsView);
+  body.append(statusCenter, viewToggle, viewContainer);
 
   const footer = document.createElement('div');
   footer.className = 'a11ytb-header';
   const footerTitle = document.createElement('div');
   footerTitle.className = 'a11ytb-title';
-  footerTitle.textContent = 'Raccourci : Alt+Shift+A';
+  footerTitle.textContent = 'Raccourcis : Alt+Shift+A • Alt+Shift+P • Alt+Shift+H';
 
   const activity = document.createElement('details');
   activity.className = 'a11ytb-activity';
@@ -561,7 +939,19 @@ export function mountUI({ root, state }) {
       }
     }
     if (field.type === 'range') {
-      return typeof value === 'number' ? value.toFixed(2) : value ?? '';
+      if (typeof value === 'number') {
+        let decimals = 0;
+        if (typeof field.step === 'number') {
+          const stepString = String(field.step);
+          const fraction = stepString.split('.')[1];
+          decimals = fraction ? fraction.length : 0;
+        } else if (!Number.isInteger(value)) {
+          decimals = 2;
+        }
+        const formatted = decimals > 0 ? value.toFixed(decimals) : value.toString();
+        return decimals > 0 ? Number.parseFloat(formatted).toString() : formatted;
+      }
+      return value ?? '';
     }
     if (field.type === 'toggle') {
       return value ? 'Activé' : 'Désactivé';
@@ -572,6 +962,9 @@ export function mountUI({ root, state }) {
   function createOptionField(manifest, field) {
     const wrapper = document.createElement('div');
     wrapper.className = 'a11ytb-option';
+    if (field?.type) {
+      wrapper.classList.add(`a11ytb-option--${field.type}`);
+    }
     let update = () => {};
 
     if (field.type === 'range') {
@@ -591,11 +984,27 @@ export function mountUI({ root, state }) {
       if (field.step !== undefined) input.step = String(field.step);
       input.setAttribute('aria-label', field.label || field.path);
 
+      const minValueRaw = Number(field.min ?? 0);
+      const maxValueRaw = Number(field.max ?? 100);
+      const sliderMin = Number.isFinite(minValueRaw) ? minValueRaw : 0;
+      const sliderMax = Number.isFinite(maxValueRaw) ? maxValueRaw : sliderMin + 100;
+      const sliderLow = Math.min(sliderMin, sliderMax);
+      const sliderHigh = Math.max(sliderMin, sliderMax);
+      const sliderSpan = sliderHigh - sliderLow || 1;
+
+      const updateSliderVisual = (value) => {
+        if (!Number.isFinite(value)) return;
+        const clamped = Math.min(sliderHigh, Math.max(sliderLow, value));
+        const ratio = (clamped - sliderLow) / sliderSpan;
+        input.style.setProperty('--a11ytb-slider-progress', `${ratio * 100}%`);
+      };
+
       input.addEventListener('input', () => {
         const raw = input.valueAsNumber;
         const safe = Number.isNaN(raw) ? Number(field.min ?? 0) : raw;
         state.set(field.path, safe);
         valueNode.textContent = formatFieldValue(field, safe);
+        updateSliderVisual(safe);
       });
       input.addEventListener('change', () => {
         const raw = input.valueAsNumber;
@@ -604,9 +1013,35 @@ export function mountUI({ root, state }) {
         if (typeof field.onChange === 'function') {
           field.onChange(safe, { state: state.get(), field, manifest });
         }
+        updateSliderVisual(safe);
       });
 
       wrapper.append(label, input);
+
+      if (field.min !== undefined || field.max !== undefined) {
+        const scale = document.createElement('div');
+        scale.className = 'a11ytb-option-scale';
+        const minLabel = document.createElement('span');
+        minLabel.className = 'a11ytb-option-scale-label';
+        if (field.min !== undefined) {
+          minLabel.textContent = Number.isFinite(sliderMin)
+            ? formatFieldValue(field, sliderMin)
+            : `${field.min}`;
+        } else {
+          minLabel.textContent = '';
+        }
+        const maxLabel = document.createElement('span');
+        maxLabel.className = 'a11ytb-option-scale-label';
+        if (field.max !== undefined) {
+          maxLabel.textContent = Number.isFinite(sliderMax)
+            ? formatFieldValue(field, sliderMax)
+            : `${field.max}`;
+        } else {
+          maxLabel.textContent = '';
+        }
+        scale.append(minLabel, maxLabel);
+        wrapper.append(scale);
+      }
       if (field.description) {
         const hint = document.createElement('p');
         hint.className = 'a11ytb-option-description';
@@ -621,6 +1056,7 @@ export function mountUI({ root, state }) {
           input.value = String(value);
         }
         valueNode.textContent = formatFieldValue(field, value);
+        updateSliderVisual(value);
       };
     } else if (field.type === 'toggle') {
       const trueValue = field.trueValue !== undefined ? field.trueValue : true;
@@ -633,6 +1069,15 @@ export function mountUI({ root, state }) {
       const title = document.createElement('span');
       title.className = 'a11ytb-option-title';
       title.textContent = field.label || field.path;
+      const status = document.createElement('span');
+      status.className = 'a11ytb-option-status';
+
+      const syncToggleVisual = (value) => {
+        const formatted = formatFieldValue(field, value);
+        label.setAttribute('data-value', formatted);
+        label.dataset.state = value === trueValue ? 'on' : 'off';
+        status.textContent = formatted;
+      };
 
       input.addEventListener('change', () => {
         const value = input.checked ? trueValue : falseValue;
@@ -640,9 +1085,10 @@ export function mountUI({ root, state }) {
         if (typeof field.onChange === 'function') {
           field.onChange(value, { state: state.get(), field, manifest });
         }
+        syncToggleVisual(value);
       });
 
-      label.append(input, title);
+      label.append(input, title, status);
       wrapper.append(label);
       if (field.description) {
         const hint = document.createElement('p');
@@ -655,7 +1101,7 @@ export function mountUI({ root, state }) {
         const current = readValue(snapshot, field.path);
         const checked = current === trueValue;
         input.checked = checked;
-        label.setAttribute('data-value', formatFieldValue(field, current));
+        syncToggleVisual(current);
       };
     } else if (field.type === 'select') {
       const label = document.createElement('label');
@@ -1550,6 +1996,28 @@ export function mountUI({ root, state }) {
         });
       }
     }
+    if (currentView === 'guides' && activeViewId !== 'guides') {
+      requestAnimationFrame(() => {
+        const focusables = collectFocusable(guidesView);
+        const target = focusables[0] || guidesView;
+        if (typeof target?.focus === 'function') {
+          try {
+            target.focus({ preventScroll: true });
+          } catch (error) {
+            target.focus();
+          }
+        }
+      });
+    }
+    if (currentView === 'shortcuts' && activeViewId !== 'shortcuts') {
+      requestAnimationFrame(() => {
+        try {
+          shortcutsView.focus({ preventScroll: true });
+        } catch (error) {
+          shortcutsView.focus();
+        }
+      });
+    }
     activeViewId = currentView;
   }
 
@@ -1794,6 +2262,7 @@ export function mountUI({ root, state }) {
   root.append(overlay, fab, panel);
 
   let lastFocusedElement = null;
+  let releaseOutsideInert = null;
 
   const FOCUSABLE_SELECTORS = [
     'a[href]',
@@ -1823,10 +2292,24 @@ export function mountUI({ root, state }) {
     overlay.setAttribute('aria-hidden', String(!shouldOpen));
     document.body.classList.toggle('a11ytb-modal-open', shouldOpen);
     if (shouldOpen) {
+      if (typeof releaseOutsideInert === 'function') {
+        releaseOutsideInert();
+      }
+      releaseOutsideInert = applyInertToSiblings(root);
       lastFocusedElement = document.activeElement;
       const focusables = getFocusableElements();
       (focusables[0] || panel).focus();
+      if (state.get('ui.view') === 'options' && !releaseOptionsFocusTrap) {
+        setupOptionsFocusTrap();
+      }
     } else {
+      if (typeof releaseOutsideInert === 'function') {
+        releaseOutsideInert();
+        releaseOutsideInert = null;
+      }
+      if (activeViewId === 'options') {
+        teardownOptionsFocusTrap();
+      }
       const target = (lastFocusedElement && typeof lastFocusedElement.focus === 'function') ? lastFocusedElement : fab;
       target.focus();
       lastFocusedElement = null;
@@ -1844,11 +2327,29 @@ export function mountUI({ root, state }) {
   header.querySelector('[data-action="dock-right"]').addEventListener('click', () => state.set('ui.dock', 'right'));
   header.querySelector('[data-action="dock-bottom"]').addEventListener('click', () => state.set('ui.dock', 'bottom'));
 
+  const viewHotkeys = new Map([
+    ['m', 'modules'],
+    ['o', 'options'],
+    ['g', 'organize'],
+    ['p', 'guides'],
+    ['h', 'shortcuts']
+  ]);
+
   window.addEventListener('keydown', (e) => {
-    if (e.altKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+    if (!e.altKey || !e.shiftKey || e.defaultPrevented) return;
+    const key = typeof e.key === 'string' ? e.key.toLowerCase() : '';
+    if (key === 'a') {
       e.preventDefault();
       toggle();
+      return;
     }
+    const targetView = viewHotkeys.get(key);
+    if (!targetView) return;
+    e.preventDefault();
+    if (panel.dataset.open !== 'true') {
+      toggle(true);
+    }
+    state.set('ui.view', targetView);
   });
 
   overlay.addEventListener('click', () => toggle(false));

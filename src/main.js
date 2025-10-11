@@ -74,9 +74,15 @@ const baseInitial = {
     showHidden: false,
     activity: [],
     view: 'modules',
-    lastProfile: null
+    lastProfile: null,
+    guides: {
+      completedSteps: {}
+    }
   },
-  profiles: profilePresets
+  profiles: profilePresets,
+  runtime: {
+    modules: {}
+  }
 };
 
 const initial = normalizedManifests.reduce(
@@ -120,7 +126,9 @@ const ensureDefaults = [
   ['ui.activity', initial.ui.activity],
   ['ui.view', initial.ui.view],
   ['ui.lastProfile', initial.ui.lastProfile],
+  ['ui.guides', initial.ui.guides],
   ['profiles', initial.profiles],
+  ['runtime.modules', initial.runtime.modules],
   ['tts.progress', initial.tts.progress]
 ];
 
