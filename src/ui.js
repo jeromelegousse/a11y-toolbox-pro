@@ -64,6 +64,17 @@ export function mountUI({ root, state }) {
         if (!Number.isNaN(currentRate) && currentRate < 1) {
           state.set('tts.rate', 1);
         }
+        state.set('audio.theme', 'vigilance');
+        state.set('audio.masterVolume', 1);
+        state.set('audio.events.alert.volume', 1);
+        state.set('audio.events.alert.timbre', 'bright');
+        state.set('audio.events.confirm.volume', 0.9);
+        state.set('audio.events.info.volume', 0.85);
+        window.a11ytb?.logActivity?.("Vision basse : thème audio 'vigilance', volume maître à 100 % et alertes renforcées", {
+          tone: 'info',
+          tags: ['audio', 'profil'],
+          profile: 'vision-low'
+        });
       }
     },
     {
@@ -78,6 +89,16 @@ export function mountUI({ root, state }) {
         state.set('spacing.lineHeight', 1.7);
         state.set('spacing.letterSpacing', 0.12);
         state.set('tts.rate', 0.9);
+        state.set('audio.theme', 'calm-focus');
+        state.set('audio.masterVolume', 0.85);
+        state.set('audio.events.alert.volume', 0.85);
+        state.set('audio.events.confirm.volume', 0.7);
+        state.set('audio.events.info.volume', 0.6);
+        window.a11ytb?.logActivity?.('Confort de lecture : thème audio apaisé et volumes ajustés pour limiter la fatigue', {
+          tone: 'info',
+          tags: ['audio', 'profil'],
+          profile: 'reading-comfort'
+        });
       }
     }
   ];
