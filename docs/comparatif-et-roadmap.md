@@ -16,7 +16,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 | Axe | Forces des solutions pro | État actuel A11y Toolbox Pro | Pistes rapides |
 | --- | --- | --- | --- |
 | **UX / UI** | Parcours guidés, microcopie pédagogique, hiérarchie d'information claire (axe Insights, Stark) | Panneau unique avec options listées sans priorisation ni guidance | Prioriser les actions critiques, ajouter onboarding contextualisé et exemples d'usage |
-| **Ergonomie** | Navigation clavier fluide, focus trap dans les dialogues, raccourcis cohérents, feedback état chargement | Quelques raccourcis globaux, focus partiellement géré dans le panneau | Harmoniser les patterns clavier, afficher la liste des raccourcis, ajouter indicateurs de statut (chargement/sauvegarde) |
+| **Ergonomie** | Navigation clavier fluide, focus trap dans les dialogues, raccourcis cohérents, feedback état chargement | Focus trap complet, vue « Raccourcis » et centre d’état temps réel (TTS/STT/Braille) mais peu d’indicateurs pour les autres modules | Harmoniser les patterns clavier, ajouter indicateurs de statut (chargement/sauvegarde), préparer la personnalisation des raccourcis |
 | **Fiabilité** | Tests automatisés (axe core), reporting d'erreurs, synchronisation cloud, compatibilité multi-navigateurs | Démo locale sans pipeline de tests, journal local uniquement | Ajouter tests unitaires + e2e, gestion offline/erreurs, fallback progressif sur features vocales |
 | **Design** | Design systems documentés, tokens (couleurs, espace), mode sombre cohérent | Styles ad hoc par module, contraste variable, icônes hétérogènes | Définir tokens de base, bibliothèque d'icônes accessible, mode sombre clair | 
 
@@ -31,7 +31,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 
 - **Phase 0** :
   - Les tests automatisés restent à industrialiser (unitaires + visuels, point 6).
-  - Le focus trap complet du panneau d’options n’est pas encore généralisé (point 8).
+  - Le focus trap complet du panneau d’options est couvert (isolation inert + restitution focus), il faut maintenant étendre les indicateurs d’état.
   - L’atelier design system doit encore fournir les exports CSS/tokens prêts à l’emploi (point 7).
 - **Phase 1** : aucun chantier sur le builder drag & drop, les collections de modules ou le chargement conditionnel n’a démarré.
 - **Phase 2 et suivantes** : observabilité temps réel, profils dynamiques, catalogue de modules et multi-tenant restent entièrement à concevoir.
@@ -92,7 +92,7 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
 5. Documenter le guide module (voir `docs/module-guide.md`).
 6. Mettre en place des tests automatisés (lint déjà dispo) et prévoir des tests visuels/screenshot pour les nouveaux blocs.
 7. Lancer un **atelier de design system** : définir palette + composants de base, livrer un kit Figma pour préparer l'implémentation.
-8. Ajouter un **focus trap** et la gestion explicite du cycle de focus pour le panneau d'options.
+8. ✅ Ajouter un **focus trap** complet avec isolation (`inert`) du reste de la page pour le panneau d'options.
 
 ### Phase 1 – Admin modulaire (T3 2025)
 

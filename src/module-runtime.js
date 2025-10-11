@@ -14,8 +14,14 @@ export function setupModuleRuntime({ state, catalog }) {
   const initialized = new Set();
   const loading = new Map();
 
+  function updateModuleRuntime(moduleId, patch) {
+    const current = state.get(`runtime.modules.${moduleId}`) || {};
+    state.set(`runtime.modules.${moduleId}`, { ...current, ...patch });
+  }
+
   function loadModule(moduleId) {
     if (initialized.has(moduleId)) {
+      updateModuleRuntime(moduleId, { state: 'ready', error: null });
       return Promise.resolve(getModule(moduleId));
     }
     if (loading.has(moduleId)) {
@@ -25,6 +31,7 @@ export function setupModuleRuntime({ state, catalog }) {
     if (!loader) {
       return Promise.reject(new Error(`Module loader missing for "${moduleId}".`));
     }
+    updateModuleRuntime(moduleId, { state: 'loading', error: null });
     const promise = loader()
       .then(() => {
         const mod = getModule(moduleId);
@@ -37,15 +44,18 @@ export function setupModuleRuntime({ state, catalog }) {
               mod.init({ state });
             } catch (error) {
               console.error(`a11ytb: échec de l’initialisation du module ${moduleId}.`, error);
+              updateModuleRuntime(moduleId, { state: 'error', error: error?.message || 'Échec d\'initialisation' });
               throw error;
             }
           }
           initialized.add(moduleId);
         }
+        updateModuleRuntime(moduleId, { state: 'ready', error: null });
         return mod;
       })
       .catch((error) => {
         console.error(`a11ytb: impossible de charger le module ${moduleId}.`, error);
+        updateModuleRuntime(moduleId, { state: 'error', error: error?.message || 'Échec de chargement' });
         throw error;
       })
       .finally(() => {
@@ -61,7 +71,9 @@ export function setupModuleRuntime({ state, catalog }) {
 
   let lastDisabled = new Set(state.get('ui.disabled') ?? []);
   moduleToBlocks.forEach((blockIds, moduleId) => {
-    if (isModuleEnabled(blockIds, lastDisabled)) {
+    const enabled = isModuleEnabled(blockIds, lastDisabled);
+    updateModuleRuntime(moduleId, { blockIds, enabled });
+    if (enabled) {
       loadModule(moduleId).catch(() => {});
     }
   });
@@ -71,6 +83,9 @@ export function setupModuleRuntime({ state, catalog }) {
     moduleToBlocks.forEach((blockIds, moduleId) => {
       const wasEnabled = isModuleEnabled(blockIds, lastDisabled);
       const isEnabled = isModuleEnabled(blockIds, nextDisabled);
+      if (wasEnabled !== isEnabled) {
+        updateModuleRuntime(moduleId, { enabled: isEnabled });
+      }
       if (isEnabled && !wasEnabled) {
         loadModule(moduleId).catch(() => {});
       }
@@ -83,7 +98,8 @@ export function setupModuleRuntime({ state, catalog }) {
   window.a11ytb.runtime.loadModule = loadModule;
   window.a11ytb.runtime.moduleStatus = (id) => ({
     loaded: initialized.has(id),
-    blockIds: moduleToBlocks.get(id) ?? []
+    blockIds: moduleToBlocks.get(id) ?? [],
+    ...(state.get(`runtime.modules.${id}`) || {})
   });
   if (window.a11ytb.registry) {
     window.a11ytb.registry.loadModule = loadModule;

@@ -76,7 +76,10 @@ const baseInitial = {
     view: 'modules',
     lastProfile: null
   },
-  profiles: profilePresets
+  profiles: profilePresets,
+  runtime: {
+    modules: {}
+  }
 };
 
 const initial = normalizedManifests.reduce(
@@ -121,6 +124,7 @@ const ensureDefaults = [
   ['ui.view', initial.ui.view],
   ['ui.lastProfile', initial.ui.lastProfile],
   ['profiles', initial.profiles],
+  ['runtime.modules', initial.runtime.modules],
   ['tts.progress', initial.tts.progress]
 ];
 
