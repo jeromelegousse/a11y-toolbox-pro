@@ -18,7 +18,7 @@ Ce plan couvre l'intégration rapide des moteurs de reconnaissance vocale et des
 
 | Fournisseur | Avantages | Quota gratuit | Actions immédiates |
 |-------------|-----------|---------------|--------------------|
-| **OpenAI Whisper API** | Haute précision multilingue | Crédit d'essai (5$) | Créer un client `openai-whisper.ts`, tester transcription `whisper-1`.
+| **OpenAI Whisper API** | Haute précision multilingue | Crédit d'essai (5$) | ✅ Client `openai-whisper` + CLI `npm run demo:stt`.
 | **Google Cloud Speech-to-Text v2** | Streaming + diarisation | 60 min/mois (90 jours) | Utiliser compte d'essai, configurer `GOOGLE_APPLICATION_CREDENTIALS` et wrapper REST (`speech:recognize`).
 | **Deepgram** | Bons SDK + webhooks | 200$ crédit d'accueil | Utiliser SDK JS officiel, test sur échantillon `pre-recorded`.
 | **AssemblyAI** | Fonctionnalités enrichies (résumé) | 3h gratuites | Appel REST `/v2/transcript`, suivre statut asynchrone.
@@ -54,7 +54,7 @@ Prévoir un README dédié dans `scripts/` expliquant l'installation (requiremen
 
 1. **Semaine 1**
    - Mettre en place la base (`.env.local`, service API, interfaces).
-   - Implémenter OpenAI Whisper API + script de démo.
+   - ✅ Implémenter OpenAI Whisper API + script de démo.
    - Préparer dataset échantillon.
 
 2. **Semaine 2**

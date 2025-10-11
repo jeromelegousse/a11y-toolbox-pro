@@ -8,3 +8,13 @@ Déposez dans ce dossier quelques fichiers audio (10–30 secondes) et des ima
 - Ajouter un fichier `metadata.json` si vous disposez des transcriptions de référence.
 
 ⚠️ Les fichiers placés ici sont ignorés par Git. Conservez un inventaire séparé si nécessaire.
+
+## Utilisation rapide
+
+Une fois vos fichiers déposés, lancez par exemple :
+
+```bash
+npm run demo:stt -- --file=./data/samples/mon-audio.wav --language=fr
+```
+
+Le script retournera la transcription générée par l'API configurée.

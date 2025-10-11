@@ -9,3 +9,4 @@ tests/visual/**/*.png
 data/samples/*
 !data/samples/README.md
 credentials/
+!docs/credentials/

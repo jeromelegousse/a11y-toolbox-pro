@@ -10,13 +10,14 @@ function delay(ms) {
 /**
  * Effectue un appel fetch avec gestion du timeout et des retries.
  * @param {string | URL} url
- * @param {RequestInit & { timeout?: number }} [options]
+ * @param {RequestInit & { timeout?: number, body?: RequestInit['body'] | (() => RequestInit['body']) }} [options]
  * @param {{ retries?: number, retryDelayMs?: number }} [retryOptions]
  */
 export async function fetchWithRetry(url, options = {}, retryOptions = {}) {
   const {
     timeout = DEFAULT_TIMEOUT_MS,
     signal,
+    body,
     ...restOptions
   } = options;
 
@@ -37,6 +38,7 @@ export async function fetchWithRetry(url, options = {}, retryOptions = {}) {
 
       const response = await fetch(url, {
         ...restOptions,
+        body: typeof body === 'function' ? body() : body,
         signal: signal ?? controller.signal
       });
 
