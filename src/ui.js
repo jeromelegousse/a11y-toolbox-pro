@@ -1,4 +1,5 @@
 import { listBlocks, renderBlock, listModuleManifests } from './registry.js';
+import { applyInertToSiblings } from './utils/inert.js';
 
 const DEFAULT_BLOCK_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h7v7H4V5zm9 0h7v7h-7V5zM4 12h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>';
 
@@ -210,7 +211,8 @@ export function mountUI({ root, state }) {
   const viewDefinitions = [
     { id: 'modules', label: 'Modules' },
     { id: 'options', label: 'Options & Profils' },
-    { id: 'organize', label: 'Organisation' }
+    { id: 'organize', label: 'Organisation' },
+    { id: 'shortcuts', label: 'Raccourcis' }
   ];
   viewDefinitions.forEach((view) => {
     const btn = document.createElement('button');
@@ -248,10 +250,18 @@ export function mountUI({ root, state }) {
   organizeView.setAttribute('hidden', '');
   organizeView.tabIndex = -1;
 
+  const shortcutsView = document.createElement('div');
+  shortcutsView.className = 'a11ytb-view a11ytb-view--shortcuts';
+  shortcutsView.setAttribute('role', 'region');
+  shortcutsView.setAttribute('aria-label', 'Raccourcis clavier et navigation');
+  shortcutsView.setAttribute('hidden', '');
+  shortcutsView.tabIndex = -1;
+
   const viewElements = new Map([
     ['modules', modulesView],
     ['options', optionsView],
-    ['organize', organizeView]
+    ['organize', organizeView],
+    ['shortcuts', shortcutsView]
   ]);
 
   const filters = document.createElement('div');
@@ -370,14 +380,121 @@ export function mountUI({ root, state }) {
   optionsScroll.append(profilesSection, configSection);
   optionsView.append(optionsScroll);
 
-  viewContainer.append(modulesView, optionsView, organizeView);
+  function createShortcutComboElement(variants) {
+    const container = document.createElement('span');
+    container.className = 'a11ytb-shortcut-combo';
+    variants.forEach((keys, variantIndex) => {
+      keys.forEach((key, keyIndex) => {
+        const kbd = document.createElement('kbd');
+        kbd.className = 'a11ytb-shortcut-key';
+        kbd.textContent = key;
+        container.append(kbd);
+        if (keyIndex < keys.length - 1) {
+          const join = document.createElement('span');
+          join.className = 'a11ytb-shortcut-join';
+          join.setAttribute('aria-hidden', 'true');
+          join.textContent = '+';
+          container.append(join);
+        }
+      });
+      if (variantIndex < variants.length - 1) {
+        const or = document.createElement('span');
+        or.className = 'a11ytb-shortcut-or';
+        or.textContent = 'ou';
+        container.append(or);
+      }
+    });
+    return container;
+  }
+
+  const shortcutsScroll = document.createElement('div');
+  shortcutsScroll.className = 'a11ytb-options-scroll';
+  const shortcutsSection = document.createElement('section');
+  shortcutsSection.className = 'a11ytb-options-section';
+  const shortcutsHeader = document.createElement('div');
+  shortcutsHeader.className = 'a11ytb-section-header';
+  const shortcutsTitle = document.createElement('h3');
+  shortcutsTitle.className = 'a11ytb-section-title';
+  shortcutsTitle.textContent = 'Raccourcis clavier';
+  const shortcutsDescription = document.createElement('p');
+  shortcutsDescription.className = 'a11ytb-section-description';
+  shortcutsDescription.textContent = 'Accédez rapidement aux vues du panneau et maîtrisez les déplacements au clavier.';
+  shortcutsHeader.append(shortcutsTitle, shortcutsDescription);
+
+  const shortcutsGrid = document.createElement('div');
+  shortcutsGrid.className = 'a11ytb-shortcuts-grid';
+
+  const shortcutGroups = [
+    {
+      title: 'Navigation du panneau',
+      description: 'Raccourcis globaux accessibles depuis toute la page.',
+      shortcuts: [
+        { combo: [['Alt', 'Shift', 'A']], description: 'Ouvrir ou fermer la boîte à outils.' },
+        { combo: [['Alt', 'Shift', 'M']], description: 'Afficher la vue Modules.' },
+        { combo: [['Alt', 'Shift', 'O']], description: 'Afficher la vue Options & Profils.' },
+        { combo: [['Alt', 'Shift', 'G']], description: 'Afficher la vue Organisation.' },
+        { combo: [['Alt', 'Shift', 'H']], description: 'Afficher cette vue Raccourcis.' }
+      ]
+    },
+    {
+      title: 'Gestion du panneau',
+      description: 'Disponible lorsque la boîte à outils est ouverte.',
+      shortcuts: [
+        { combo: [['Tab'], ['Shift', 'Tab']], description: 'Parcourir les commandes disponibles.' },
+        { combo: [['Échap']], description: 'Fermer le panneau en conservant le focus précédent.' }
+      ]
+    },
+    {
+      title: 'Réorganisation des modules',
+      description: 'Raccourcis utilisables dans la vue Organisation.',
+      shortcuts: [
+        { combo: [['Entrée'], ['Espace']], description: 'Saisir ou déposer la carte sélectionnée.' },
+        { combo: [['↑'], ['↓']], description: 'Déplacer la carte saisie vers le haut ou vers le bas.' },
+        { combo: [['Échap']], description: 'Annuler la saisie et replacer la carte.' }
+      ]
+    }
+  ];
+
+  shortcutGroups.forEach((group) => {
+    const card = document.createElement('article');
+    card.className = 'a11ytb-config-card a11ytb-shortcuts-card';
+    const heading = document.createElement('h4');
+    heading.className = 'a11ytb-shortcuts-heading';
+    heading.textContent = group.title;
+    card.append(heading);
+    if (group.description) {
+      const copy = document.createElement('p');
+      copy.className = 'a11ytb-shortcuts-description';
+      copy.textContent = group.description;
+      card.append(copy);
+    }
+    const list = document.createElement('dl');
+    list.className = 'a11ytb-shortcuts-list';
+    group.shortcuts.forEach((shortcut) => {
+      const dt = document.createElement('dt');
+      dt.className = 'a11ytb-shortcut-keys';
+      dt.append(createShortcutComboElement(shortcut.combo));
+      const dd = document.createElement('dd');
+      dd.className = 'a11ytb-shortcut-description';
+      dd.textContent = shortcut.description;
+      list.append(dt, dd);
+    });
+    card.append(list);
+    shortcutsGrid.append(card);
+  });
+
+  shortcutsSection.append(shortcutsHeader, shortcutsGrid);
+  shortcutsScroll.append(shortcutsSection);
+  shortcutsView.append(shortcutsScroll);
+
+  viewContainer.append(modulesView, optionsView, organizeView, shortcutsView);
   body.append(viewToggle, viewContainer);
 
   const footer = document.createElement('div');
   footer.className = 'a11ytb-header';
   const footerTitle = document.createElement('div');
   footerTitle.className = 'a11ytb-title';
-  footerTitle.textContent = 'Raccourci : Alt+Shift+A';
+  footerTitle.textContent = 'Raccourcis : Alt+Shift+A • Alt+Shift+H';
 
   const activity = document.createElement('details');
   activity.className = 'a11ytb-activity';
@@ -1550,6 +1667,15 @@ export function mountUI({ root, state }) {
         });
       }
     }
+    if (currentView === 'shortcuts' && activeViewId !== 'shortcuts') {
+      requestAnimationFrame(() => {
+        try {
+          shortcutsView.focus({ preventScroll: true });
+        } catch (error) {
+          shortcutsView.focus();
+        }
+      });
+    }
     activeViewId = currentView;
   }
 
@@ -1794,6 +1920,7 @@ export function mountUI({ root, state }) {
   root.append(overlay, fab, panel);
 
   let lastFocusedElement = null;
+  let releaseOutsideInert = null;
 
   const FOCUSABLE_SELECTORS = [
     'a[href]',
@@ -1823,10 +1950,24 @@ export function mountUI({ root, state }) {
     overlay.setAttribute('aria-hidden', String(!shouldOpen));
     document.body.classList.toggle('a11ytb-modal-open', shouldOpen);
     if (shouldOpen) {
+      if (typeof releaseOutsideInert === 'function') {
+        releaseOutsideInert();
+      }
+      releaseOutsideInert = applyInertToSiblings(root);
       lastFocusedElement = document.activeElement;
       const focusables = getFocusableElements();
       (focusables[0] || panel).focus();
+      if (state.get('ui.view') === 'options' && !releaseOptionsFocusTrap) {
+        setupOptionsFocusTrap();
+      }
     } else {
+      if (typeof releaseOutsideInert === 'function') {
+        releaseOutsideInert();
+        releaseOutsideInert = null;
+      }
+      if (activeViewId === 'options') {
+        teardownOptionsFocusTrap();
+      }
       const target = (lastFocusedElement && typeof lastFocusedElement.focus === 'function') ? lastFocusedElement : fab;
       target.focus();
       lastFocusedElement = null;
@@ -1844,11 +1985,28 @@ export function mountUI({ root, state }) {
   header.querySelector('[data-action="dock-right"]').addEventListener('click', () => state.set('ui.dock', 'right'));
   header.querySelector('[data-action="dock-bottom"]').addEventListener('click', () => state.set('ui.dock', 'bottom'));
 
+  const viewHotkeys = new Map([
+    ['m', 'modules'],
+    ['o', 'options'],
+    ['g', 'organize'],
+    ['h', 'shortcuts']
+  ]);
+
   window.addEventListener('keydown', (e) => {
-    if (e.altKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+    if (!e.altKey || !e.shiftKey || e.defaultPrevented) return;
+    const key = typeof e.key === 'string' ? e.key.toLowerCase() : '';
+    if (key === 'a') {
       e.preventDefault();
       toggle();
+      return;
     }
+    const targetView = viewHotkeys.get(key);
+    if (!targetView) return;
+    e.preventDefault();
+    if (panel.dataset.open !== 'true') {
+      toggle(true);
+    }
+    state.set('ui.view', targetView);
   });
 
   overlay.addEventListener('click', () => toggle(false));
