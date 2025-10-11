@@ -78,6 +78,15 @@ export function setupModuleRuntime({ state, catalog }) {
     }
   });
 
+  const modulesWithoutBlocks = catalog
+    .map((entry) => entry.id)
+    .filter((id) => !moduleToBlocks.has(id));
+
+  modulesWithoutBlocks.forEach((moduleId) => {
+    updateModuleRuntime(moduleId, { blockIds: [], enabled: true });
+    loadModule(moduleId).catch(() => {});
+  });
+
   state.on((snapshot) => {
     const nextDisabled = new Set(snapshot?.ui?.disabled ?? []);
     moduleToBlocks.forEach((blockIds, moduleId) => {
@@ -87,6 +96,11 @@ export function setupModuleRuntime({ state, catalog }) {
         updateModuleRuntime(moduleId, { enabled: isEnabled });
       }
       if (isEnabled && !wasEnabled) {
+        loadModule(moduleId).catch(() => {});
+      }
+    });
+    modulesWithoutBlocks.forEach((moduleId) => {
+      if (!loading.has(moduleId) && !initialized.has(moduleId)) {
         loadModule(moduleId).catch(() => {});
       }
     });
