@@ -1,0 +1,32 @@
+/*
+ * A11y Toolbox Pro — Design tokens exposés via variables CSS.
+ *
+ * Ces valeurs sont synchronisées avec l’atelier design system
+ * (voir docs/design-system-workshop.md). Elles servent de base
+ * aux composants UI ainsi qu’aux futurs exports (Figma, Tokens Studio…).
+ */
+
+:root {
+  /* Palette principale */
+  --a11ytb-color-bg: #0f172a;
+  --a11ytb-color-surface: #111827;
+  --a11ytb-color-surface-alt: #1f2937;
+  --a11ytb-color-primary: #38bdf8;
+  --a11ytb-color-primary-strong: #0ea5e9;
+  --a11ytb-color-accent: #22c55e;
+  --a11ytb-color-warning: #f59e0b;
+  --a11ytb-color-danger: #f97316;
+  --a11ytb-color-text: #f8fafc;
+  --a11ytb-color-text-muted: #cbd5f5;
+  --a11ytb-color-border: #334155;
+
+  /* Typographie & espacement */
+  --a11ytb-font-family-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --a11ytb-font-size-xs: 12px;
+  --a11ytb-font-size-sm: 14px;
+  --a11ytb-font-size-base: 16px;
+  --a11ytb-font-size-lg: 18px;
+  --a11ytb-radius-sm: 6px;
+  --a11ytb-radius-lg: 12px;
+  --a11ytb-space-unit: 8px;
+}
