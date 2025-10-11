@@ -22,7 +22,13 @@ const profilePresets = {
       'spacing.letterSpacing': 0.08,
       'tts.rate': 0.9,
       'tts.pitch': 0.9,
-      'tts.volume': 1
+      'tts.volume': 1,
+      'audio.theme': 'vigilance',
+      'audio.masterVolume': 1,
+      'audio.events.alert.volume': 1,
+      'audio.events.alert.timbre': 'bright',
+      'audio.events.confirm.volume': 0.9,
+      'audio.events.info.volume': 0.85
     }
   },
   dyslexie: {
@@ -38,7 +44,12 @@ const profilePresets = {
       'spacing.letterSpacing': 0.12,
       'tts.rate': 0.85,
       'tts.pitch': 1,
-      'tts.volume': 0.95
+      'tts.volume': 0.95,
+      'audio.theme': 'calm-focus',
+      'audio.masterVolume': 0.85,
+      'audio.events.alert.volume': 0.85,
+      'audio.events.confirm.volume': 0.7,
+      'audio.events.info.volume': 0.6
     }
   },
   'lecture-rapide': {
@@ -54,7 +65,12 @@ const profilePresets = {
       'spacing.letterSpacing': 0.05,
       'tts.rate': 1.25,
       'tts.pitch': 1,
-      'tts.volume': 1
+      'tts.volume': 1,
+      'audio.theme': 'tempo-dynamic',
+      'audio.masterVolume': 0.95,
+      'audio.events.alert.volume': 0.95,
+      'audio.events.confirm.volume': 1,
+      'audio.events.info.volume': 0.9
     }
   }
 };
@@ -94,10 +110,6 @@ const initial = normalizedManifests.reduce(
   baseInitial
 );
 
-const feedback = createFeedback();
-if (!window.a11ytb) window.a11ytb = {};
-window.a11ytb.feedback = feedback;
-
 const moduleIcons = {
   tts: '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 9v6h3l4 4V5L7 9H4zm13 3a3 3 0 00-3-3v6a3 3 0 003-3zm-3-6.9v2.07a5 5 0 010 9.66V18a7 7 0 000-13.9z"/></svg>',
   stt: '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3zm5-3a1 1 0 012 0 7 7 0 01-6 6.92V21h3v1H8v-1h3v-3.08A7 7 0 015 11a1 1 0 012 0 5 5 0 0010 0z"/></svg>',
@@ -118,6 +130,12 @@ function ttsStatusMessage(status) {
 }
 
 const state = createStore('a11ytb/v1', initial);
+const feedback = createFeedback({
+  initialConfig: state.get('audio'),
+  subscribe: (listener) => state.on((snapshot) => listener?.(snapshot.audio))
+});
+if (!window.a11ytb) window.a11ytb = {};
+window.a11ytb.feedback = feedback;
 const ensureDefaults = [
   ['ui.category', initial.ui.category],
   ['ui.search', initial.ui.search],
