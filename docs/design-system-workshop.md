@@ -64,6 +64,7 @@ Chaque composant est documenté dans le kit Figma avec ses variantes (Auto Layou
   - Page `🧱 Composants` avec les variants (boutons, chips, cartes, champs).
   - Page `📐 Layout` proposant une grille 8pt et exemples de panneaux.
 - Les tokens sont également disponibles en JSON (`assets/design-system/figma-kit.tokens.json`) pour intégration via le plugin *Tokens Studio*.
+- Un export CSS vivant (`src/css/design-tokens.css`) expose les mêmes variables pour l’interface web ; il est importé par `src/css/styles.css` et doit rester synchronisé avec le kit.
 - À chaque évolution : mettre à jour le `.fig` + JSON, incrémenter la version en commentaire et noter la date.
 
 ## 6. Prochaines étapes atelier
