@@ -39,7 +39,7 @@ const contrast = {
       .a11ytb-contrast .content,
       .a11ytb-contrast .site-header,
       .a11ytb-contrast .site-footer {
-        background-color: #000 !important;
+        background: #000 !important;
         color: #fff !important;
       }
       .a11ytb-contrast .a11ytb-panel,
