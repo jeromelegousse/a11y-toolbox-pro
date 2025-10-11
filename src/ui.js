@@ -58,12 +58,34 @@ export function mountUI({ root, state }) {
         ensureVisible(['contrast-controls', 'spacing-controls', 'tts-controls']);
         ensurePinned(['contrast-controls', 'tts-controls']);
         state.set('contrast.enabled', true);
-        state.set('spacing.lineHeight', 1.8);
-        state.set('spacing.letterSpacing', 0.05);
-        const currentRate = Number(state.get('tts.rate') ?? 1);
-        if (!Number.isNaN(currentRate) && currentRate < 1) {
-          state.set('tts.rate', 1);
-        }
+        state.set('spacing.lineHeight', 1.9);
+        state.set('spacing.letterSpacing', 0.08);
+        state.set('tts.rate', 0.9);
+        state.set('tts.pitch', 0.9);
+        state.set('tts.volume', 1);
+        state.set('audio.theme', 'vigilance');
+        state.set('audio.masterVolume', 1);
+        state.set('audio.events.alert.volume', 1);
+        state.set('audio.events.alert.timbre', 'bright');
+        state.set('audio.events.confirm.volume', 0.9);
+        state.set('audio.events.info.volume', 0.85);
+        window.a11ytb?.logActivity?.(
+          'Vision basse : paramètres audio appliqués (thème vigilance, volume maître 100 %, alertes renforcées).',
+          {
+            tone: 'info',
+            tags: ['audio', 'profil'],
+            profile: 'vision-low',
+            audio: {
+              theme: 'vigilance',
+              masterVolume: 1,
+              events: {
+                alert: { volume: 1, timbre: 'bright' },
+                confirm: { volume: 0.9 },
+                info: { volume: 0.85 }
+              }
+            }
+          }
+        );
       }
     },
     {
@@ -74,10 +96,34 @@ export function mountUI({ root, state }) {
         ensureEnabled(['spacing-controls', 'tts-controls']);
         ensureVisible(['spacing-controls', 'tts-controls']);
         ensurePinned(['spacing-controls']);
-        state.set('contrast.enabled', false);
-        state.set('spacing.lineHeight', 1.7);
+        state.set('contrast.enabled', true);
+        state.set('spacing.lineHeight', 1.8);
         state.set('spacing.letterSpacing', 0.12);
-        state.set('tts.rate', 0.9);
+        state.set('tts.rate', 0.85);
+        state.set('tts.pitch', 1);
+        state.set('tts.volume', 0.95);
+        state.set('audio.theme', 'calm-focus');
+        state.set('audio.masterVolume', 0.85);
+        state.set('audio.events.alert.volume', 0.85);
+        state.set('audio.events.confirm.volume', 0.7);
+        state.set('audio.events.info.volume', 0.6);
+        window.a11ytb?.logActivity?.(
+          'Confort de lecture : paramètres audio appliqués (thème calm-focus, volume maître 85 %, alertes adoucies).',
+          {
+            tone: 'info',
+            tags: ['audio', 'profil'],
+            profile: 'reading-comfort',
+            audio: {
+              theme: 'calm-focus',
+              masterVolume: 0.85,
+              events: {
+                alert: { volume: 0.85 },
+                confirm: { volume: 0.7 },
+                info: { volume: 0.6 }
+              }
+            }
+          }
+        );
       }
     }
   ];
