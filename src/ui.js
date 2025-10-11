@@ -1,5 +1,6 @@
 import { listBlocks, renderBlock, listModuleManifests } from './registry.js';
 import { applyInertToSiblings } from './utils/inert.js';
+import { summarizeStatuses } from './status-center.js';
 
 const DEFAULT_BLOCK_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h7v7H4V5zm9 0h7v7h-7V5zM4 12h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>';
 
@@ -204,6 +205,96 @@ export function mountUI({ root, state }) {
 
   const body = document.createElement('div');
   body.className = 'a11ytb-body';
+
+  const statusCenter = document.createElement('section');
+  statusCenter.className = 'a11ytb-status-center';
+  statusCenter.setAttribute('role', 'region');
+  statusCenter.setAttribute('aria-label', 'État en temps réel des modules vocaux et braille');
+
+  const statusHeader = document.createElement('div');
+  statusHeader.className = 'a11ytb-status-header';
+  const statusTitle = document.createElement('h2');
+  statusTitle.className = 'a11ytb-status-title';
+  statusTitle.textContent = 'État en temps réel';
+  const statusDescription = document.createElement('p');
+  statusDescription.className = 'a11ytb-status-description';
+  statusDescription.textContent = 'Suivez la disponibilité des modules Lecture vocale, Dictée et Braille.';
+  statusHeader.append(statusTitle, statusDescription);
+
+  const statusGrid = document.createElement('div');
+  statusGrid.className = 'a11ytb-status-grid';
+
+  statusCenter.append(statusHeader, statusGrid);
+
+  const statusCards = new Map();
+
+  function ensureStatusCard(summary) {
+    let entry = statusCards.get(summary.id);
+    if (!entry) {
+      const card = document.createElement('article');
+      card.className = 'a11ytb-status-card';
+      card.dataset.statusId = summary.id;
+      card.setAttribute('role', 'group');
+
+      const headerRow = document.createElement('div');
+      headerRow.className = 'a11ytb-status-card-header';
+
+      const label = document.createElement('span');
+      label.className = 'a11ytb-status-label';
+      label.id = `a11ytb-status-label-${summary.id}`;
+      label.textContent = summary.label;
+
+      const badge = document.createElement('span');
+      badge.className = 'a11ytb-badge';
+
+      headerRow.append(label, badge);
+
+      const value = document.createElement('p');
+      value.className = 'a11ytb-status-value';
+      value.dataset.ref = 'value';
+      value.setAttribute('role', 'status');
+      value.setAttribute('aria-live', summary.live || 'polite');
+      value.setAttribute('aria-labelledby', label.id);
+
+      const detail = document.createElement('p');
+      detail.className = 'a11ytb-status-detail';
+      detail.dataset.ref = 'detail';
+
+      card.append(headerRow, value, detail);
+      statusGrid.append(card);
+      entry = { card, badge, value, detail, label };
+      statusCards.set(summary.id, entry);
+    }
+    return entry;
+  }
+
+  function updateStatusCards(snapshot) {
+    const summaries = summarizeStatuses(snapshot || state.get());
+    summaries.forEach((summary) => {
+      const entry = ensureStatusCard(summary);
+      entry.card.dataset.tone = summary.tone || 'info';
+      if (summary.badge) {
+        entry.badge.textContent = summary.badge;
+        entry.badge.hidden = false;
+      } else {
+        entry.badge.textContent = '';
+        entry.badge.hidden = true;
+      }
+      entry.value.textContent = summary.value || '';
+      entry.value.setAttribute('aria-live', summary.live || 'polite');
+      entry.value.setAttribute('aria-labelledby', entry.label.id);
+      if (summary.detail) {
+        entry.detail.textContent = summary.detail;
+        entry.detail.hidden = false;
+      } else {
+        entry.detail.textContent = '';
+        entry.detail.hidden = true;
+      }
+    });
+  }
+
+  updateStatusCards(state.get());
+  state.on(updateStatusCards);
 
   const viewToggle = document.createElement('div');
   viewToggle.className = 'a11ytb-view-toggle';
@@ -488,7 +579,7 @@ export function mountUI({ root, state }) {
   shortcutsView.append(shortcutsScroll);
 
   viewContainer.append(modulesView, optionsView, organizeView, shortcutsView);
-  body.append(viewToggle, viewContainer);
+  body.append(statusCenter, viewToggle, viewContainer);
 
   const footer = document.createElement('div');
   footer.className = 'a11ytb-header';

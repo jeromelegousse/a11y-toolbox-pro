@@ -16,7 +16,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 | Axe | Forces des solutions pro | État actuel A11y Toolbox Pro | Pistes rapides |
 | --- | --- | --- | --- |
 | **UX / UI** | Parcours guidés, microcopie pédagogique, hiérarchie d'information claire (axe Insights, Stark) | Panneau unique avec options listées sans priorisation ni guidance | Prioriser les actions critiques, ajouter onboarding contextualisé et exemples d'usage |
-| **Ergonomie** | Navigation clavier fluide, focus trap dans les dialogues, raccourcis cohérents, feedback état chargement | Focus trap partiel, vue « Raccourcis » listant les combinaisons principales mais feedback d’état encore limité | Harmoniser les patterns clavier, ajouter indicateurs de statut (chargement/sauvegarde), préparer la personnalisation des raccourcis |
+| **Ergonomie** | Navigation clavier fluide, focus trap dans les dialogues, raccourcis cohérents, feedback état chargement | Focus trap complet, vue « Raccourcis » et centre d’état temps réel (TTS/STT/Braille) mais peu d’indicateurs pour les autres modules | Harmoniser les patterns clavier, ajouter indicateurs de statut (chargement/sauvegarde), préparer la personnalisation des raccourcis |
 | **Fiabilité** | Tests automatisés (axe core), reporting d'erreurs, synchronisation cloud, compatibilité multi-navigateurs | Démo locale sans pipeline de tests, journal local uniquement | Ajouter tests unitaires + e2e, gestion offline/erreurs, fallback progressif sur features vocales |
 | **Design** | Design systems documentés, tokens (couleurs, espace), mode sombre cohérent | Styles ad hoc par module, contraste variable, icônes hétérogènes | Définir tokens de base, bibliothèque d'icônes accessible, mode sombre clair | 
 
