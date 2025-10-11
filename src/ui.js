@@ -780,6 +780,8 @@ export function mountUI({ root, state }) {
 
   const moduleElements = new Map();
   const adminItems = new Map();
+  const adminToolbarCounts = { active: null, hidden: null, pinned: null };
+  const organizeFilterToggles = new Map();
 
   const organizeScroll = document.createElement('div');
   organizeScroll.className = 'a11ytb-organize-scroll';
@@ -806,6 +808,68 @@ export function mountUI({ root, state }) {
   organizePointerHint.id = 'a11ytb-organize-pointer';
   organizePointerHint.textContent = 'À la souris ou au tactile : maintenez la carte enfoncée pour la déplacer, relâchez pour déposer.';
 
+  const organizeToolbar = document.createElement('div');
+  organizeToolbar.className = 'a11ytb-admin-toolbar';
+
+  const toolbarMetrics = document.createElement('div');
+  toolbarMetrics.className = 'a11ytb-admin-toolbar-metrics';
+
+  const makeMetric = (label, ref) => {
+    const metric = document.createElement('span');
+    metric.className = 'a11ytb-admin-toolbar-count';
+    const value = document.createElement('span');
+    value.className = 'a11ytb-admin-toolbar-count-value';
+    value.dataset.ref = ref;
+    value.textContent = '0';
+    const text = document.createElement('span');
+    text.className = 'a11ytb-admin-toolbar-count-label';
+    text.textContent = label;
+    metric.append(value, text);
+    toolbarMetrics.append(metric);
+    return value;
+  };
+
+  adminToolbarCounts.active = makeMetric('Actifs', 'count-active');
+  adminToolbarCounts.hidden = makeMetric('Masqués', 'count-hidden');
+  adminToolbarCounts.pinned = makeMetric('Épinglés', 'count-pinned');
+
+  const toolbarFilters = document.createElement('div');
+  toolbarFilters.className = 'a11ytb-admin-toolbar-filters';
+
+  const makeFilterToggle = (filter, label, description) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'a11ytb-admin-toolbar-toggle';
+    button.dataset.organizeFilter = filter;
+    button.setAttribute('aria-pressed', 'false');
+    button.setAttribute('aria-label', description);
+    button.title = description;
+    button.dataset.defaultAria = description;
+    button.dataset.defaultTitle = description;
+    button.textContent = label;
+    organizeFilterToggles.set(filter, button);
+    toolbarFilters.append(button);
+    return button;
+  };
+
+  makeFilterToggle('pinned', 'Épinglés', 'Afficher uniquement les modules épinglés');
+  makeFilterToggle('hidden', 'Masqués', 'Afficher uniquement les modules masqués');
+
+  toolbarFilters.addEventListener('click', (event) => {
+    const toggle = event.target.closest('[data-organize-filter]');
+    if (!toggle) return;
+    const filter = toggle.dataset.organizeFilter;
+    if (!filter) return;
+    const prefs = getPreferences();
+    const current = prefs.organizeFilter;
+    const next = current === filter ? 'all' : filter;
+    if (next !== current) {
+      state.set('ui.organizeFilter', next);
+    }
+  });
+
+  organizeToolbar.append(toolbarMetrics, toolbarFilters);
+
   const adminList = document.createElement('ol');
   adminList.className = 'a11ytb-admin-list';
   adminList.setAttribute('aria-labelledby', organizeTitle.id);
@@ -817,7 +881,7 @@ export function mountUI({ root, state }) {
   organizeLive.setAttribute('role', 'status');
   organizeLive.setAttribute('aria-live', 'polite');
 
-  organizeSection.append(organizeHeader, organizeKeyboardHint, organizePointerHint, adminList);
+  organizeSection.append(organizeHeader, organizeKeyboardHint, organizePointerHint, organizeToolbar, adminList);
   organizeScroll.append(organizeSection);
   organizeView.append(organizeScroll, organizeLive);
   blocks.forEach(block => {
@@ -1184,6 +1248,7 @@ export function mountUI({ root, state }) {
       disabled: Array.isArray(ui.disabled) ? [...ui.disabled] : [],
       moduleOrder: Array.isArray(ui.moduleOrder) ? [...ui.moduleOrder] : [],
       showHidden: !!ui.showHidden,
+      organizeFilter: ui.organizeFilter === 'pinned' || ui.organizeFilter === 'hidden' ? ui.organizeFilter : 'all',
       view: ui.view || 'modules',
       activeProfile: ui.activeProfile || 'custom',
       priorities: normalizePriorityObject(ui.priorities)
@@ -1202,13 +1267,20 @@ export function mountUI({ root, state }) {
 
   function updateAdminPositions() {
     const items = Array.from(adminList.querySelectorAll('.a11ytb-admin-item'));
-    const total = items.length;
-    items.forEach((item, index) => {
+    const visible = items.filter(item => !item.hasAttribute('hidden'));
+    const total = visible.length;
+    visible.forEach((item, index) => {
       item.setAttribute('aria-posinset', String(index + 1));
       item.setAttribute('aria-setsize', String(total));
       const badge = item.querySelector('[data-ref="position"]');
       if (badge) badge.textContent = String(index + 1);
     });
+    items
+      .filter(item => item.hasAttribute('hidden'))
+      .forEach((item) => {
+        item.removeAttribute('aria-posinset');
+        item.setAttribute('aria-setsize', String(total));
+      });
   }
 
   function announceOrganize(message) {
@@ -1314,7 +1386,7 @@ export function mountUI({ root, state }) {
     if (!keyboardDragId) return;
     const item = adminItems.get(keyboardDragId);
     if (!item) return;
-    const siblings = Array.from(adminList.querySelectorAll('.a11ytb-admin-item'));
+    const siblings = Array.from(adminList.querySelectorAll('.a11ytb-admin-item:not([hidden])'));
     const index = siblings.indexOf(item);
     if (index === -1) return;
     const targetIndex = direction < 0 ? index - 1 : index + 1;
@@ -1339,10 +1411,13 @@ export function mountUI({ root, state }) {
       }
     }
     const total = siblings.length;
-    const newIndex = Array.from(adminList.children).indexOf(item);
+    const visibleSiblings = Array.from(adminList.querySelectorAll('.a11ytb-admin-item:not([hidden])'));
+    const newIndex = visibleSiblings.indexOf(item);
     const block = blockInfo.get(keyboardDragId);
     const title = block?.title || keyboardDragId;
-    announceOrganize(`${title} position ${newIndex + 1} sur ${total}.`);
+    if (newIndex !== -1) {
+      announceOrganize(`${title} position ${newIndex + 1} sur ${total}.`);
+    }
   }
 
   let pointerDragState = null;
@@ -1412,7 +1487,7 @@ export function mountUI({ root, state }) {
     if (!pointerDragState || event.pointerId !== pointerDragState.pointerId) return;
     event.preventDefault();
     const { item } = pointerDragState;
-    const siblings = Array.from(adminList.querySelectorAll('.a11ytb-admin-item')).filter(el => el !== item);
+    const siblings = Array.from(adminList.querySelectorAll('.a11ytb-admin-item:not([hidden])')).filter(el => el !== item);
     const clientY = event.clientY;
     let inserted = false;
     for (const sibling of siblings) {
@@ -1521,6 +1596,56 @@ export function mountUI({ root, state }) {
 
     label.append(checkbox, labelText);
 
+    const status = document.createElement('div');
+    status.className = 'a11ytb-admin-status';
+
+    const pinnedBadge = document.createElement('span');
+    pinnedBadge.className = 'a11ytb-admin-badge a11ytb-admin-badge--pinned';
+    pinnedBadge.dataset.ref = 'badge-pinned';
+    pinnedBadge.textContent = 'Épinglé';
+    pinnedBadge.hidden = true;
+
+    const hiddenBadge = document.createElement('span');
+    hiddenBadge.className = 'a11ytb-admin-badge a11ytb-admin-badge--hidden';
+    hiddenBadge.dataset.ref = 'badge-hidden';
+    hiddenBadge.textContent = 'Masqué';
+    hiddenBadge.hidden = true;
+
+    const disabledBadge = document.createElement('span');
+    disabledBadge.className = 'a11ytb-admin-badge a11ytb-admin-badge--disabled';
+    disabledBadge.dataset.ref = 'badge-disabled';
+    disabledBadge.textContent = 'Désactivé';
+    disabledBadge.hidden = true;
+
+    status.append(pinnedBadge, hiddenBadge, disabledBadge);
+
+    const actions = document.createElement('div');
+    actions.className = 'a11ytb-admin-actions';
+    actions.setAttribute('role', 'group');
+    actions.setAttribute('aria-label', 'Actions d’organisation du module');
+
+    const pinButton = document.createElement('button');
+    pinButton.type = 'button';
+    pinButton.className = 'a11ytb-admin-action';
+    pinButton.dataset.adminAction = 'pin';
+    pinButton.setAttribute('aria-pressed', 'false');
+    const pinLabel = `Épingler le module ${block.title || block.id}`.trim();
+    pinButton.setAttribute('aria-label', pinLabel);
+    pinButton.title = pinLabel;
+    pinButton.innerHTML = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M15 2l3 3-2.29 2.29 2 2L19 12l-3-1-2-2L6 17l-2-2 8-8-2-2 1-1h4z"/></svg>';
+
+    const hideButton = document.createElement('button');
+    hideButton.type = 'button';
+    hideButton.className = 'a11ytb-admin-action';
+    hideButton.dataset.adminAction = 'hide';
+    hideButton.setAttribute('aria-pressed', 'false');
+    const hideLabel = `Masquer le module ${block.title || block.id}`.trim();
+    hideButton.setAttribute('aria-label', hideLabel);
+    hideButton.title = hideLabel;
+    hideButton.innerHTML = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 5c4.73 0 8.74 3.11 10 7-1.26 3.89-5.27 7-10 7s-8.74-3.11-10-7c1.26-3.89 5.27-7 10-7zm0 2c-3.05 0-6.17 2.09-7.27 5 1.1 2.91 4.22 5 7.27 5s6.17-2.09 7.27-5C18.17 9.09 15.05 7 12 7zm0 2a3 3 0 110 6 3 3 0 010-6z"/></svg>';
+
+    actions.append(pinButton, hideButton);
+
     const meta = document.createElement('div');
     meta.className = 'a11ytb-admin-meta';
 
@@ -1588,7 +1713,7 @@ export function mountUI({ root, state }) {
       priorityHint.textContent = getPriorityDescription(normalized || null);
     });
 
-    li.append(handle, order, icon, label, meta);
+    li.append(handle, order, icon, label, status, actions, meta);
 
     li.addEventListener('keydown', onAdminItemKeydown);
     li.addEventListener('pointerdown', onAdminItemPointerDown);
@@ -1621,12 +1746,44 @@ export function mountUI({ root, state }) {
       markProfileAsCustom();
     });
 
+    pinButton.addEventListener('click', () => {
+      const prefs = getPreferences();
+      const pinned = Array.isArray(prefs.pinned) ? [...prefs.pinned] : [];
+      const index = pinned.indexOf(block.id);
+      if (index === -1) {
+        pinned.unshift(block.id);
+      } else {
+        pinned.splice(index, 1);
+      }
+      setListIfChanged('ui.pinned', pinned, prefs.pinned);
+      markProfileAsCustom();
+    });
+
+    hideButton.addEventListener('click', () => {
+      const prefs = getPreferences();
+      const hidden = Array.isArray(prefs.hidden) ? [...prefs.hidden] : [];
+      const index = hidden.indexOf(block.id);
+      if (index === -1) {
+        hidden.push(block.id);
+        setListIfChanged('ui.hidden', hidden, prefs.hidden);
+        const pinned = Array.isArray(prefs.pinned) ? prefs.pinned.filter(id => id !== block.id) : [];
+        setListIfChanged('ui.pinned', pinned, prefs.pinned);
+      } else {
+        hidden.splice(index, 1);
+        setListIfChanged('ui.hidden', hidden, prefs.hidden);
+      }
+      markProfileAsCustom();
+    });
+
     return li;
   }
 
   function syncAdminList() {
     const prefs = getPreferences();
     const disabledSet = new Set(prefs.disabled);
+    const hiddenSet = new Set(prefs.hidden);
+    const pinnedSet = new Set(prefs.pinned);
+    const currentFilter = prefs.organizeFilter;
     const validPriorities = {};
     Object.entries(prefs.priorities || {}).forEach(([id, priority]) => {
       if (allowedIds.has(id) && PRIORITY_LOOKUP.has(priority)) {
@@ -1657,13 +1814,43 @@ export function mountUI({ root, state }) {
     const items = Array.from(adminList.querySelectorAll('.a11ytb-admin-item'));
     items.forEach((item) => {
       const id = item.dataset.blockId;
+      if (!id) return;
+      const title = item.dataset.title || id;
       const enabled = !disabledSet.has(id);
+      const hidden = hiddenSet.has(id);
+      const pinned = pinnedSet.has(id);
+      const showItem = currentFilter === 'all'
+        ? true
+        : currentFilter === 'pinned'
+          ? pinned
+          : hidden;
+      if (showItem) {
+        item.hidden = false;
+        item.setAttribute('aria-hidden', 'false');
+        item.tabIndex = 0;
+      } else {
+        item.hidden = true;
+        item.setAttribute('aria-hidden', 'true');
+        item.tabIndex = -1;
+      }
       const checkbox = item.querySelector('input[type="checkbox"][data-ref="toggle"]');
       if (checkbox && checkbox.checked !== enabled) {
         checkbox.checked = enabled;
       }
       item.classList.toggle('is-disabled', !enabled);
+      item.classList.toggle('is-hidden', hidden);
+      item.classList.toggle('is-pinned', pinned);
       item.setAttribute('aria-disabled', String(!enabled));
+      const pinnedBadge = item.querySelector('[data-ref="badge-pinned"]');
+      if (pinnedBadge) pinnedBadge.hidden = !pinned;
+      const hiddenBadge = item.querySelector('[data-ref="badge-hidden"]');
+      if (hiddenBadge) hiddenBadge.hidden = !hidden;
+      const disabledBadge = item.querySelector('[data-ref="badge-disabled"]');
+      if (disabledBadge) disabledBadge.hidden = enabled;
+      const statusContainer = item.querySelector('.a11ytb-admin-status');
+      if (statusContainer) {
+        statusContainer.hidden = !(pinned || hidden || !enabled);
+      }
       const prioritySelect = item.querySelector('select[data-ref="priority"]');
       const priorityHint = item.querySelector('[data-ref="priority-hint"]');
       const priorityId = validPriorities[id] || '';
@@ -1672,6 +1859,57 @@ export function mountUI({ root, state }) {
       }
       if (priorityHint) {
         priorityHint.textContent = getPriorityDescription(priorityId || null);
+      }
+      const pinBtn = item.querySelector('[data-admin-action="pin"]');
+      if (pinBtn) {
+        const actionLabel = `${pinned ? 'Retirer l’épingle du' : 'Épingler le'} module ${title}`.trim();
+        pinBtn.setAttribute('aria-pressed', String(pinned));
+        pinBtn.classList.toggle('is-active', pinned);
+        if (enabled) {
+          pinBtn.disabled = false;
+          pinBtn.removeAttribute('aria-disabled');
+          pinBtn.setAttribute('aria-label', actionLabel);
+          pinBtn.title = actionLabel;
+        } else {
+          pinBtn.disabled = true;
+          pinBtn.setAttribute('aria-disabled', 'true');
+          pinBtn.setAttribute('aria-label', `Impossible de modifier l’épingle du module ${title} tant qu’il est désactivé`);
+          pinBtn.title = 'Module désactivé : action indisponible';
+        }
+      }
+      const hideBtn = item.querySelector('[data-admin-action="hide"]');
+      if (hideBtn) {
+        const hideLabel = `${hidden ? 'Afficher' : 'Masquer'} le module ${title}`.trim();
+        hideBtn.setAttribute('aria-pressed', String(hidden));
+        hideBtn.classList.toggle('is-active', hidden);
+        const accessibleLabel = enabled ? hideLabel : `${hideLabel} (module désactivé)`;
+        hideBtn.setAttribute('aria-label', accessibleLabel);
+        hideBtn.title = accessibleLabel;
+        hideBtn.disabled = false;
+        hideBtn.removeAttribute('aria-disabled');
+      }
+    });
+    if (adminToolbarCounts.active) {
+      adminToolbarCounts.active.textContent = String(Math.max(0, blockIds.length - disabledSet.size));
+    }
+    if (adminToolbarCounts.hidden) {
+      adminToolbarCounts.hidden.textContent = String(hiddenSet.size);
+    }
+    if (adminToolbarCounts.pinned) {
+      adminToolbarCounts.pinned.textContent = String(pinnedSet.size);
+    }
+    organizeFilterToggles.forEach((button, filterKey) => {
+      const pressed = currentFilter === filterKey;
+      button.setAttribute('aria-pressed', String(pressed));
+      button.classList.toggle('is-active', pressed);
+      const defaultLabel = button.dataset.defaultAria || button.getAttribute('aria-label');
+      const defaultTitle = button.dataset.defaultTitle || button.title;
+      if (pressed) {
+        button.setAttribute('aria-label', 'Afficher tous les modules');
+        button.title = 'Afficher tous les modules';
+      } else {
+        if (defaultLabel) button.setAttribute('aria-label', defaultLabel);
+        if (defaultTitle) button.title = defaultTitle;
       }
     });
     updateAdminPositions();
