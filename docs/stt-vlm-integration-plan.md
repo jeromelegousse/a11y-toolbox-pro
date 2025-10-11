@@ -4,16 +4,15 @@ Ce plan couvre l'intégration rapide des moteurs de reconnaissance vocale et des
 
 ## 1. Préparation
 
-1. **Gestion des secrets**
-   - Ajouter un fichier `.env.local` à la racine du projet (déjà ignoré par Git si nécessaire).
-   - Renseigner les clés sous la forme `FOURNISSEUR_API_KEY="..."`.
-   - Documenter les procédures de récupération des clés dans `docs/credentials/README.md` (à créer si besoin).
-   - Prévoir un utilitaire Node/TS pour charger ces variables via `dotenv`.
+1. **Gestion des secrets** ✅
+   - Fichier d'exemple `.env.example` à dupliquer en `.env.local` (ignoré par Git) pour stocker les clés (`FOURNISSEUR_API_KEY="..."`).
+   - Documentation centralisée dans `docs/credentials/README.md` pour la récupération des clés.
+   - Utilitaire Node `scripts/integrations/env.js` basé sur `dotenv` pour charger automatiquement `.env.local` et `.env`.
 
-2. **Outils communs**
-   - Créer un service `packages/integrations/src/api-clients.ts` centralisant les appels HTTP (`fetch` natif + gestion retries/timeout).
-   - Structurer une interface `SpeechEngine` et `VisionEngine` pour uniformiser les appels.
-   - Mettre en place un dossier `data/samples/` contenant une dizaine de fichiers audio courts + captures pour tests rapides.
+2. **Outils communs** ✅
+   - Service HTTP `src/integrations/http-client.js` gérant `fetch` + retries/timeout.
+   - Interfaces `SpeechEngine` et `VisionEngine` définies en JSDoc dans le même module.
+   - Dossier `data/samples/` prêt à accueillir les fichiers audio/images de test (ignorés par Git).
 
 ## 2. Vague 1 — APIs avec quota gratuit
 
