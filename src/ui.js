@@ -1634,6 +1634,8 @@ export function mountUI({ root, state }) {
 
     const status = document.createElement('div');
     status.className = 'a11ytb-admin-status';
+    status.hidden = true;
+    status.setAttribute('aria-hidden', 'true');
 
     const pinnedBadge = document.createElement('span');
     pinnedBadge.className = 'a11ytb-admin-badge a11ytb-admin-badge--pinned';
@@ -1885,7 +1887,9 @@ export function mountUI({ root, state }) {
       if (disabledBadge) disabledBadge.hidden = enabled;
       const statusContainer = item.querySelector('.a11ytb-admin-status');
       if (statusContainer) {
-        statusContainer.hidden = !(pinned || hidden || !enabled);
+        const shouldHideStatus = !(pinned || hidden || !enabled);
+        statusContainer.hidden = shouldHideStatus;
+        statusContainer.setAttribute('aria-hidden', shouldHideStatus ? 'true' : 'false');
       }
       const prioritySelect = item.querySelector('select[data-ref="priority"]');
       const priorityHint = item.querySelector('[data-ref="priority-hint"]');
