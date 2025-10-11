@@ -31,7 +31,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 
 - **Phase 0** :
   - Les tests automatisés restent à industrialiser (unitaires + visuels, point 6).
-  - Le focus trap complet du panneau d’options est couvert (isolation inert + restitution focus), il faut maintenant étendre les indicateurs d’état.
+  - Le focus trap complet du panneau d’options est couvert (isolation inert + restitution focus) et le centre d’état unifie désormais voix, braille, contraste et espacements ; il reste à exposer les métriques de performance et de compatibilité.
   - L’atelier design system doit encore fournir les exports CSS/tokens prêts à l’emploi (point 7).
 - **Phase 1** : aucun chantier sur le builder drag & drop, les collections de modules ou le chargement conditionnel n’a démarré.
 - **Phase 2 et suivantes** : observabilité temps réel, profils dynamiques, catalogue de modules et multi-tenant restent entièrement à concevoir.
@@ -42,7 +42,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 - **Guidage** : pas de parcours FastPass ou de checklists interactives.
 - **Personnalisation avancée** : profils dynamiques, raccourcis personnalisables et réglages voix étendus manquent face à Stark.
 - **Collaboration** : aucune intégration Jira/Linear/Slack ni partage multi-utilisateurs, contrairement aux suites professionnelles.
-- **Observabilité** : pas de score de conformité ni d’analytics consolidés comme sur les plateformes enterprise.
+- **Observabilité** : pas de score de conformité ni d’analytics consolidés comme sur les plateformes enterprise, mais le centre d’état s’aligne progressivement sur les tableaux de bord temps réel proposés par Accessibility Insights ou Stark.
 
 ## Recommandations stratégiques
 
@@ -150,7 +150,8 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
    préférences sauvegardées.
 3. Mettre en place des **tests contractuels** sur le manifest (validation JSON Schema, dépendances cycliques).
 4. Introduire un **switch de chargement différé** par module (coché/décoché) côté runtime pour mesurer l'impact performance.
-5. Documenter un **processus de contribution** pour les modules (template PR, checklist accessibilité, revue design system).
+5. Instrumenter le **centre d’état** (latence de chargement, compatibilité navigateur) pour se rapprocher des indicateurs temps réel d’Accessibility Insights et Stark.
+6. Documenter un **processus de contribution** pour les modules (template PR, checklist accessibilité, revue design system).
 
 ## Étapes moyen terme
 
@@ -168,4 +169,4 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
 - Publication d'un **design system public** (documentation + composants web) pour favoriser l'écosystème de modules tiers.
 - Mise en place d'un **système de licences** et de partenariats pour les modules premium.
 
-Mise à jour : 2025-10-15
+Mise à jour : 2025-10-16

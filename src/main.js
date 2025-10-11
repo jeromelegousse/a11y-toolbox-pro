@@ -2,9 +2,11 @@ import { createStore } from './store.js';
 import { mountUI } from './ui.js';
 import { registerBlock, registerModuleManifest } from './registry.js';
 import { createFeedback } from './feedback.js';
+import { manifest as audioManifest } from './modules/audio.manifest.js';
 import { mergeManifestDefaults } from './module-manifest.js';
 import { moduleCatalog } from './module-catalog.js';
 import { setupModuleRuntime } from './module-runtime.js';
+import { setupAudioFeedback } from './audio-feedback.js';
 
 const profilePresets = {
   'vision-basse': {
@@ -73,9 +75,10 @@ const profilePresets = {
   }
 };
 
-const normalizedManifests = moduleCatalog.map(({ id, manifest }) =>
-  registerModuleManifest(manifest, id)
-);
+const normalizedManifests = [
+  registerModuleManifest(audioManifest, audioManifest.id),
+  ...moduleCatalog.map(({ id, manifest }) => registerModuleManifest(manifest, id))
+];
 
 const baseInitial = {
   ui: {
@@ -107,10 +110,6 @@ const initial = normalizedManifests.reduce(
   baseInitial
 );
 
-const feedback = createFeedback();
-if (!window.a11ytb) window.a11ytb = {};
-window.a11ytb.feedback = feedback;
-
 const moduleIcons = {
   tts: '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 9v6h3l4 4V5L7 9H4zm13 3a3 3 0 00-3-3v6a3 3 0 003-3zm-3-6.9v2.07a5 5 0 010 9.66V18a7 7 0 000-13.9z"/></svg>',
   stt: '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3zm5-3a1 1 0 012 0 7 7 0 01-6 6.92V21h3v1H8v-1h3v-3.08A7 7 0 015 11a1 1 0 012 0 5 5 0 0010 0z"/></svg>',
@@ -131,6 +130,12 @@ function ttsStatusMessage(status) {
 }
 
 const state = createStore('a11ytb/v1', initial);
+const feedback = createFeedback({
+  initialConfig: state.get('audio'),
+  subscribe: (listener) => state.on((snapshot) => listener?.(snapshot.audio))
+});
+if (!window.a11ytb) window.a11ytb = {};
+window.a11ytb.feedback = feedback;
 const ensureDefaults = [
   ['ui.category', initial.ui.category],
   ['ui.search', initial.ui.search],
@@ -145,6 +150,7 @@ const ensureDefaults = [
   ['ui.view', initial.ui.view],
   ['ui.lastProfile', initial.ui.lastProfile],
   ['ui.guides', initial.ui.guides],
+  ['audio', initial.audio],
   ['profiles', initial.profiles],
   ['runtime.modules', initial.runtime.modules],
   ['tts.progress', initial.tts.progress]
@@ -158,6 +164,7 @@ ensureDefaults.forEach(([path, fallback]) => {
     state.set(path, clone);
   }
 });
+setupAudioFeedback({ state, feedback });
 document.documentElement.dataset.dock = state.get('ui.dock') || 'right';
 state.on(s => {
   if (s.ui?.dock) document.documentElement.dataset.dock = s.ui.dock;

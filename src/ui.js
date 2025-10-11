@@ -2,6 +2,7 @@ import { listBlocks, renderBlock, listModuleManifests } from './registry.js';
 import { applyInertToSiblings } from './utils/inert.js';
 import { summarizeStatuses } from './status-center.js';
 import { buildGuidedChecklists, toggleManualChecklistStep } from './guided-checklists.js';
+import { normalizeAudioEvents } from './audio-config.js';
 
 const DEFAULT_BLOCK_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h7v7H4V5zm9 0h7v7h-7V5zM4 12h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>';
 
@@ -265,7 +266,7 @@ export function mountUI({ root, state }) {
   const statusCenter = document.createElement('section');
   statusCenter.className = 'a11ytb-status-center';
   statusCenter.setAttribute('role', 'region');
-  statusCenter.setAttribute('aria-label', 'État en temps réel des modules vocaux et braille');
+  statusCenter.setAttribute('aria-label', 'État en temps réel des modules vocaux, braille et vision');
 
   const statusHeader = document.createElement('div');
   statusHeader.className = 'a11ytb-status-header';
@@ -274,7 +275,7 @@ export function mountUI({ root, state }) {
   statusTitle.textContent = 'État en temps réel';
   const statusDescription = document.createElement('p');
   statusDescription.className = 'a11ytb-status-description';
-  statusDescription.textContent = 'Suivez la disponibilité des modules Lecture vocale, Dictée et Braille.';
+  statusDescription.textContent = 'Suivez la disponibilité des modules Lecture vocale, Dictée, Braille, Contraste et Espacements.';
   statusHeader.append(statusTitle, statusDescription);
 
   const statusGrid = document.createElement('div');
@@ -2517,8 +2518,36 @@ export function mountUI({ root, state }) {
     };
     const next = [entry, ...current].slice(0, 50);
     state.set('ui.activity', next);
-    if (tone) {
-      window.a11ytb?.feedback?.play(options.tone);
+    const audioEventsState = state.get('audio.events');
+    const hasEventsObject = audioEventsState && typeof audioEventsState === 'object';
+    const normalizedEvents = normalizeAudioEvents(hasEventsObject ? audioEventsState : undefined);
+    const severityConfig = severity ? normalizedEvents[severity] : undefined;
+    const explicitEntry = hasEventsObject && severity ? audioEventsState[severity] : undefined;
+
+    let shouldPlayEarcon = false;
+    let presetToPlay = null;
+
+    if (severity && severityConfig) {
+      const enabled = severityConfig.enabled !== false;
+      if (explicitEntry !== undefined) {
+        shouldPlayEarcon = enabled;
+        presetToPlay = severityConfig.sound || tone || null;
+      } else if (tone) {
+        shouldPlayEarcon = enabled;
+        presetToPlay = tone;
+      } else if (enabled && severityConfig.sound) {
+        shouldPlayEarcon = true;
+        presetToPlay = severityConfig.sound;
+      }
+    } else if (tone) {
+      shouldPlayEarcon = true;
+      presetToPlay = tone;
+    }
+
+    if (shouldPlayEarcon && typeof presetToPlay === 'string' && presetToPlay) {
+      window.a11ytb?.feedback?.play(presetToPlay);
+    } else if (!hasEventsObject && tone) {
+      window.a11ytb?.feedback?.play(tone);
     }
     return entry;
   }

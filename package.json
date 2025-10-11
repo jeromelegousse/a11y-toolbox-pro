@@ -10,7 +10,8 @@
     "lint": "npm run lint:js && npm run lint:css",
     "test:unit": "vitest run",
     "test:visual": "playwright test",
-    "test": "npm run lint && npm run test:unit && npm run test:visual"
+    "test": "npm run lint && npm run test:unit && npm run test:visual",
+    "demo:stt": "node scripts/integrations/demo-stt.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.42.1",
@@ -20,6 +21,7 @@
     "iconv-lite": "^0.6.3",
     "stylelint": "^15.11.0",
     "stylelint-config-standard": "^34.0.0",
-    "vitest": "^1.6.0"
+    "vitest": "^1.6.0",
+    "dotenv": "^16.4.5"
   }
 }

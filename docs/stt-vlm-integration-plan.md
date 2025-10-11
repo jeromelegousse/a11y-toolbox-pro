@@ -4,22 +4,21 @@ Ce plan couvre l'intégration rapide des moteurs de reconnaissance vocale et des
 
 ## 1. Préparation
 
-1. **Gestion des secrets**
-   - Ajouter un fichier `.env.local` à la racine du projet (déjà ignoré par Git si nécessaire).
-   - Renseigner les clés sous la forme `FOURNISSEUR_API_KEY="..."`.
-   - Documenter les procédures de récupération des clés dans `docs/credentials/README.md` (à créer si besoin).
-   - Prévoir un utilitaire Node/TS pour charger ces variables via `dotenv`.
+1. **Gestion des secrets** ✅
+   - Fichier d'exemple `.env.example` à dupliquer en `.env.local` (ignoré par Git) pour stocker les clés (`FOURNISSEUR_API_KEY="..."`).
+   - Documentation centralisée dans `docs/credentials/README.md` pour la récupération des clés.
+   - Utilitaire Node `scripts/integrations/env.js` basé sur `dotenv` pour charger automatiquement `.env.local` et `.env`.
 
-2. **Outils communs**
-   - Créer un service `packages/integrations/src/api-clients.ts` centralisant les appels HTTP (`fetch` natif + gestion retries/timeout).
-   - Structurer une interface `SpeechEngine` et `VisionEngine` pour uniformiser les appels.
-   - Mettre en place un dossier `data/samples/` contenant une dizaine de fichiers audio courts + captures pour tests rapides.
+2. **Outils communs** ✅
+   - Service HTTP `src/integrations/http-client.js` gérant `fetch` + retries/timeout.
+   - Interfaces `SpeechEngine` et `VisionEngine` définies en JSDoc dans le même module.
+   - Dossier `data/samples/` prêt à accueillir les fichiers audio/images de test (ignorés par Git).
 
 ## 2. Vague 1 — APIs avec quota gratuit
 
 | Fournisseur | Avantages | Quota gratuit | Actions immédiates |
 |-------------|-----------|---------------|--------------------|
-| **OpenAI Whisper API** | Haute précision multilingue | Crédit d'essai (5$) | Créer un client `openai-whisper.ts`, tester transcription `whisper-1`.
+| **OpenAI Whisper API** | Haute précision multilingue | Crédit d'essai (5$) | ✅ Client `openai-whisper` + CLI `npm run demo:stt`.
 | **Google Cloud Speech-to-Text v2** | Streaming + diarisation | 60 min/mois (90 jours) | Utiliser compte d'essai, configurer `GOOGLE_APPLICATION_CREDENTIALS` et wrapper REST (`speech:recognize`).
 | **Deepgram** | Bons SDK + webhooks | 200$ crédit d'accueil | Utiliser SDK JS officiel, test sur échantillon `pre-recorded`.
 | **AssemblyAI** | Fonctionnalités enrichies (résumé) | 3h gratuites | Appel REST `/v2/transcript`, suivre statut asynchrone.
@@ -55,7 +54,7 @@ Prévoir un README dédié dans `scripts/` expliquant l'installation (requiremen
 
 1. **Semaine 1**
    - Mettre en place la base (`.env.local`, service API, interfaces).
-   - Implémenter OpenAI Whisper API + script de démo.
+   - ✅ Implémenter OpenAI Whisper API + script de démo.
    - Préparer dataset échantillon.
 
 2. **Semaine 2**
