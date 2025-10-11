@@ -1,18 +1,7 @@
 import { registerModule } from '../registry.js';
+import { manifest } from './braille.manifest.js';
 
-export const manifest = {
-  id: 'braille',
-  name: 'Transcription braille',
-  version: '0.1.0',
-  description: 'Convertit un texte latin simplifié en caractères braille Unicode.',
-  category: 'conversion',
-  keywords: ['braille', 'transcription'],
-  defaults: {
-    state: {
-      braille: { output: '' }
-    }
-  }
-};
+export { manifest };
 
 const letters = {
   a: 0x2801, b: 0x2803, c: 0x2809, d: 0x2819, e: 0x2811,

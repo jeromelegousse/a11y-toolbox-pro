@@ -1,13 +1,10 @@
 import { createStore } from './store.js';
 import { mountUI } from './ui.js';
-import { registerBlock, listModuleManifests, listModules } from './registry.js';
+import { registerBlock, registerModuleManifest } from './registry.js';
 import { createFeedback } from './feedback.js';
 import { mergeManifestDefaults } from './module-manifest.js';
-import './modules/tts.js';
-import './modules/stt.js';
-import './modules/braille.js';
-import './modules/contrast.js';
-import './modules/spacing.js';
+import { moduleCatalog } from './module-catalog.js';
+import { setupModuleRuntime } from './module-runtime.js';
 
 const profilePresets = {
   'vision-basse': {
@@ -60,6 +57,10 @@ const profilePresets = {
   }
 };
 
+const normalizedManifests = moduleCatalog.map(({ id, manifest }) =>
+  registerModuleManifest(manifest, id)
+);
+
 const baseInitial = {
   ui: {
     dock: 'right',
@@ -77,7 +78,7 @@ const baseInitial = {
   profiles: profilePresets
 };
 
-const initial = listModuleManifests().reduce(
+const initial = normalizedManifests.reduce(
   (acc, manifest) => mergeManifestDefaults(acc, manifest),
   baseInitial
 );
@@ -106,13 +107,6 @@ function ttsStatusMessage(status) {
 }
 
 const state = createStore('a11ytb/v1', initial);
-listModules().forEach((mod) => {
-  try {
-    mod.init?.({ state });
-  } catch (error) {
-    console.error(`a11ytb: échec de l’initialisation du module ${mod.id}`, error);
-  }
-});
 const ensureDefaults = [
   ['ui.category', initial.ui.category],
   ['ui.search', initial.ui.search],
@@ -141,9 +135,6 @@ state.on(s => {
   if (s.ui?.dock) document.documentElement.dataset.dock = s.ui.dock;
 });
 
-const root = document.getElementById('a11ytb-root');
-mountUI({ root, state });
-
 function markProfileCustom() {
   if (state.get('ui.activeProfile') !== 'custom') {
     state.set('ui.activeProfile', 'custom');
@@ -152,6 +143,7 @@ function markProfileCustom() {
 
 registerBlock({
   id: 'tts-controls',
+  moduleId: 'tts',
   title: 'Lecture vocale (TTS)',
   icon: moduleIcons.tts,
   category: 'lecture',
@@ -264,6 +256,7 @@ registerBlock({
 
 registerBlock({
   id: 'stt-controls',
+  moduleId: 'stt',
   title: 'Reconnaissance vocale (STT)',
   icon: moduleIcons.stt,
   category: 'interaction',
@@ -304,6 +297,7 @@ registerBlock({
 
 registerBlock({
   id: 'braille-controls',
+  moduleId: 'braille',
   title: 'Braille',
   icon: moduleIcons.braille,
   category: 'lecture',
@@ -342,6 +336,7 @@ registerBlock({
 
 registerBlock({
   id: 'contrast-controls',
+  moduleId: 'contrast',
   title: 'Contraste élevé',
   icon: moduleIcons.contrast,
   category: 'vision',
@@ -376,6 +371,7 @@ registerBlock({
 
 registerBlock({
   id: 'spacing-controls',
+  moduleId: 'spacing',
   title: 'Espacements',
   icon: moduleIcons.spacing,
   category: 'vision',
@@ -418,3 +414,8 @@ registerBlock({
     });
   }
 });
+
+setupModuleRuntime({ state, catalog: moduleCatalog });
+
+const root = document.getElementById('a11ytb-root');
+mountUI({ root, state });

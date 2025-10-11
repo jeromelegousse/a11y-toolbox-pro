@@ -2,6 +2,14 @@ import { validateModuleManifest } from './module-manifest.js';
 
 const _modules = new Map();
 const _moduleManifests = new Map();
+
+export function registerModuleManifest(manifest, moduleId) {
+  const normalized = validateModuleManifest(manifest ?? { id: moduleId }, moduleId);
+  const existing = _moduleManifests.get(normalized.id);
+  if (existing) return existing;
+  _moduleManifests.set(normalized.id, normalized);
+  return normalized;
+}
 const PLACEHOLDER_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 3a2 2 0 11-2 2 2 2 0 012-2zm0 4a1 1 0 011 1v8a1 1 0 01-2 0V10a1 1 0 011-1z"/></svg>';
 export const DEFAULT_BLOCK_ICON = PLACEHOLDER_ICON;
 
@@ -17,8 +25,7 @@ export function registerModule(definition) {
     throw new Error(`Module with id "${id}" is already registered.`);
   }
 
-  const manifest = validateModuleManifest(definition.manifest ?? { id }, id);
-  _moduleManifests.set(id, manifest);
+  const manifest = registerModuleManifest(definition.manifest ?? { id }, id);
 
   const normalized = {
     ...definition,
@@ -115,6 +122,7 @@ if (!window.a11ytb.registry) {
     listBlocks,
     getBlock,
     listModuleManifests,
-    getModuleManifest
+    getModuleManifest,
+    registerModuleManifest
   };
 }
