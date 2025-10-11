@@ -19,13 +19,17 @@ export const openAiWhisperEngine = {
     const absolutePath = ensureFilePath(filePath);
     const apiKey = requireEnv('OPENAI_API_KEY');
 
-    const formData = new FormData();
-    formData.append('model', DEFAULT_MODEL);
-    formData.append('file', createReadStream(absolutePath), basename(absolutePath));
+    const createPayload = () => {
+      const formData = new FormData();
+      formData.append('model', DEFAULT_MODEL);
+      formData.append('file', createReadStream(absolutePath), basename(absolutePath));
 
-    if (language) {
-      formData.append('language', language);
-    }
+      if (language) {
+        formData.append('language', language);
+      }
+
+      return formData;
+    };
 
     const response = await fetchWithRetry(
       OPENAI_TRANSCRIPTION_ENDPOINT,
@@ -34,7 +38,7 @@ export const openAiWhisperEngine = {
         headers: {
           Authorization: `Bearer ${apiKey}`
         },
-        body: formData,
+        body: createPayload,
         timeout: 30000
       },
       {
