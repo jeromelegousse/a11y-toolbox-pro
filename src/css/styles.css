@@ -1185,13 +1185,16 @@ body {
     grid-template-areas:
       'handle order label'
       'icon icon label'
-      'status status actions'
+      'status status status'
+      'actions actions actions'
       'meta meta meta';
     align-items: flex-start;
   }
 
   .a11ytb-admin-actions {
     justify-content: flex-start;
+    flex-wrap: wrap;
+    width: 100%;
   }
 
   .a11ytb-admin-toolbar {
