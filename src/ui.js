@@ -1,6 +1,7 @@
 import { listBlocks, renderBlock, listModuleManifests } from './registry.js';
 import { applyInertToSiblings } from './utils/inert.js';
 import { summarizeStatuses } from './status-center.js';
+import { buildGuidedChecklists, toggleManualChecklistStep } from './guided-checklists.js';
 
 const DEFAULT_BLOCK_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h7v7H4V5zm9 0h7v7h-7V5zM4 12h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>';
 
@@ -303,6 +304,7 @@ export function mountUI({ root, state }) {
     { id: 'modules', label: 'Modules' },
     { id: 'options', label: 'Options & Profils' },
     { id: 'organize', label: 'Organisation' },
+    { id: 'guides', label: 'Guides' },
     { id: 'shortcuts', label: 'Raccourcis' }
   ];
   viewDefinitions.forEach((view) => {
@@ -341,6 +343,13 @@ export function mountUI({ root, state }) {
   organizeView.setAttribute('hidden', '');
   organizeView.tabIndex = -1;
 
+  const guidesView = document.createElement('div');
+  guidesView.className = 'a11ytb-view a11ytb-view--guides';
+  guidesView.setAttribute('role', 'region');
+  guidesView.setAttribute('aria-label', 'Parcours guidés et checklists');
+  guidesView.setAttribute('hidden', '');
+  guidesView.tabIndex = -1;
+
   const shortcutsView = document.createElement('div');
   shortcutsView.className = 'a11ytb-view a11ytb-view--shortcuts';
   shortcutsView.setAttribute('role', 'region');
@@ -352,6 +361,7 @@ export function mountUI({ root, state }) {
     ['modules', modulesView],
     ['options', optionsView],
     ['organize', organizeView],
+    ['guides', guidesView],
     ['shortcuts', shortcutsView]
   ]);
 
@@ -474,6 +484,162 @@ export function mountUI({ root, state }) {
   optionsScroll.append(profilesSection, configSection);
   optionsView.append(optionsScroll);
 
+  const guidesScroll = document.createElement('div');
+  guidesScroll.className = 'a11ytb-options-scroll';
+  const guidesSection = document.createElement('section');
+  guidesSection.className = 'a11ytb-options-section';
+  guidesSection.classList.add('a11ytb-options-section--guides');
+  const guidesHeader = document.createElement('div');
+  guidesHeader.className = 'a11ytb-section-header';
+  const guidesTitle = document.createElement('h3');
+  guidesTitle.className = 'a11ytb-section-title';
+  guidesTitle.textContent = 'Parcours guidés';
+  const guidesDescription = document.createElement('p');
+  guidesDescription.className = 'a11ytb-section-description';
+  guidesDescription.textContent = 'Suivez les checklists d’onboarding pour valider les réglages essentiels et surveiller vos services.';
+  guidesHeader.append(guidesTitle, guidesDescription);
+  const guidesGrid = document.createElement('div');
+  guidesGrid.className = 'a11ytb-guides-grid';
+  guidesSection.append(guidesHeader, guidesGrid);
+  guidesScroll.append(guidesSection);
+  guidesView.append(guidesScroll);
+
+  function renderGuidedChecklists(snapshot) {
+    if (!guidesGrid) return;
+    const checklists = buildGuidedChecklists(snapshot || state.get());
+    guidesGrid.innerHTML = '';
+    if (!checklists.length) {
+      const empty = document.createElement('p');
+      empty.className = 'a11ytb-empty-state';
+      empty.textContent = 'Aucune checklist disponible pour le moment.';
+      guidesGrid.append(empty);
+      return;
+    }
+    checklists.forEach((checklist) => {
+      const card = document.createElement('article');
+      card.className = 'a11ytb-config-card a11ytb-guide-card';
+      if (checklist.tone) {
+        card.dataset.tone = checklist.tone;
+      }
+
+      const header = document.createElement('div');
+      header.className = 'a11ytb-guide-card-header';
+      const title = document.createElement('h4');
+      title.className = 'a11ytb-guide-title';
+      title.textContent = checklist.title;
+      header.append(title);
+
+      const progress = document.createElement('div');
+      progress.className = 'a11ytb-guide-progress';
+      const progressLabel = document.createElement('span');
+      progressLabel.className = 'a11ytb-guide-progress-label';
+      progressLabel.textContent = `${checklist.completedCount}/${checklist.total} terminées`;
+      const progressTrack = document.createElement('div');
+      progressTrack.className = 'a11ytb-guide-progress-track';
+      const progressFill = document.createElement('span');
+      progressFill.className = 'a11ytb-guide-progress-fill';
+      const percent = Math.round(checklist.progress * 100);
+      progressFill.style.width = `${percent}%`;
+      progressFill.setAttribute('aria-hidden', 'true');
+      progressTrack.append(progressFill);
+      progress.append(progressLabel, progressTrack);
+      header.append(progress);
+
+      card.append(header);
+
+      if (checklist.description) {
+        const intro = document.createElement('p');
+        intro.className = 'a11ytb-guide-description';
+        intro.textContent = checklist.description;
+        card.append(intro);
+      }
+
+      if (checklist.nextStep) {
+        const next = document.createElement('p');
+        next.className = 'a11ytb-guide-next-step';
+        next.innerHTML = `<span class="a11ytb-guide-next-label">Prochaine étape :</span> ${checklist.nextStep.label}`;
+        card.append(next);
+      }
+
+      const list = document.createElement('ol');
+      list.className = 'a11ytb-guide-steps';
+      list.setAttribute('aria-label', `Étapes pour ${checklist.title}`);
+
+      checklist.steps.forEach((step) => {
+        const item = document.createElement('li');
+        item.className = 'a11ytb-guide-step';
+        item.dataset.state = step.completed ? 'done' : 'todo';
+        item.dataset.mode = step.state;
+
+        const status = document.createElement('span');
+        status.className = 'a11ytb-guide-step-status';
+        status.setAttribute('aria-hidden', 'true');
+        status.textContent = step.completed ? '✓' : '';
+
+        const body = document.createElement('div');
+        body.className = 'a11ytb-guide-step-body';
+
+        const label = document.createElement('span');
+        label.className = 'a11ytb-guide-step-label';
+        label.textContent = step.label;
+        body.append(label);
+
+        if (step.detail) {
+          const detail = document.createElement('p');
+          detail.className = 'a11ytb-guide-step-detail';
+          detail.textContent = step.detail;
+          body.append(detail);
+        }
+
+        item.append(status, body);
+
+        if (step.state === 'manual') {
+          const toggle = document.createElement('button');
+          toggle.type = 'button';
+          toggle.className = 'a11ytb-guide-step-toggle';
+          toggle.dataset.guideAction = 'toggle-step';
+          toggle.dataset.stepId = step.id;
+          toggle.dataset.stepLabel = step.label;
+          toggle.setAttribute('aria-pressed', String(step.completed));
+          toggle.textContent = step.completed ? 'Marquer à refaire' : 'Marquer comme fait';
+          item.append(toggle);
+        } else {
+          const badge = document.createElement('span');
+          badge.className = 'a11ytb-guide-step-tag';
+          badge.textContent = 'Suivi automatique';
+          item.append(badge);
+        }
+
+        list.append(item);
+      });
+
+      card.append(list);
+      guidesGrid.append(card);
+    });
+  }
+
+  renderGuidedChecklists(state.get());
+  state.on(renderGuidedChecklists);
+
+  guidesGrid.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-guide-action="toggle-step"]');
+    if (!button) return;
+    const stepId = button.dataset.stepId;
+    if (!stepId) return;
+    const wasCompleted = button.getAttribute('aria-pressed') === 'true';
+    const changed = toggleManualChecklistStep(state, stepId);
+    if (!changed) return;
+    const nowCompleted = !wasCompleted;
+    const label = button.dataset.stepLabel || stepId;
+    button.setAttribute('aria-pressed', String(nowCompleted));
+    button.textContent = nowCompleted ? 'Marquer à refaire' : 'Marquer comme fait';
+    const tone = nowCompleted ? 'confirm' : 'info';
+    logActivity(`${nowCompleted ? 'Étape validée' : 'Étape réinitialisée'} : ${label}`, {
+      tone,
+      tags: ['guides', stepId]
+    });
+  });
+
   function createShortcutComboElement(variants) {
     const container = document.createElement('span');
     container.className = 'a11ytb-shortcut-combo';
@@ -527,6 +693,7 @@ export function mountUI({ root, state }) {
         { combo: [['Alt', 'Shift', 'M']], description: 'Afficher la vue Modules.' },
         { combo: [['Alt', 'Shift', 'O']], description: 'Afficher la vue Options & Profils.' },
         { combo: [['Alt', 'Shift', 'G']], description: 'Afficher la vue Organisation.' },
+        { combo: [['Alt', 'Shift', 'P']], description: 'Afficher la vue Guides.' },
         { combo: [['Alt', 'Shift', 'H']], description: 'Afficher cette vue Raccourcis.' }
       ]
     },
@@ -581,14 +748,14 @@ export function mountUI({ root, state }) {
   shortcutsScroll.append(shortcutsSection);
   shortcutsView.append(shortcutsScroll);
 
-  viewContainer.append(modulesView, optionsView, organizeView, shortcutsView);
+  viewContainer.append(modulesView, optionsView, organizeView, guidesView, shortcutsView);
   body.append(statusCenter, viewToggle, viewContainer);
 
   const footer = document.createElement('div');
   footer.className = 'a11ytb-header';
   const footerTitle = document.createElement('div');
   footerTitle.className = 'a11ytb-title';
-  footerTitle.textContent = 'Raccourcis : Alt+Shift+A • Alt+Shift+H';
+  footerTitle.textContent = 'Raccourcis : Alt+Shift+A • Alt+Shift+P • Alt+Shift+H';
 
   const activity = document.createElement('details');
   activity.className = 'a11ytb-activity';
@@ -1829,6 +1996,19 @@ export function mountUI({ root, state }) {
         });
       }
     }
+    if (currentView === 'guides' && activeViewId !== 'guides') {
+      requestAnimationFrame(() => {
+        const focusables = collectFocusable(guidesView);
+        const target = focusables[0] || guidesView;
+        if (typeof target?.focus === 'function') {
+          try {
+            target.focus({ preventScroll: true });
+          } catch (error) {
+            target.focus();
+          }
+        }
+      });
+    }
     if (currentView === 'shortcuts' && activeViewId !== 'shortcuts') {
       requestAnimationFrame(() => {
         try {
@@ -2151,6 +2331,7 @@ export function mountUI({ root, state }) {
     ['m', 'modules'],
     ['o', 'options'],
     ['g', 'organize'],
+    ['p', 'guides'],
     ['h', 'shortcuts']
   ]);
 

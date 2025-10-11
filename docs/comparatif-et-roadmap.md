@@ -15,7 +15,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 
 | Axe | Forces des solutions pro | État actuel A11y Toolbox Pro | Pistes rapides |
 | --- | --- | --- | --- |
-| **UX / UI** | Parcours guidés, microcopie pédagogique, hiérarchie d'information claire (axe Insights, Stark) | Panneau unique avec options listées sans priorisation ni guidance | Prioriser les actions critiques, ajouter onboarding contextualisé et exemples d'usage |
+| **UX / UI** | Parcours guidés, microcopie pédagogique, hiérarchie d'information claire (axe Insights, Stark) | Panneau unique avec options listées et vue Guides (checklists onboarding) mais peu de scénarios contextualisés | Prioriser les actions critiques, étendre l'onboarding contextuel et proposer des exemples d'usage |
 | **Ergonomie** | Navigation clavier fluide, focus trap dans les dialogues, raccourcis cohérents, feedback état chargement | Focus trap complet, vue « Raccourcis » et centre d’état temps réel (TTS/STT/Braille) mais peu d’indicateurs pour les autres modules | Harmoniser les patterns clavier, ajouter indicateurs de statut (chargement/sauvegarde), préparer la personnalisation des raccourcis |
 | **Fiabilité** | Tests automatisés (axe core), reporting d'erreurs, synchronisation cloud, compatibilité multi-navigateurs | Démo locale sans pipeline de tests, journal local uniquement | Ajouter tests unitaires + e2e, gestion offline/erreurs, fallback progressif sur features vocales |
 | **Design** | Design systems documentés, tokens (couleurs, espace), mode sombre cohérent | Styles ad hoc par module, contraste variable, icônes hétérogènes | Définir tokens de base, bibliothèque d'icônes accessible, mode sombre clair | 
@@ -63,7 +63,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
    - Paramétrage contextuel : permettre aux modules de déclarer leurs paramètres et d'afficher un panneau commun (comparable à Stark qui centralise la configuration contraste/vision).
 
 4. **Améliorer l'expérience utilisateur et la cohérence visuelle**
-   - Mettre en place des **parcours guidés** (checklist pas à pas) inspirés des FastPass d'Accessibility Insights pour aider les nouveaux utilisateurs à configurer la boîte à outils.
+  - Étendre les **parcours guidés** (vue Guides actuelle) vers des checklists contextuelles inspirées des FastPass d'Accessibility Insights pour accompagner la configuration avancée.
    - Ajouter une **microcopie d'aide** (tooltips, exemples) pour chaque option critique afin de réduire la charge cognitive.
    - Construire un **design system minimal** : palette accessible, échelles de spacing/typo, composants (boutons, input, toggles) mutualisés.
    - Définir un **mode sombre** et garantir une cohérence icône/illustration (SVG optimisés, lignes de 1.5px, labels visibles).
