@@ -85,67 +85,72 @@ function clampVolume(value) {
 
 export function createFeedback(options = {}) {
   const player = makeTonePlayer();
-  let themeId = 'classic';
+  const presets = {
+    confirm: { frequency: 880, duration: 0.12, type: 'triangle' },
+    toggle: { frequency: 540, duration: 0.1, type: 'sine' },
+    success: { frequency: 760, duration: 0.16, type: 'triangle' },
+    info: { frequency: 520, duration: 0.14, type: 'sine' },
+    warning: { frequency: 420, duration: 0.2, type: 'sawtooth', volume: 0.16 },
+    alert: { frequency: 320, duration: 0.22, type: 'square', volume: 0.18 }
+  };
+
   let masterVolume = 1;
-  let eventSettings = { ...DEFAULT_EVENTS };
+  let eventTable = {};
 
-  function resolveTheme(id) {
-    return THEMES[id] || THEMES.classic;
+  function clampVolume(value, fallback = 0.15) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return fallback;
+    return Math.min(1, Math.max(0, numeric));
   }
 
-  function configure(config = {}) {
-    if (config.theme) {
-      themeId = THEMES[config.theme] ? config.theme : themeId;
-    }
-    if (config.masterVolume !== undefined) {
-      masterVolume = clampVolume(config.masterVolume);
-    }
-    if (config.events && typeof config.events === 'object') {
-      const next = { ...eventSettings };
-      Object.keys(DEFAULT_EVENTS).forEach((key) => {
-        if (config.events[key] !== undefined) {
-          next[key] = !!config.events[key];
-        }
-      });
-      eventSettings = next;
-    }
-  }
-
-  function shouldPlay(name) {
-    const family = EVENT_FAMILIES[name] || 'confirm';
-    return eventSettings[family] !== false;
-  }
-
-  function withMasterVolume(preset) {
-    const options = { ...preset };
-    if (options.volume !== undefined) {
-      options.volume = Math.max(0, options.volume * masterVolume);
-    } else {
-      options.volume = 0.15 * masterVolume;
-    }
-    return options;
+  function normalizePresetName(name) {
+    if (typeof name !== 'string') return null;
+    const key = name.trim();
+    return key ? key : null;
   }
 
   function play(name = 'confirm') {
-    if (!player.enabled) return;
-    if (typeof name === 'string' && !shouldPlay(name)) return;
-    const presets = resolveTheme(themeId);
-    const preset = typeof name === 'object'
-      ? name
-      : presets[name] || THEMES.classic[name] || presets.confirm;
-    const optionsToPlay = withMasterVolume(preset);
-    player.play(optionsToPlay);
+    const preset = typeof name === 'object' ? name : presets[name] || presets.confirm;
+    if (player.enabled) {
+      const base = preset || presets.confirm;
+      const options = { ...base };
+      const baseVolume = base && typeof base.volume === 'number' ? base.volume : 0.15;
+      options.volume = clampVolume(baseVolume * masterVolume, baseVolume);
+      player.play(options);
+    }
   }
 
-  const initialConfig = options.initialConfig
-    || (typeof options.getInitialConfig === 'function' ? options.getInitialConfig() : undefined);
-  if (initialConfig) configure(initialConfig);
+  function configure(options = {}) {
+    if (!options || typeof options !== 'object') return;
 
-  if (typeof options.subscribe === 'function') {
-    options.subscribe((nextConfig) => {
-      if (nextConfig) configure(nextConfig);
-    });
+    if (options.volume !== undefined) {
+      const nextVolume = Number(options.volume);
+      if (Number.isFinite(nextVolume)) {
+        masterVolume = clampVolume(nextVolume, masterVolume);
+      }
+    }
+
+    if (options.events && typeof options.events === 'object') {
+      const normalized = {};
+      Object.entries(options.events).forEach(([severity, entry]) => {
+        if (!entry || typeof entry !== 'object') return;
+        const presetName = normalizePresetName(entry.preset) || normalizePresetName(entry.sound) || null;
+        const enabled = entry.enabled !== undefined ? !!entry.enabled : true;
+        normalized[severity] = {
+          enabled,
+          preset: presetName
+        };
+      });
+      eventTable = normalized;
+    }
   }
 
-  return { play, configure };
+  function getConfig() {
+    return {
+      volume: masterVolume,
+      events: structuredClone(eventTable)
+    };
+  }
+
+  return { play, configure, getConfig, presets: Object.freeze({ ...presets }) };
 }

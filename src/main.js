@@ -2,9 +2,11 @@ import { createStore } from './store.js';
 import { mountUI } from './ui.js';
 import { registerBlock, registerModuleManifest } from './registry.js';
 import { createFeedback } from './feedback.js';
+import { manifest as audioManifest } from './modules/audio.manifest.js';
 import { mergeManifestDefaults } from './module-manifest.js';
 import { moduleCatalog } from './module-catalog.js';
 import { setupModuleRuntime } from './module-runtime.js';
+import { setupAudioFeedback } from './audio-feedback.js';
 
 const profilePresets = {
   'vision-basse': {
@@ -73,9 +75,10 @@ const profilePresets = {
   }
 };
 
-const normalizedManifests = moduleCatalog.map(({ id, manifest }) =>
-  registerModuleManifest(manifest, id)
-);
+const normalizedManifests = [
+  registerModuleManifest(audioManifest, audioManifest.id),
+  ...moduleCatalog.map(({ id, manifest }) => registerModuleManifest(manifest, id))
+];
 
 const baseInitial = {
   ui: {
@@ -147,6 +150,7 @@ const ensureDefaults = [
   ['ui.view', initial.ui.view],
   ['ui.lastProfile', initial.ui.lastProfile],
   ['ui.guides', initial.ui.guides],
+  ['audio', initial.audio],
   ['profiles', initial.profiles],
   ['runtime.modules', initial.runtime.modules],
   ['tts.progress', initial.tts.progress]
@@ -160,6 +164,7 @@ ensureDefaults.forEach(([path, fallback]) => {
     state.set(path, clone);
   }
 });
+setupAudioFeedback({ state, feedback });
 document.documentElement.dataset.dock = state.get('ui.dock') || 'right';
 state.on(s => {
   if (s.ui?.dock) document.documentElement.dataset.dock = s.ui.dock;
