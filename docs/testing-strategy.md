@@ -14,6 +14,7 @@ Ce document précise comment nous automatisons les vérifications et comment ajo
 ## 2. Tests unitaires (Vitest)
 
 - Les scénarios unitaires résident dans `tests/*.test.js` et `tests/**/*.test.js` (hors `visual/`).
+- `tests/inert.test.js` couvre l’isolation `inert` appliquée au panneau pour sécuriser le focus trap.
 - Utilisez `vitest` en mode watch (`npx vitest`) pendant le développement pour profiter du rechargement à chaud.
 - Mockez les APIs navigateur via des helpers simples (ex. `MemoryStorage` dans `tests/store.test.js`) afin de conserver des tests déterministes.
 - Ajoutez un test dédié pour chaque régression corrigée au niveau des modules ou du store.

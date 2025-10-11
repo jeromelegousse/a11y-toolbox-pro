@@ -31,7 +31,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 
 - **Phase 0** :
   - Les tests automatisés restent à industrialiser (unitaires + visuels, point 6).
-  - Le focus trap complet du panneau d’options n’est pas encore généralisé (point 8).
+  - Le focus trap complet du panneau d’options est couvert (isolation inert + restitution focus), il faut maintenant étendre les indicateurs d’état.
   - L’atelier design system doit encore fournir les exports CSS/tokens prêts à l’emploi (point 7).
 - **Phase 1** : aucun chantier sur le builder drag & drop, les collections de modules ou le chargement conditionnel n’a démarré.
 - **Phase 2 et suivantes** : observabilité temps réel, profils dynamiques, catalogue de modules et multi-tenant restent entièrement à concevoir.
@@ -92,7 +92,7 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
 5. Documenter le guide module (voir `docs/module-guide.md`).
 6. Mettre en place des tests automatisés (lint déjà dispo) et prévoir des tests visuels/screenshot pour les nouveaux blocs.
 7. Lancer un **atelier de design system** : définir palette + composants de base, livrer un kit Figma pour préparer l'implémentation.
-8. Ajouter un **focus trap** et la gestion explicite du cycle de focus pour le panneau d'options.
+8. ✅ Ajouter un **focus trap** complet avec isolation (`inert`) du reste de la page pour le panneau d'options.
 
 ### Phase 1 – Admin modulaire (T3 2025)
 

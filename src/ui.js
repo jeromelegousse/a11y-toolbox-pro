@@ -1,4 +1,5 @@
 import { listBlocks, renderBlock, listModuleManifests } from './registry.js';
+import { applyInertToSiblings } from './utils/inert.js';
 
 const DEFAULT_BLOCK_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h7v7H4V5zm9 0h7v7h-7V5zM4 12h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>';
 
@@ -1919,6 +1920,7 @@ export function mountUI({ root, state }) {
   root.append(overlay, fab, panel);
 
   let lastFocusedElement = null;
+  let releaseOutsideInert = null;
 
   const FOCUSABLE_SELECTORS = [
     'a[href]',
@@ -1948,10 +1950,24 @@ export function mountUI({ root, state }) {
     overlay.setAttribute('aria-hidden', String(!shouldOpen));
     document.body.classList.toggle('a11ytb-modal-open', shouldOpen);
     if (shouldOpen) {
+      if (typeof releaseOutsideInert === 'function') {
+        releaseOutsideInert();
+      }
+      releaseOutsideInert = applyInertToSiblings(root);
       lastFocusedElement = document.activeElement;
       const focusables = getFocusableElements();
       (focusables[0] || panel).focus();
+      if (state.get('ui.view') === 'options' && !releaseOptionsFocusTrap) {
+        setupOptionsFocusTrap();
+      }
     } else {
+      if (typeof releaseOutsideInert === 'function') {
+        releaseOutsideInert();
+        releaseOutsideInert = null;
+      }
+      if (activeViewId === 'options') {
+        teardownOptionsFocusTrap();
+      }
       const target = (lastFocusedElement && typeof lastFocusedElement.focus === 'function') ? lastFocusedElement : fab;
       target.focus();
       lastFocusedElement = null;
