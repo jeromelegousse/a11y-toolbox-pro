@@ -207,6 +207,15 @@ export function mountUI({ root, state }) {
   const body = document.createElement('div');
   body.className = 'a11ytb-body';
 
+  const shell = document.createElement('div');
+  shell.className = 'a11ytb-shell';
+
+  const shellNav = document.createElement('div');
+  shellNav.className = 'a11ytb-shell-nav';
+
+  const shellMain = document.createElement('div');
+  shellMain.className = 'a11ytb-shell-main';
+
   const statusCenter = document.createElement('section');
   statusCenter.className = 'a11ytb-status-center';
   statusCenter.setAttribute('role', 'region');
@@ -301,18 +310,41 @@ export function mountUI({ root, state }) {
   viewToggle.className = 'a11ytb-view-toggle';
   const viewButtons = new Map();
   const viewDefinitions = [
-    { id: 'modules', label: 'Modules' },
-    { id: 'options', label: 'Options & Profils' },
-    { id: 'organize', label: 'Organisation' },
-    { id: 'guides', label: 'Guides' },
-    { id: 'shortcuts', label: 'Raccourcis' }
+    {
+      id: 'modules',
+      label: 'Modules',
+      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 5h6v6H5zm8 0h6v6h-6zm0 8h6v6h-6zm-8 0h6v6H5z"/></svg>'
+    },
+    {
+      id: 'options',
+      label: 'Options & Profils',
+      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 6h14v2H5zm0 5h10v2H5zm0 5h14v2H5z"/></svg>'
+    },
+    {
+      id: 'organize',
+      label: 'Organisation',
+      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h9v4H4zm0 5h6v4H4zm0 5h11v4H4zm12-5l4-3v10z"/></svg>'
+    },
+    {
+      id: 'guides',
+      label: 'Guides',
+      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M6 4h9l3 3v13H6zm2 4v2h8V8zm0 4v2h5v-2z"/></svg>'
+    },
+    {
+      id: 'shortcuts',
+      label: 'Raccourcis',
+      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 7a3 3 0 013-3h10a3 3 0 013 3v10a3 3 0 01-3 3H7a3 3 0 01-3-3zm5 2v6h2V9zm4 0v6h2V9z"/></svg>'
+    }
   ];
   viewDefinitions.forEach((view) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'a11ytb-chip a11ytb-chip--view';
     btn.dataset.view = view.id;
-    btn.textContent = view.label;
+    btn.innerHTML = `
+      <span class="a11ytb-view-icon" aria-hidden="true">${view.icon}</span>
+      <span class="a11ytb-view-label">${view.label}</span>
+    `;
     btn.setAttribute('aria-pressed', 'false');
     btn.addEventListener('click', () => {
       state.set('ui.view', view.id);
@@ -443,7 +475,12 @@ export function mountUI({ root, state }) {
   const modulesContainer = document.createElement('div');
   modulesContainer.className = 'a11ytb-modules';
 
-  modulesView.append(filters, modulesContainer);
+  modulesView.append(modulesContainer);
+
+  shellNav.append(statusCenter, viewToggle, filters);
+  shellMain.append(viewContainer);
+  shell.append(shellNav, shellMain);
+  body.append(shell);
 
   const optionsScroll = document.createElement('div');
   optionsScroll.className = 'a11ytb-options-scroll';
@@ -749,7 +786,6 @@ export function mountUI({ root, state }) {
   shortcutsView.append(shortcutsScroll);
 
   viewContainer.append(modulesView, optionsView, organizeView, guidesView, shortcutsView);
-  body.append(statusCenter, viewToggle, viewContainer);
 
   const footer = document.createElement('div');
   footer.className = 'a11ytb-header';
@@ -1966,6 +2002,11 @@ export function mountUI({ root, state }) {
       const active = id === currentView;
       btn.classList.toggle('is-active', active);
       btn.setAttribute('aria-pressed', String(active));
+      if (active) {
+        btn.setAttribute('aria-current', 'page');
+      } else {
+        btn.removeAttribute('aria-current');
+      }
     });
     viewElements.forEach((element, id) => {
       const isActive = id === currentView;
