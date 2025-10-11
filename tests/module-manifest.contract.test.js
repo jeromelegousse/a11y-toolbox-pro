@@ -1,16 +1,9 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { validateModuleManifest } from '../src/module-manifest.js';
-
-const MODULE_PATHS = [
-  '../src/modules/tts.js',
-  '../src/modules/stt.js',
-  '../src/modules/braille.js',
-  '../src/modules/contrast.js',
-  '../src/modules/spacing.js'
-];
+import { moduleCatalog } from '../src/module-catalog.js';
 
 async function loadAllModules() {
-  return Promise.all(MODULE_PATHS.map((path) => import(path)));
+  return Promise.all(moduleCatalog.map((entry) => entry.loader()));
 }
 
 function ensureTestEnvironment() {
@@ -79,19 +72,18 @@ describe('module manifest contract', () => {
   });
 
   it('valide chaque manifest de module via validateModuleManifest', async () => {
-    const modules = await loadAllModules();
-
+    const { registerModuleManifest, listModuleManifests } = await import('../src/registry.js');
     const normalizedById = new Map();
-    modules.forEach((moduleEntry) => {
-      const manifest = moduleEntry.manifest || moduleEntry.default?.manifest;
+    moduleCatalog.forEach(({ manifest, id }) => {
       expect(manifest).toBeDefined();
-      expect(typeof manifest.id).toBe('string');
-      const normalized = validateModuleManifest(manifest, manifest.id);
+      expect(typeof id).toBe('string');
+      const normalized = validateModuleManifest(manifest, id);
       normalizedById.set(normalized.id, normalized);
       expect(Object.isFrozen(normalized)).toBe(true);
+      registerModuleManifest(manifest, id);
     });
 
-    const { listModuleManifests } = await import('../src/registry.js');
+    await loadAllModules();
     const registered = listModuleManifests();
     registered.forEach((manifest) => {
       expect(normalizedById.get(manifest.id)).toEqual(manifest);
@@ -99,8 +91,11 @@ describe('module manifest contract', () => {
   });
 
   it('assure que le graphe de dépendances est acyclique et complet', async () => {
+    const { registerModuleManifest, listModuleManifests } = await import('../src/registry.js');
+    moduleCatalog.forEach(({ manifest, id }) => {
+      registerModuleManifest(manifest, id);
+    });
     await loadAllModules();
-    const { listModuleManifests } = await import('../src/registry.js');
     const manifests = listModuleManifests();
 
     const dependencyGraph = new Map(
