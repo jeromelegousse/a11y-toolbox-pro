@@ -437,9 +437,11 @@ export function mountUI({ root, state }) {
 
   const optionsScroll = document.createElement('div');
   optionsScroll.className = 'a11ytb-options-scroll';
+  optionsScroll.classList.add('a11ytb-options-scroll--panel');
 
   const profilesSection = document.createElement('section');
   profilesSection.className = 'a11ytb-options-section';
+  profilesSection.classList.add('a11ytb-options-section--profiles');
   const profilesHeader = document.createElement('div');
   profilesHeader.className = 'a11ytb-section-header';
   const profilesTitle = document.createElement('h3');
@@ -455,6 +457,7 @@ export function mountUI({ root, state }) {
 
   const configSection = document.createElement('section');
   configSection.className = 'a11ytb-options-section';
+  configSection.classList.add('a11ytb-options-section--config');
   const configHeader = document.createElement('div');
   configHeader.className = 'a11ytb-section-header';
   const configTitle = document.createElement('h3');
@@ -769,7 +772,19 @@ export function mountUI({ root, state }) {
       }
     }
     if (field.type === 'range') {
-      return typeof value === 'number' ? value.toFixed(2) : value ?? '';
+      if (typeof value === 'number') {
+        let decimals = 0;
+        if (typeof field.step === 'number') {
+          const stepString = String(field.step);
+          const fraction = stepString.split('.')[1];
+          decimals = fraction ? fraction.length : 0;
+        } else if (!Number.isInteger(value)) {
+          decimals = 2;
+        }
+        const formatted = decimals > 0 ? value.toFixed(decimals) : value.toString();
+        return decimals > 0 ? Number.parseFloat(formatted).toString() : formatted;
+      }
+      return value ?? '';
     }
     if (field.type === 'toggle') {
       return value ? 'Activé' : 'Désactivé';
@@ -780,6 +795,9 @@ export function mountUI({ root, state }) {
   function createOptionField(manifest, field) {
     const wrapper = document.createElement('div');
     wrapper.className = 'a11ytb-option';
+    if (field?.type) {
+      wrapper.classList.add(`a11ytb-option--${field.type}`);
+    }
     let update = () => {};
 
     if (field.type === 'range') {
@@ -799,11 +817,27 @@ export function mountUI({ root, state }) {
       if (field.step !== undefined) input.step = String(field.step);
       input.setAttribute('aria-label', field.label || field.path);
 
+      const minValueRaw = Number(field.min ?? 0);
+      const maxValueRaw = Number(field.max ?? 100);
+      const sliderMin = Number.isFinite(minValueRaw) ? minValueRaw : 0;
+      const sliderMax = Number.isFinite(maxValueRaw) ? maxValueRaw : sliderMin + 100;
+      const sliderLow = Math.min(sliderMin, sliderMax);
+      const sliderHigh = Math.max(sliderMin, sliderMax);
+      const sliderSpan = sliderHigh - sliderLow || 1;
+
+      const updateSliderVisual = (value) => {
+        if (!Number.isFinite(value)) return;
+        const clamped = Math.min(sliderHigh, Math.max(sliderLow, value));
+        const ratio = (clamped - sliderLow) / sliderSpan;
+        input.style.setProperty('--a11ytb-slider-progress', `${ratio * 100}%`);
+      };
+
       input.addEventListener('input', () => {
         const raw = input.valueAsNumber;
         const safe = Number.isNaN(raw) ? Number(field.min ?? 0) : raw;
         state.set(field.path, safe);
         valueNode.textContent = formatFieldValue(field, safe);
+        updateSliderVisual(safe);
       });
       input.addEventListener('change', () => {
         const raw = input.valueAsNumber;
@@ -812,9 +846,35 @@ export function mountUI({ root, state }) {
         if (typeof field.onChange === 'function') {
           field.onChange(safe, { state: state.get(), field, manifest });
         }
+        updateSliderVisual(safe);
       });
 
       wrapper.append(label, input);
+
+      if (field.min !== undefined || field.max !== undefined) {
+        const scale = document.createElement('div');
+        scale.className = 'a11ytb-option-scale';
+        const minLabel = document.createElement('span');
+        minLabel.className = 'a11ytb-option-scale-label';
+        if (field.min !== undefined) {
+          minLabel.textContent = Number.isFinite(sliderMin)
+            ? formatFieldValue(field, sliderMin)
+            : `${field.min}`;
+        } else {
+          minLabel.textContent = '';
+        }
+        const maxLabel = document.createElement('span');
+        maxLabel.className = 'a11ytb-option-scale-label';
+        if (field.max !== undefined) {
+          maxLabel.textContent = Number.isFinite(sliderMax)
+            ? formatFieldValue(field, sliderMax)
+            : `${field.max}`;
+        } else {
+          maxLabel.textContent = '';
+        }
+        scale.append(minLabel, maxLabel);
+        wrapper.append(scale);
+      }
       if (field.description) {
         const hint = document.createElement('p');
         hint.className = 'a11ytb-option-description';
@@ -829,6 +889,7 @@ export function mountUI({ root, state }) {
           input.value = String(value);
         }
         valueNode.textContent = formatFieldValue(field, value);
+        updateSliderVisual(value);
       };
     } else if (field.type === 'toggle') {
       const trueValue = field.trueValue !== undefined ? field.trueValue : true;
@@ -841,6 +902,15 @@ export function mountUI({ root, state }) {
       const title = document.createElement('span');
       title.className = 'a11ytb-option-title';
       title.textContent = field.label || field.path;
+      const status = document.createElement('span');
+      status.className = 'a11ytb-option-status';
+
+      const syncToggleVisual = (value) => {
+        const formatted = formatFieldValue(field, value);
+        label.setAttribute('data-value', formatted);
+        label.dataset.state = value === trueValue ? 'on' : 'off';
+        status.textContent = formatted;
+      };
 
       input.addEventListener('change', () => {
         const value = input.checked ? trueValue : falseValue;
@@ -848,9 +918,10 @@ export function mountUI({ root, state }) {
         if (typeof field.onChange === 'function') {
           field.onChange(value, { state: state.get(), field, manifest });
         }
+        syncToggleVisual(value);
       });
 
-      label.append(input, title);
+      label.append(input, title, status);
       wrapper.append(label);
       if (field.description) {
         const hint = document.createElement('p');
@@ -863,7 +934,7 @@ export function mountUI({ root, state }) {
         const current = readValue(snapshot, field.path);
         const checked = current === trueValue;
         input.checked = checked;
-        label.setAttribute('data-value', formatFieldValue(field, current));
+        syncToggleVisual(current);
       };
     } else if (field.type === 'select') {
       const label = document.createElement('label');
