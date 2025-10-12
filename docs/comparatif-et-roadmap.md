@@ -23,7 +23,8 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 ## Écarts actuels
 
 - **Portée fonctionnelle** : la démo couvre surtout quelques actions temps réel (TTS, STT, contraste, espacement) mais n'exécute ni audit automatique ni export de rapports comme axe DevTools ou Accessibility Insights.
-- **Personnalisation** : il manque des profils prêts à l'emploi (dyslexie, vision basse, etc.) et des options fines (voix TTS, raccourcis personnalisables) présentes chez Stark ou les toolbars commerciales.
+- **Personnalisation** : des profils préconfigurés (Vision basse, Dyslexie, Lecture vocale rapide) sont désormais disponibles avec sauvegarde côté store, mais ils restent limités à un socle commun sans personnalisation fine (voix TTS, raccourcis personnalisables, profils dynamiques) comme proposé par Stark.
+- **Administration modulaire** : une première itération du builder réordonnable accessible est en ligne (saisie clavier avec annonces live et support souris/tactile) mais ne gère pas encore les dépendances, le lazy-loading ni les validations avancées.
 - **Collaboration** : un journal exportable (JSON/CSV) est disponible mais il manque encore le partage multi-utilisateurs et les intégrations outils présentes dans les solutions professionnelles.
 - **Gouvernance modules** : le registre est simple (`registerModule`, `registerBlock`) mais n'intègre pas de gestion de versions ou de dépendances, ce qui limite la scalabilité face aux bibliothèques modulaires plus matures.
 
@@ -33,7 +34,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
   - Les tests automatisés restent à industrialiser (unitaires + visuels, point 6).
   - Le focus trap complet du panneau d’options est couvert (isolation inert + restitution focus) et le centre d’état unifie désormais voix, braille, contraste et espacements ; il reste à exposer les métriques de performance et de compatibilité.
   - L’atelier design system doit encore fournir les exports CSS/tokens prêts à l’emploi (point 7).
-- **Phase 1** : aucun chantier sur le builder drag & drop, les collections de modules ou le chargement conditionnel n’a démarré.
+- **Phase 1** : le builder drag & drop accessible est livré en version initiale mais les collections de modules et le chargement conditionnel restent à lancer.
 - **Phase 2 et suivantes** : observabilité temps réel, profils dynamiques, catalogue de modules et multi-tenant restent entièrement à concevoir.
 
 ## Manques face à la concurrence
@@ -96,10 +97,7 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
 
 ### Phase 1 – Admin modulaire (T3 2025)
 
-- Développer un **builder drag & drop** pour ordonner les modules et blocs par simple glisser-déposer (support clavier inclus).
-  - Composant "liste réordonnable" avec `aria-grabbed`, gestion focus et annonces live pour refléter la nouvelle position.
-  - Interaction souris + tactile + clavier (touches `Space`/`Enter` pour saisir, `↑`/`↓` pour déplacer, `Esc` pour annuler).
-  - Sauvegarde optimiste + rollback si un module échoue à se repositionner (ex : dépendance non satisfaite).
+- ✅ Première itération du **builder drag & drop** livrée : liste réordonnable accessible (clavier, annonces live, souris/tactile) avec sauvegarde optimiste et rollback de base.
 - Introduire des **collections de modules** : regroupements thématiques (lecture, navigation, contraste) avec bascule globale.
   - Définir un modèle `collection.json` (id, label, description, modules inclus, dépendances).
   - Afficher la collection comme un bloc repliable avec un switch maître qui active/désactive tous les modules compatibles.
@@ -111,6 +109,13 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
   - Gestion mémoire : déchargement (`unmount`) lors d'une désactivation manuelle avec sauvegarde de l'état utilisateur.
 - Ajouter une vue "Dépendances" dans l'admin, affichant les modules requis avant activation.
 - Versionner les manifestes (`semver`) et exposer un historique des changements dans l'interface.
+
+### Prochaines itérations
+
+- **Personnalisation avancée** : ouvrir la configuration fine des profils (raccourcis personnalisés, paramètres TTS/STT, granularité par module) et permettre la duplication de profils existants.
+- **Collections & dépendances** : livrer les regroupements de modules avec gestion des dépendances et conflits.
+- **Chargement conditionnel** : généraliser le lazy-loading et la décharge automatique pour réduire le coût mémoire.
+- **Instrumentation** : enrichir le centre d'état avec des métriques de performance et de compatibilité module par module.
 
 ### Phase 2 – Observabilité et personnalisation avancée (T4 2025 - T1 2026)
 
@@ -146,8 +151,7 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
 
 1. Consolider la documentation module (exemples drag & drop, bonnes pratiques de lazy-loading) et la faire valider par les
    premiers contributeurs externes.
-2. Déployer la première version de l'**interface drag & drop** (Phase 1) en se concentrant sur l'accessibilité clavier et les
-   préférences sauvegardées.
+2. Finaliser les **collections de modules** (modèle `collection.json`, bascule globale, gestion des dépendances de base).
 3. Mettre en place des **tests contractuels** sur le manifest (validation JSON Schema, dépendances cycliques).
 4. Introduire un **switch de chargement différé** par module (coché/décoché) côté runtime pour mesurer l'impact performance.
 5. Instrumenter le **centre d’état** (latence de chargement, compatibilité navigateur) pour se rapprocher des indicateurs temps réel d’Accessibility Insights et Stark.

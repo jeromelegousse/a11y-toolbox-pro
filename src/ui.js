@@ -280,7 +280,14 @@ export function mountUI({ root, state }) {
       const badge = document.createElement('span');
       badge.className = 'a11ytb-badge';
 
-      headerRow.append(label, badge);
+      const risk = document.createElement('span');
+      risk.className = 'a11ytb-status-risk';
+      risk.dataset.ref = 'risk';
+      risk.setAttribute('role', 'status');
+      risk.setAttribute('aria-live', 'polite');
+      risk.hidden = true;
+
+      headerRow.append(label, badge, risk);
 
       const value = document.createElement('p');
       value.className = 'a11ytb-status-value';
@@ -293,9 +300,32 @@ export function mountUI({ root, state }) {
       detail.className = 'a11ytb-status-detail';
       detail.dataset.ref = 'detail';
 
-      card.append(headerRow, value, detail);
+      const meta = document.createElement('dl');
+      meta.className = 'a11ytb-status-meta';
+
+      const latencyTerm = document.createElement('dt');
+      latencyTerm.textContent = 'Latence moyenne';
+      const latencyValue = document.createElement('dd');
+      latencyValue.dataset.ref = 'latency';
+      latencyValue.textContent = 'Non mesuré';
+
+      const compatTerm = document.createElement('dt');
+      compatTerm.textContent = 'Compatibilité';
+      const compatValue = document.createElement('dd');
+      compatValue.dataset.ref = 'compat';
+      compatValue.textContent = 'Pré-requis non déclarés';
+
+      meta.append(latencyTerm, latencyValue, compatTerm, compatValue);
+
+      const announcement = document.createElement('span');
+      announcement.className = 'a11ytb-sr-only';
+      announcement.dataset.ref = 'announcement';
+      announcement.setAttribute('role', 'status');
+      announcement.setAttribute('aria-live', 'polite');
+
+      card.append(headerRow, value, detail, meta, announcement);
       statusGrid.append(card);
-      entry = { card, badge, value, detail, label };
+      entry = { card, badge, risk, value, detail, label, latencyValue, compatValue, announcement };
       statusCards.set(summary.id, entry);
     }
     return entry;
@@ -322,6 +352,29 @@ export function mountUI({ root, state }) {
       } else {
         entry.detail.textContent = '';
         entry.detail.hidden = true;
+      }
+      const insights = summary.insights || {};
+      if (entry.risk) {
+        if (insights.riskLevel) {
+          entry.risk.textContent = insights.riskLevel;
+          entry.risk.dataset.score = insights.riskLevel;
+          entry.risk.setAttribute('aria-label', insights.riskDescription || '');
+          entry.risk.hidden = false;
+        } else {
+          entry.risk.textContent = '';
+          entry.risk.dataset.score = '';
+          entry.risk.setAttribute('aria-label', '');
+          entry.risk.hidden = true;
+        }
+      }
+      if (entry.latencyValue) {
+        entry.latencyValue.textContent = insights.latencyLabel || 'Non mesuré';
+      }
+      if (entry.compatValue) {
+        entry.compatValue.textContent = insights.compatLabel || 'Pré-requis non déclarés';
+      }
+      if (entry.announcement) {
+        entry.announcement.textContent = insights.announcement || '';
       }
     });
   }
@@ -883,6 +936,7 @@ export function mountUI({ root, state }) {
 
   const moduleElements = new Map();
   const adminItems = new Map();
+  const dependencyViews = new Map();
   const adminToolbarCounts = { active: null, hidden: null, pinned: null };
   const organizeFilterToggles = new Map();
   const collectionButtons = new Map();
@@ -1771,6 +1825,7 @@ export function mountUI({ root, state }) {
     const li = document.createElement('li');
     li.className = 'a11ytb-admin-item';
     li.dataset.blockId = block.id;
+    li.dataset.moduleId = block.moduleId || block.id;
     li.dataset.title = block.title || block.id;
     if (block.category) {
       li.dataset.category = block.category;
@@ -1906,6 +1961,49 @@ export function mountUI({ root, state }) {
 
     priorityWrapper.append(priorityLabel, prioritySelect, priorityHint);
     meta.append(priorityWrapper);
+
+    const dependenciesSection = document.createElement('div');
+    dependenciesSection.className = 'a11ytb-admin-dependencies';
+
+    const dependenciesTitle = document.createElement('h4');
+    dependenciesTitle.className = 'a11ytb-admin-dependencies-title';
+    dependenciesTitle.textContent = 'Dépendances';
+    dependenciesSection.append(dependenciesTitle);
+
+    const dependenciesSummary = document.createElement('p');
+    dependenciesSummary.className = 'a11ytb-admin-dependencies-summary';
+    dependenciesSection.append(dependenciesSummary);
+
+    const dependenciesList = document.createElement('ul');
+    dependenciesList.className = 'a11ytb-admin-dependencies-list';
+    dependenciesSection.append(dependenciesList);
+
+    const dependenciesLive = document.createElement('div');
+    dependenciesLive.className = 'a11ytb-sr-only';
+    dependenciesLive.setAttribute('role', 'status');
+    dependenciesLive.setAttribute('aria-live', 'polite');
+    dependenciesSection.append(dependenciesLive);
+
+    meta.append(dependenciesSection);
+
+    const moduleId = li.dataset.moduleId;
+    if (moduleId) {
+      const view = {
+        wrapper: dependenciesSection,
+        list: dependenciesList,
+        summary: dependenciesSummary,
+        live: dependenciesLive,
+        moduleName: block.title || moduleId
+      };
+      if (dependencyViews.has(moduleId)) {
+        dependencyViews.get(moduleId).push(view);
+      } else {
+        dependencyViews.set(moduleId, [view]);
+      }
+      const runtimeInfo = state.get(`runtime.modules.${moduleId}`) || {};
+      const dependencies = Array.isArray(runtimeInfo.dependencies) ? runtimeInfo.dependencies : [];
+      updateDependencyDisplay(view, dependencies, { moduleName: runtimeInfo.manifestName || block.title || moduleId });
+    }
 
     prioritySelect.addEventListener('change', () => {
       const raw = prioritySelect.value;
