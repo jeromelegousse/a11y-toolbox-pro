@@ -44,13 +44,27 @@ function normalizeConfig(snapshot = {}) {
   return { theme, masterVolume, events };
 }
 
+let feedbackInstance = null;
+let unsubscribe = null;
+let applyConfig = null;
+let lastSignature = '';
+
+function buildSilentSnapshot() {
+  const events = Object.keys(DEFAULT_AUDIO.events || {}).reduce((acc, key) => {
+    acc[key] = false;
+    return acc;
+  }, {});
+  return { audio: { ...DEFAULT_AUDIO, masterVolume: 0, events } };
+}
+
 const audioFeedback = {
   id: manifest.id,
   manifest,
   init({ state }) {
-    const feedback = window.a11ytb?.feedback;
-    if (!feedback || typeof feedback.configure !== 'function') {
+    feedbackInstance = window.a11ytb?.feedback;
+    if (!feedbackInstance || typeof feedbackInstance.configure !== 'function') {
       console.warn('a11ytb: feedback audio indisponible, module non initialisé.');
+      feedbackInstance = null;
       return;
     }
 
@@ -68,17 +82,32 @@ const audioFeedback = {
       }
     }
 
-    let lastSignature = '';
-    function apply(snapshot) {
+    applyConfig = (snapshot) => {
+      if (!feedbackInstance) return;
       const config = normalizeConfig(snapshot);
       const signature = JSON.stringify(config);
       if (signature === lastSignature) return;
       lastSignature = signature;
-      feedback.configure(config);
+      feedbackInstance.configure(config);
+    };
+  },
+  mount({ state }) {
+    if (!feedbackInstance || !applyConfig) return;
+    lastSignature = '';
+    applyConfig({ audio: state.get('audio') });
+    if (unsubscribe) unsubscribe();
+    unsubscribe = state.on((s) => applyConfig({ audio: s.audio }));
+  },
+  unmount() {
+    if (unsubscribe) {
+      unsubscribe();
+      unsubscribe = null;
     }
-
-    apply({ audio: state.get('audio') });
-    state.on((s) => apply({ audio: s.audio }));
+    lastSignature = '';
+    if (feedbackInstance?.configure) {
+      const fallback = normalizeConfig(buildSilentSnapshot());
+      feedbackInstance.configure(fallback);
+    }
   }
 };
 

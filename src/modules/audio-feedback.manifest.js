@@ -5,6 +5,9 @@ export const manifest = {
   description: 'Personnalise les retours sonores (earcons) utilisés par l’outil.',
   category: 'audio',
   keywords: ['audio', 'feedback', 'earcon'],
+  runtime: {
+    preload: 'idle'
+  },
   defaults: {
     state: {
       audio: {

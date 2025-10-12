@@ -16,8 +16,11 @@ const KNOWN_FIELDS = new Set([
   'defaults',
   'lifecycle',
   'config',
-  'compat'
+  'compat',
+  'runtime'
 ]);
+
+const KNOWN_PRELOAD_STRATEGIES = new Set(['idle', 'visible', 'pointer']);
 
 function ensureArray(value, mapFn = (x) => x) {
   if (value === undefined) return undefined;
@@ -77,6 +80,22 @@ function normalizeCompat(compat) {
     if (features?.length) normalized.features = features;
   }
   return Object.keys(normalized).length ? normalized : undefined;
+}
+
+function normalizeRuntime(runtime, manifestId) {
+  if (!runtime || typeof runtime !== 'object') return undefined;
+  const normalized = {};
+
+  if (runtime.preload !== undefined) {
+    const value = typeof runtime.preload === 'string' ? runtime.preload.trim().toLowerCase() : '';
+    if (KNOWN_PRELOAD_STRATEGIES.has(value)) {
+      normalized.preload = value;
+    } else if (value) {
+      console.warn(`a11ytb: stratégie de préchargement inconnue "${value}" pour "${manifestId}".`);
+    }
+  }
+
+  return Object.keys(normalized).length ? Object.freeze(normalized) : undefined;
 }
 
 function normalizeConfig(config, manifestId) {
@@ -307,6 +326,11 @@ export function validateModuleManifest(manifest, moduleId) {
   const compat = normalizeCompat(manifest.compat);
   if (compat) {
     normalized.compat = compat;
+  }
+
+  const runtime = normalizeRuntime(manifest.runtime, id);
+  if (runtime) {
+    normalized.runtime = runtime;
   }
 
   return Object.freeze(normalized);

@@ -5,6 +5,9 @@ export const manifest = {
   description: 'Lit le contenu sélectionné ou la page complète via l’API SpeechSynthesis.',
   category: 'lecture',
   keywords: ['tts', 'lecture', 'audio', 'speech'],
+  runtime: {
+    preload: 'idle'
+  },
   permissions: ['speechSynthesis'],
   compat: {
     browsers: ['chrome >= 100', 'edge >= 100', 'safari >= 16']

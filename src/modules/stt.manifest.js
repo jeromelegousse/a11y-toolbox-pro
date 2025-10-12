@@ -5,6 +5,9 @@ export const manifest = {
   description: 'Transcrit la voix de l’utilisateur en texte grâce à l’API Web Speech.',
   category: 'interaction',
   keywords: ['stt', 'dictée', 'micro'],
+  runtime: {
+    preload: 'pointer'
+  },
   permissions: ['speechRecognition'],
   compat: {
     browsers: ['chrome >= 110', 'edge >= 110'],

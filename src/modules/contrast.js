@@ -3,13 +3,13 @@ import { manifest } from './contrast.manifest.js';
 
 export { manifest };
 
-const contrast = {
-  id: manifest.id,
-  manifest,
-  init() {
-    const style = document.createElement('style');
-    style.dataset.module = manifest.id;
-    style.textContent = `
+let styleElement = null;
+
+function ensureStyle() {
+  if (!styleElement) {
+    styleElement = document.createElement('style');
+    styleElement.dataset.module = manifest.id;
+    styleElement.textContent = `
       .a11ytb-contrast body,
       .a11ytb-contrast .content,
       .a11ytb-contrast .site-header,
@@ -58,7 +58,26 @@ const contrast = {
         color: #000 !important;
       }
     `;
-    document.head.appendChild(style);
+  }
+  if (!styleElement.isConnected) {
+    document.head.appendChild(styleElement);
+  }
+}
+
+const contrast = {
+  id: manifest.id,
+  manifest,
+  init() {
+    ensureStyle();
+  },
+  mount() {
+    ensureStyle();
+  },
+  unmount() {
+    document.documentElement.classList.remove('a11ytb-contrast');
+    if (styleElement?.isConnected) {
+      styleElement.remove();
+    }
   }
 };
 
