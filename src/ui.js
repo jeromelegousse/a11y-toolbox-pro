@@ -1,4 +1,5 @@
 import { listBlocks, renderBlock, listModuleManifests } from './registry.js';
+import { moduleCatalog } from './module-catalog.js';
 import { applyInertToSiblings } from './utils/inert.js';
 import { summarizeStatuses } from './status-center.js';
 import { buildGuidedChecklists, toggleManualChecklistStep } from './guided-checklists.js';
@@ -183,6 +184,22 @@ export function mountUI({ root, state }) {
     if (!arraysEqual(next, reference)) {
       state.set(path, next);
     }
+  }
+
+  function createBadge(label, variant, { title, ariaLabel } = {}) {
+    const badge = document.createElement('span');
+    badge.className = 'a11ytb-module-badge';
+    if (variant) {
+      badge.classList.add(`a11ytb-module-badge--${variant}`);
+    }
+    badge.textContent = label;
+    if (title) {
+      badge.title = title;
+    }
+    if (ariaLabel) {
+      badge.setAttribute('aria-label', ariaLabel);
+    }
+    return badge;
   }
 
   function markProfileAsCustom() {
@@ -928,8 +945,13 @@ export function mountUI({ root, state }) {
 
   const allManifests = listModuleManifests();
   const manifestByModuleId = new Map(allManifests.map((manifest) => [manifest.id, manifest]));
+  const catalogModuleIds = Array.from(new Set([
+    ...moduleCatalog.map((entry) => entry.id),
+    ...manifestByModuleId.keys()
+  ]));
 
   const collectionDefinitions = moduleCollections.filter((entry) => entry && entry.id && Array.isArray(entry.modules) && entry.modules.length);
+  const collectionById = new Map(collectionDefinitions.map((collection) => [collection.id, collection]));
   const moduleCollectionsIndex = new Map();
   const collectionBlockIds = new Map();
 
@@ -943,6 +965,54 @@ export function mountUI({ root, state }) {
       moduleCollectionsIndex.get(moduleId).add(collection.id);
     });
   });
+
+  const namespaceToModule = new Map([
+    ['contrast', 'contrast'],
+    ['spacing', 'spacing'],
+    ['tts', 'tts'],
+    ['stt', 'stt'],
+    ['braille', 'braille'],
+    ['audio', 'audio-feedback'],
+    ['audit', 'audit']
+  ]);
+
+  function extractModulesFromProfile(settings = {}) {
+    const modules = new Set();
+    Object.keys(settings).forEach((path) => {
+      if (typeof path !== 'string') return;
+      const namespace = path.split('.')[0];
+      if (!namespace) return;
+      const moduleId = namespaceToModule.get(namespace);
+      if (moduleId) {
+        modules.add(moduleId);
+      }
+    });
+    return Array.from(modules);
+  }
+
+  const presetProfiles = state.get('profiles') || {};
+  const profileFilterEntries = Object.entries(presetProfiles)
+    .map(([id, profile]) => {
+      const modules = extractModulesFromProfile(profile?.settings || {});
+      return {
+        id,
+        label: profile?.name || id,
+        modules
+      };
+    })
+    .filter((entry) => entry.modules.length);
+
+  const moduleToProfiles = new Map();
+  profileFilterEntries.forEach((profile) => {
+    profile.modules.forEach((moduleId) => {
+      if (!moduleToProfiles.has(moduleId)) {
+        moduleToProfiles.set(moduleId, new Set());
+      }
+      moduleToProfiles.get(moduleId).add(profile.id);
+    });
+  });
+
+  const profileDisplayById = new Map(profileFilterEntries.map((entry) => [entry.id, entry.label]));
 
   function getCollectionsForBlock(blockId) {
     const block = blockInfo.get(blockId);
@@ -969,6 +1039,82 @@ export function mountUI({ root, state }) {
 
   const organizeScroll = document.createElement('div');
   organizeScroll.className = 'a11ytb-organize-scroll';
+
+  const availableSection = document.createElement('section');
+  availableSection.className = 'a11ytb-options-section a11ytb-options-section--available';
+  const availableHeader = document.createElement('div');
+  availableHeader.className = 'a11ytb-section-header';
+  const availableTitle = document.createElement('h3');
+  availableTitle.className = 'a11ytb-section-title';
+  availableTitle.textContent = 'Modules disponibles';
+  const availableDescription = document.createElement('p');
+  availableDescription.className = 'a11ytb-section-description';
+  availableDescription.textContent = 'Filtrez le catalogue interne, vérifiez la compatibilité et identifiez rapidement les dépendances avant activation.';
+  availableHeader.append(availableTitle, availableDescription);
+
+  const availableFiltersBar = document.createElement('div');
+  availableFiltersBar.className = 'a11ytb-available-filters';
+
+  const availableFilterSelects = {};
+
+  function createFilterControl(key, id, labelText, options) {
+    const select = document.createElement('select');
+    select.className = 'a11ytb-available-filter-select';
+    select.id = id;
+    options.forEach((option) => {
+      const opt = document.createElement('option');
+      opt.value = option.value;
+      opt.textContent = option.label;
+      select.append(opt);
+    });
+    availableFilterSelects[key] = select;
+    const container = document.createElement('div');
+    container.className = 'a11ytb-available-filter-field';
+    const label = document.createElement('span');
+    label.className = 'a11ytb-available-filter-label';
+    label.textContent = labelText;
+    label.id = `${id}-label`;
+    select.setAttribute('aria-labelledby', label.id);
+    container.append(label, select);
+    return container;
+  }
+
+  const profileFilterChoices = [
+    { value: 'all', label: 'Tous les profils' },
+    ...profileFilterEntries.map((entry) => ({ value: entry.id, label: entry.label }))
+  ];
+
+  const collectionFilterChoices = [
+    { value: 'all', label: 'Toutes les collections' },
+    ...collectionDefinitions.map((collection) => ({ value: collection.id, label: collection.label || collection.id }))
+  ];
+
+  const compatibilityFilterChoices = [
+    { value: 'all', label: 'Compatibilité : toutes' },
+    { value: 'full', label: 'Compatibles' },
+    { value: 'partial', label: 'Partielles' },
+    { value: 'unknown', label: 'À vérifier' },
+    { value: 'none', label: 'Non déclarées' }
+  ];
+
+  const profileFilterField = createFilterControl('profile', 'a11ytb-available-filter-profile', 'Profils', profileFilterChoices);
+  const collectionFilterField = createFilterControl('collection', 'a11ytb-available-filter-collection', 'Collections', collectionFilterChoices);
+  const compatibilityFilterField = createFilterControl('compatibility', 'a11ytb-available-filter-compat', 'Compatibilité', compatibilityFilterChoices);
+
+  availableFiltersBar.append(profileFilterField, collectionFilterField, compatibilityFilterField);
+
+  [['profile', availableFilterSelects.profile], ['collection', availableFilterSelects.collection], ['compatibility', availableFilterSelects.compatibility]].forEach(([key, select]) => {
+    if (!select) return;
+    select.addEventListener('change', () => {
+      state.set(`ui.availableModules.${key}`, select.value);
+    });
+  });
+
+  const availableGrid = document.createElement('div');
+  availableGrid.className = 'a11ytb-available-grid';
+
+  availableSection.append(availableHeader, availableFiltersBar, availableGrid);
+
   const organizeSection = document.createElement('section');
   organizeSection.className = 'a11ytb-options-section';
   const organizeHeader = document.createElement('div');
@@ -1173,8 +1319,260 @@ export function mountUI({ root, state }) {
   }
   organizeChildren.push(organizeToolbar, adminList);
   organizeSection.append(...organizeChildren);
-  organizeScroll.append(organizeSection);
+  organizeScroll.append(availableSection, organizeSection);
   organizeView.append(organizeScroll, organizeLive);
+  const COMPAT_STATUS_LABELS = {
+    none: 'Non déclarée',
+    full: 'Compatible',
+    partial: 'Partielle',
+    unknown: 'À vérifier'
+  };
+
+  const COMPAT_STATUS_DESCRIPTIONS = {
+    none: 'Aucune information de compatibilité n’est fournie.',
+    full: 'Compatibilité annoncée avec les plateformes ciblées.',
+    partial: 'Certaines fonctionnalités requises manquent sur cet environnement.',
+    unknown: 'Compatibilité non vérifiée automatiquement.'
+  };
+
+  function ensureSelectValue(select, value) {
+    if (!select) return;
+    const allowed = Array.from(select.options).some((option) => option.value === value);
+    const next = allowed ? value : (select.options[0]?.value ?? 'all');
+    if (select.value !== next) {
+      select.value = next;
+    }
+  }
+
+  function formatCategoryLabel(category) {
+    if (!category) return 'Divers';
+    const match = categories.find((entry) => entry.id === category);
+    if (match) return match.label;
+    return category.charAt(0).toUpperCase() + category.slice(1);
+  }
+
+  function createReferenceTag(label) {
+    const tag = document.createElement('span');
+    tag.className = 'a11ytb-available-tag';
+    tag.textContent = label;
+    return tag;
+  }
+
+  function renderAvailableModules(snapshot) {
+    if (!availableGrid) return;
+    const data = snapshot || state.get();
+    const prefs = data?.ui?.availableModules || {};
+    const profileFilter = prefs.profile || 'all';
+    const collectionFilter = prefs.collection || 'all';
+    const compatibilityFilter = prefs.compatibility || 'all';
+
+    ensureSelectValue(availableFilterSelects.profile, profileFilter);
+    ensureSelectValue(availableFilterSelects.collection, collectionFilter);
+    ensureSelectValue(availableFilterSelects.compatibility, compatibilityFilter);
+
+    const runtime = data?.runtime?.modules || {};
+    const modules = [];
+
+    catalogModuleIds.forEach((moduleId) => {
+      const manifest = manifestByModuleId.get(moduleId);
+      if (!manifest) return;
+      const runtimeEntry = runtime[moduleId] || {};
+      const compat = runtimeEntry.metrics?.compat || {};
+      const compatStatus = compat.status || 'none';
+      const profileIds = Array.from(moduleToProfiles.get(moduleId) ?? []);
+      const collectionIds = Array.from(moduleCollectionsIndex.get(moduleId) ?? []);
+      const matchesProfile = profileFilter === 'all' || profileIds.includes(profileFilter);
+      const matchesCollection = collectionFilter === 'all' || collectionIds.includes(collectionFilter);
+      const matchesCompat = compatibilityFilter === 'all' || (compatStatus || 'none') === compatibilityFilter;
+      if (!matchesProfile || !matchesCollection || !matchesCompat) return;
+      const dependencies = Array.isArray(runtimeEntry.dependencies) ? runtimeEntry.dependencies : [];
+      modules.push({
+        id: moduleId,
+        manifest,
+        runtime: runtimeEntry,
+        compat,
+        compatStatus,
+        dependencies,
+        profileIds,
+        collectionIds
+      });
+    });
+
+    modules.sort((a, b) => {
+      const nameA = a.manifest.name || a.id;
+      const nameB = b.manifest.name || b.id;
+      return nameA.localeCompare(nameB, 'fr', { sensitivity: 'base' });
+    });
+
+    availableGrid.innerHTML = '';
+
+    if (!modules.length) {
+      const empty = document.createElement('p');
+      empty.className = 'a11ytb-empty-state';
+      empty.textContent = 'Aucun module ne correspond aux filtres sélectionnés.';
+      availableGrid.append(empty);
+      return;
+    }
+
+    modules.forEach((entry) => {
+      const card = document.createElement('article');
+      card.className = 'a11ytb-available-card';
+      card.dataset.moduleId = entry.id;
+
+      const header = document.createElement('header');
+      header.className = 'a11ytb-available-card-header';
+
+      const title = document.createElement('h4');
+      title.className = 'a11ytb-available-card-title';
+      title.textContent = entry.manifest.name || entry.id;
+
+      const version = document.createElement('span');
+      version.className = 'a11ytb-available-card-version';
+      version.textContent = `v${entry.manifest.version || '0.0.0'}`;
+
+      header.append(title, version);
+      card.append(header);
+
+      if (entry.manifest.description) {
+        const description = document.createElement('p');
+        description.className = 'a11ytb-available-card-description';
+        description.textContent = entry.manifest.description;
+        card.append(description);
+      }
+
+      const meta = document.createElement('div');
+      meta.className = 'a11ytb-available-card-meta';
+      meta.append(createBadge(formatCategoryLabel(entry.manifest.category), 'category', { title: 'Catégorie du module' }));
+
+      const compatLabel = COMPAT_STATUS_LABELS[entry.compatStatus] || COMPAT_STATUS_LABELS.none;
+      const compatBadge = createBadge(`Compatibilité : ${compatLabel}`, `compat-${entry.compatStatus}`, {
+        title: COMPAT_STATUS_DESCRIPTIONS[entry.compatStatus] || COMPAT_STATUS_DESCRIPTIONS.none
+      });
+      meta.append(compatBadge);
+
+      if (entry.runtime.enabled) {
+        meta.append(createBadge('Actif', 'active', { title: 'Module chargé dans la configuration actuelle.' }));
+      }
+
+      if (entry.dependencies.length) {
+        meta.append(createBadge('Requis', 'required', { title: 'Ce module dépend d’autres modules pour fonctionner.' }));
+      }
+
+      if (entry.dependencies.some((dep) => dep.status && dep.status !== 'ok')) {
+        meta.append(createBadge('En conflit', 'conflict', { title: 'Certaines dépendances signalent un conflit.' }));
+      }
+
+      card.append(meta);
+
+      if (entry.dependencies.length) {
+        const depsTitle = document.createElement('p');
+        depsTitle.className = 'a11ytb-available-subtitle';
+        depsTitle.textContent = 'Dépendances';
+        card.append(depsTitle);
+
+        const depList = document.createElement('ul');
+        depList.className = 'a11ytb-available-deps';
+        entry.dependencies.forEach((dep) => {
+          const item = document.createElement('li');
+          item.className = 'a11ytb-available-dep';
+
+          const name = document.createElement('span');
+          name.className = 'a11ytb-available-dep-name';
+          name.textContent = dep.label || dep.id;
+
+          const statusBadge = createBadge(dep.statusLabel || 'Requis', `dependency-${dep.status || 'ok'}`, {
+            title: dep.message || ''
+          });
+          statusBadge.dataset.status = dep.status || 'ok';
+
+          const headerRow = document.createElement('div');
+          headerRow.className = 'a11ytb-available-dep-header';
+          headerRow.append(name, statusBadge);
+
+          item.append(headerRow);
+
+          if (dep.message) {
+            const detail = document.createElement('p');
+            detail.className = 'a11ytb-available-dep-detail';
+            detail.textContent = dep.message;
+            item.append(detail);
+          }
+
+          depList.append(item);
+        });
+        card.append(depList);
+      }
+
+      const compatMessages = [];
+      const missingFeatures = Array.isArray(entry.compat?.missing?.features) ? entry.compat.missing.features : [];
+      const missingBrowsers = Array.isArray(entry.compat?.missing?.browsers) ? entry.compat.missing.browsers : [];
+      const unknownFeatures = Array.isArray(entry.compat?.unknown?.features) ? entry.compat.unknown.features : [];
+      const unknownBrowsers = Array.isArray(entry.compat?.unknown?.browsers) ? entry.compat.unknown.browsers : [];
+
+      if (missingFeatures.length) {
+        compatMessages.push(`Fonctionnalités manquantes : ${missingFeatures.join(', ')}`);
+      }
+      if (missingBrowsers.length) {
+        compatMessages.push(`Navigateurs manquants : ${missingBrowsers.join(', ')}`);
+      }
+      if (!missingFeatures.length && unknownFeatures.length) {
+        compatMessages.push(`Fonctionnalités à vérifier : ${unknownFeatures.join(', ')}`);
+      }
+      if (!missingBrowsers.length && unknownBrowsers.length) {
+        compatMessages.push(`Navigateurs à confirmer : ${unknownBrowsers.join(', ')}`);
+      }
+
+      if (compatMessages.length) {
+        const compatNote = document.createElement('p');
+        compatNote.className = 'a11ytb-available-compat-note';
+        compatNote.textContent = compatMessages.join(' · ');
+        card.append(compatNote);
+      }
+
+      if (entry.profileIds.length || entry.collectionIds.length) {
+        const references = document.createElement('div');
+        references.className = 'a11ytb-available-references';
+
+        if (entry.profileIds.length) {
+          const group = document.createElement('div');
+          group.className = 'a11ytb-available-reference-group';
+          const label = document.createElement('span');
+          label.className = 'a11ytb-available-reference-label';
+          label.textContent = 'Profils :';
+          group.append(label);
+          entry.profileIds.forEach((profileId) => {
+            const tag = createReferenceTag(profileDisplayById.get(profileId) || profileId);
+            group.append(tag);
+          });
+          references.append(group);
+        }
+
+        if (entry.collectionIds.length) {
+          const group = document.createElement('div');
+          group.className = 'a11ytb-available-reference-group';
+          const label = document.createElement('span');
+          label.className = 'a11ytb-available-reference-label';
+          label.textContent = 'Collections :';
+          group.append(label);
+          entry.collectionIds.forEach((collectionId) => {
+            const collection = collectionById.get(collectionId);
+            const labelText = collection?.label || collectionId;
+            const tag = createReferenceTag(labelText);
+            group.append(tag);
+          });
+          references.append(group);
+        }
+
+        card.append(references);
+      }
+
+      availableGrid.append(card);
+    });
+  }
+
+  renderAvailableModules(state.get());
+  state.on(renderAvailableModules);
+
   blocks.forEach(block => {
     const el = renderBlock(block, state, modulesContainer);
     moduleElements.set(block.id, el);
