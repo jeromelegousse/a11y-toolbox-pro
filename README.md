@@ -21,4 +21,6 @@ Ouvrez `index.html` dans un navigateur moderne (Alt+Shift+A pour ouvrir).
 3. WordPress détecte maintenant le fichier `a11y-toolbox-pro.php` et installe l’extension sans erreur. Activez-la pour injecter l’interface sur votre site.
 4. Si besoin, utilisez le filtre `a11ytb/is_enabled` dans votre thème pour conditionner le chargement (par exemple uniquement sur certaines pages).
 
+Une fois l’extension activée, un menu **A11y Toolbox Pro** apparaît dans l’administration WordPress. Vous y trouverez un guide rapide, les raccourcis clavier principaux ainsi qu’un aperçu interactif pour tester la barre latérale sans quitter l’admin.
+
 
