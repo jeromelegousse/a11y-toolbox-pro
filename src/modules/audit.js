@@ -33,8 +33,8 @@ function updateAuditState(state, patch) {
 
 async function runAudit({ state }) {
   updateAuditState(state, { status: 'running', error: null });
-  const axe = await loadAxeCore();
   try {
+    const axe = await loadAxeCore();
     const raw = await axe.run(document, {
       reporter: 'v2',
       resultTypes: ['violations', 'incomplete', 'passes']
