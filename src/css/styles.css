@@ -1049,6 +1049,98 @@ body {
   align-items: flex-start;
 }
 
+.a11ytb-admin-dependencies {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--a11ytb-border) 70%, transparent);
+}
+
+.a11ytb-admin-dependencies-title {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--a11ytb-fg) 60%, transparent);
+}
+
+.a11ytb-admin-dependencies-summary {
+  margin: 0;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--a11ytb-fg) 75%, transparent);
+}
+
+.a11ytb-admin-dependencies-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.a11ytb-admin-dependency {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--a11ytb-border) 80%, transparent);
+  background: color-mix(in srgb, var(--a11ytb-surface) 94%, transparent);
+}
+
+.a11ytb-admin-dependency-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.a11ytb-admin-dependency-name {
+  font-weight: 600;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--a11ytb-fg) 90%, transparent);
+}
+
+.a11ytb-admin-dependency-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--a11ytb-fg) 18%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-fg) 85%, transparent);
+}
+
+.a11ytb-admin-dependency-badge[data-status="ok"] {
+  background: color-mix(in srgb, var(--a11ytb-success) 28%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-success) 85%, white 15%);
+}
+
+.a11ytb-admin-dependency-badge[data-status="missing"] {
+  background: color-mix(in srgb, var(--a11ytb-danger) 32%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-danger) 88%, white 12%);
+}
+
+.a11ytb-admin-dependency-badge[data-status="incompatible"] {
+  background: color-mix(in srgb, var(--a11ytb-warning) 30%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-warning) 88%, white 12%);
+}
+
+.a11ytb-admin-dependency-message {
+  margin: 0;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--a11ytb-fg) 70%, transparent);
+}
+
 .a11ytb-admin-priority-label {
   font-size: 11px;
   letter-spacing: 0.08em;
