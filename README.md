@@ -14,4 +14,11 @@
 
 Ouvrez `index.html` dans un navigateur moderne (Alt+Shift+A pour ouvrir).
 
+## Installation comme extension WordPress
+
+1. Téléchargez l’archive du dépôt (`Code` → `Download ZIP`).
+2. Dans l’administration WordPress, allez dans **Extensions → Ajouter → Téléverser** puis sélectionnez `a11y-toolbox-pro-main.zip`.
+3. WordPress détecte maintenant le fichier `a11y-toolbox-pro.php` et installe l’extension sans erreur. Activez-la pour injecter l’interface sur votre site.
+4. Si besoin, utilisez le filtre `a11ytb/is_enabled` dans votre thème pour conditionner le chargement (par exemple uniquement sur certaines pages).
+
 
