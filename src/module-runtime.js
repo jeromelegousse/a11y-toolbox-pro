@@ -1,5 +1,135 @@
 import { getModule, listBlocks } from './registry.js';
 
+const DEPENDENCY_STATUS_LABELS = {
+  ok: 'OK',
+  missing: 'Manquant',
+  incompatible: 'Version incompatible'
+};
+
+const DEPENDENCY_STATUS_TONE = {
+  missing: 'alert',
+  incompatible: 'warning'
+};
+
+function now() {
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+    return performance.now();
+  }
+  return Date.now();
+}
+
+function compareSemver(a = '', b = '') {
+  const normalize = (input) => String(input).split('-')[0].split('.').map((part) => Number.parseInt(part, 10) || 0);
+  const aParts = normalize(a);
+  const bParts = normalize(b);
+  const length = Math.max(aParts.length, bParts.length);
+  for (let index = 0; index < length; index += 1) {
+    const aValue = aParts[index] ?? 0;
+    const bValue = bParts[index] ?? 0;
+    if (aValue > bValue) return 1;
+    if (aValue < bValue) return -1;
+  }
+  return 0;
+}
+
+function createEmptyCompat() {
+  return {
+    required: { features: [], browsers: [] },
+    missing: { features: [], browsers: [] },
+    unknown: { features: [], browsers: [] },
+    status: 'none',
+    score: 'AAA'
+  };
+}
+
+function resolveFeatureAvailability(feature) {
+  if (typeof feature !== 'string' || !feature.trim()) return null;
+  const parts = feature.trim().split('.');
+  let scope = typeof globalThis !== 'undefined' ? globalThis : window;
+  for (const part of parts) {
+    if (!scope || !(part in scope)) {
+      return false;
+    }
+    scope = scope[part];
+  }
+  return scope !== undefined ? true : null;
+}
+
+function evaluateCompatibility(manifest) {
+  if (!manifest || typeof manifest !== 'object' || !manifest.compat) {
+    return createEmptyCompat();
+  }
+
+  const compat = manifest.compat;
+  const report = createEmptyCompat();
+
+  const requiredFeatures = Array.isArray(compat.features) ? compat.features.filter(Boolean) : [];
+  const requiredBrowsers = Array.isArray(compat.browsers) ? compat.browsers.filter(Boolean) : [];
+
+  report.required.features = requiredFeatures;
+  report.required.browsers = requiredBrowsers;
+
+  requiredFeatures.forEach((feature) => {
+    const availability = resolveFeatureAvailability(feature);
+    if (availability === true) return;
+    if (availability === false) {
+      report.missing.features.push(feature);
+    } else {
+      report.unknown.features.push(feature);
+    }
+  });
+
+  if (requiredBrowsers.length) {
+    report.unknown.browsers.push(...requiredBrowsers);
+  }
+
+  const hasMissing = report.missing.features.length > 0 || report.missing.browsers.length > 0;
+  const hasUnknown = report.unknown.features.length > 0 || report.unknown.browsers.length > 0;
+
+  if (hasMissing) {
+    report.status = 'partial';
+    report.score = 'AA';
+  } else if (hasUnknown) {
+    report.status = 'unknown';
+    report.score = 'AAA';
+  } else if (requiredFeatures.length || requiredBrowsers.length) {
+    report.status = 'full';
+    report.score = 'AAA';
+  }
+
+  return report;
+}
+
+function serializeMetrics(internal) {
+  const loadSamples = internal.loadTimings.samples || 0;
+  const initSamples = internal.initTimings.samples || 0;
+  const loadAverage = loadSamples > 0 ? internal.loadTimings.total / loadSamples : null;
+  const initAverage = initSamples > 0 ? internal.initTimings.total / initSamples : null;
+  const combinedAverage = (Number.isFinite(loadAverage) ? loadAverage : 0) + (Number.isFinite(initAverage) ? initAverage : 0);
+  return {
+    attempts: internal.attempts,
+    successes: internal.successes,
+    failures: internal.failures,
+    retryCount: Math.max(0, internal.attempts - internal.successes),
+    lastAttemptAt: internal.lastAttemptAt,
+    lastError: internal.lastError,
+    timings: {
+      load: {
+        last: internal.loadTimings.last,
+        average: loadAverage,
+        samples: loadSamples
+      },
+      init: {
+        last: internal.initTimings.last,
+        average: initAverage,
+        samples: initSamples
+      },
+      combinedAverage: Number.isFinite(combinedAverage) && combinedAverage > 0 ? combinedAverage : null
+    },
+    compat: internal.compat
+  };
+}
+
 export function setupModuleRuntime({ state, catalog, collections = [] }) {
   const loaders = new Map(catalog.map((entry) => [entry.id, entry.loader]));
   const manifests = new Map(catalog.map((entry) => [entry.id, entry.manifest]));
@@ -46,6 +176,28 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
   const initialized = new Set();
   const loading = new Map();
   const metricsCache = new Map();
+
+  function ensureMetrics(moduleId) {
+    if (metricsCache.has(moduleId)) {
+      return metricsCache.get(moduleId);
+    }
+    const base = {
+      attempts: 0,
+      successes: 0,
+      failures: 0,
+      lastAttemptAt: null,
+      lastError: null,
+      loadTimings: { last: null, total: 0, samples: 0 },
+      initTimings: { last: null, total: 0, samples: 0 },
+      compat: createEmptyCompat()
+    };
+    const manifest = manifests.get(moduleId);
+    if (manifest) {
+      base.compat = evaluateCompatibility(manifest);
+    }
+    metricsCache.set(moduleId, base);
+    return base;
+  }
 
   function buildDependencyMetadata(moduleId) {
     const manifest = manifests.get(moduleId);
@@ -262,6 +414,7 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
 
   moduleToBlocks.forEach((blockIds, moduleId) => {
     const enabled = isModuleEnabled(blockIds, lastDisabled, lastDisabledCollections, moduleId);
+    applyModuleMetadata(moduleId);
     updateModuleRuntime(moduleId, { blockIds, collections: getCollectionsForModule(moduleId), enabled });
     if (enabled) {
       loadModule(moduleId).catch(() => {});
@@ -274,6 +427,7 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
 
   modulesWithoutBlocks.forEach((moduleId) => {
     const enabled = isModuleCollectionEnabled(moduleId, lastDisabledCollections);
+    applyModuleMetadata(moduleId);
     updateModuleRuntime(moduleId, { blockIds: [], collections: getCollectionsForModule(moduleId), enabled });
     if (enabled) {
       loadModule(moduleId).catch(() => {});

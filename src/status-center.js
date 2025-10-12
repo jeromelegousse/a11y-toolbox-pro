@@ -6,16 +6,100 @@ const STATUS_TONE_ALERT = 'alert';
 const STATUS_TONE_WARNING = 'warning';
 const STATUS_TONE_MUTED = 'muted';
 
-function isFiniteNumber(value) {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-
 function isEmpty(value) {
   return value === null || value === undefined || value === '';
 }
 
 function getRuntimeInfo(snapshot, moduleId) {
   return snapshot?.runtime?.modules?.[moduleId] ?? {};
+}
+
+function normalizeCompatSection(section) {
+  if (!section || typeof section !== 'object') {
+    return { features: [], browsers: [] };
+  }
+  const features = Array.isArray(section.features) ? section.features.filter(Boolean) : [];
+  const browsers = Array.isArray(section.browsers) ? section.browsers.filter(Boolean) : [];
+  return { features, browsers };
+}
+
+export function getModuleCompatibilityScore(runtimeEntry = {}) {
+  const compat = runtimeEntry?.metrics?.compat;
+  if (!compat || typeof compat !== 'object') return 'AAA';
+  const score = typeof compat.score === 'string' ? compat.score.trim().toUpperCase() : 'AAA';
+  return score || 'AAA';
+}
+
+export function computeModuleMetrics(runtimeEntry = {}, { label } = {}) {
+  const metrics = runtimeEntry?.metrics || {};
+  const attempts = Number.isFinite(metrics.attempts) ? metrics.attempts : 0;
+  const successes = Number.isFinite(metrics.successes) ? metrics.successes : 0;
+  const failures = Number.isFinite(metrics.failures) ? metrics.failures : 0;
+  const retryCount = Number.isFinite(metrics.retryCount) ? metrics.retryCount : Math.max(0, attempts - successes);
+  const timings = metrics.timings || {};
+  const combinedAverage = Number.isFinite(timings.combinedAverage) ? timings.combinedAverage : null;
+  const latencyLabel = Number.isFinite(combinedAverage) && combinedAverage > 0
+    ? `${Math.round(combinedAverage)} ms`
+    : 'Non mesuré';
+
+  const compat = metrics.compat && typeof metrics.compat === 'object' ? metrics.compat : {};
+  const required = normalizeCompatSection(compat.required);
+  const missing = normalizeCompatSection(compat.missing);
+  const unknown = normalizeCompatSection(compat.unknown);
+
+  let compatLabel = 'Pré-requis non déclarés';
+  const hasRequirements = required.features.length > 0 || required.browsers.length > 0;
+  if (hasRequirements) {
+    const missingParts = [];
+    if (missing.features.length) {
+      missingParts.push(`fonctions manquantes : ${missing.features.join(', ')}`);
+    }
+    if (missing.browsers.length) {
+      missingParts.push(`navigateurs requis : ${missing.browsers.join(', ')}`);
+    }
+    if (missingParts.length) {
+      compatLabel = `Pré-requis manquants : ${missingParts.join(' ; ')}.`;
+    } else {
+      const unknownParts = [];
+      if (unknown.features.length) {
+        unknownParts.push(`fonctions à vérifier : ${unknown.features.join(', ')}`);
+      }
+      if (unknown.browsers.length) {
+        unknownParts.push(`navigateurs ciblés : ${unknown.browsers.join(', ')}`);
+      }
+      compatLabel = unknownParts.length
+        ? `Compatibilité à vérifier : ${unknownParts.join(' ; ')}.`
+        : 'Pré-requis satisfaits.';
+    }
+  }
+
+  let riskLevel = getModuleCompatibilityScore(runtimeEntry);
+  if ((runtimeEntry?.state === 'error' || failures > 0) && riskLevel === 'AAA') {
+    riskLevel = 'AA';
+  }
+
+  const moduleLabel = label || runtimeEntry?.manifestName || 'Module';
+  const riskDescription = `${moduleLabel} — indice de fiabilité ${riskLevel}.`;
+  const announcement = `${moduleLabel} : indice ${riskLevel}.`;
+
+  return {
+    attempts,
+    successes,
+    failures,
+    retryCount,
+    latencyLabel,
+    compatLabel,
+    riskLevel,
+    riskDescription,
+    announcement,
+    compat: { required, missing, unknown }
+  };
+}
+
+function finalizeSummary(summary, runtime) {
+  const moduleLabel = summary.label || runtime?.manifestName || summary.id || 'Module';
+  summary.insights = computeModuleMetrics(runtime, { label: moduleLabel });
+  return summary;
 }
 
 function toneToStatusTone(tone) {

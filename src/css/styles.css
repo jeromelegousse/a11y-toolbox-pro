@@ -884,7 +884,7 @@ body {
   color: color-mix(in srgb, var(--a11ytb-fg) 70%, transparent);
 }
 
-@media (max-width: 640px) {
+@media (width <= 640px) {
   .a11ytb-catalog-filters {
     grid-template-columns: minmax(0, 1fr);
   }
