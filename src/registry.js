@@ -114,6 +114,13 @@ export function renderBlock(block, state, root) {
 
   if (typeof block.wire === 'function') block.wire({ root: el, state });
   root.appendChild(el);
+  if (window.a11ytb?.runtime?.registerBlockElement) {
+    try {
+      window.a11ytb.runtime.registerBlockElement(block.id, el);
+    } catch (error) {
+      console.error(`a11ytb: impossible d’enregistrer le bloc ${block.id} auprès du runtime.`, error);
+    }
+  }
   return el;
 }
 

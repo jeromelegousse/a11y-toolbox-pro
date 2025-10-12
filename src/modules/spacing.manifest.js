@@ -5,6 +5,9 @@ export const manifest = {
   description: 'Injecte des variables CSS pour ajuster l’interlignage et l’espacement des lettres.',
   category: 'vision',
   keywords: ['espacement', 'typographie'],
+  runtime: {
+    preload: 'visible'
+  },
   defaults: {
     state: {
       spacing: { lineHeight: 1.5, letterSpacing: 0 }

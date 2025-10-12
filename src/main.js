@@ -18,6 +18,8 @@ const profilePresets = {
     tags: ['Vision', 'Lecture'],
     tone: 'confirm',
     activity: 'Profil Vision basse appliqué',
+    preset: true,
+    createdAt: 0,
     settings: {
       'contrast.enabled': true,
       'spacing.lineHeight': 1.9,
@@ -40,6 +42,8 @@ const profilePresets = {
     tags: ['Lecture', 'Focus'],
     tone: 'confirm',
     activity: 'Profil Confort dyslexie appliqué',
+    preset: true,
+    createdAt: 0,
     settings: {
       'contrast.enabled': true,
       'spacing.lineHeight': 1.8,
@@ -61,6 +65,8 @@ const profilePresets = {
     tags: ['Voix', 'Productivité'],
     tone: 'confirm',
     activity: 'Profil Lecture vocale rapide appliqué',
+    preset: true,
+    createdAt: 0,
     settings: {
       'contrast.enabled': false,
       'spacing.lineHeight': 1.6,
@@ -107,6 +113,10 @@ const baseInitial = {
     },
     collections: {
       disabled: []
+    },
+    shortcuts: {
+      overrides: {},
+      lastRecorded: null
     }
   },
   profiles: profilePresets,

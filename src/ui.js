@@ -47,6 +47,208 @@ export function mountUI({ root, state }) {
   ];
   const PRIORITY_LOOKUP = new Map(PRIORITY_LEVELS.map((level) => [level.id, level]));
 
+  const CUSTOM_SHORTCUT_DEFINITIONS = [
+    { id: 'toggle-panel', label: 'Ouvrir ou fermer la boîte à outils.', default: 'Alt+Shift+A' },
+    { id: 'view-modules', label: 'Afficher la vue Modules.', default: 'Alt+Shift+M', view: 'modules' },
+    { id: 'view-options', label: 'Afficher la vue Options & Profils.', default: 'Alt+Shift+O', view: 'options' },
+    { id: 'view-organize', label: 'Afficher la vue Organisation.', default: 'Alt+Shift+G', view: 'organize' },
+    { id: 'view-guides', label: 'Afficher la vue Guides.', default: 'Alt+Shift+P', view: 'guides' },
+    { id: 'view-shortcuts', label: 'Afficher cette vue Raccourcis.', default: 'Alt+Shift+H', view: 'shortcuts' }
+  ];
+  const CUSTOM_SHORTCUT_LOOKUP = new Map(CUSTOM_SHORTCUT_DEFINITIONS.map((item) => [item.id, item]));
+
+  const SHORTCUT_KEY_DISPLAY = new Map([
+    ['escape', 'Échap'],
+    ['esc', 'Échap'],
+    ['enter', 'Entrée'],
+    ['return', 'Entrée'],
+    ['space', 'Espace'],
+    [' ', 'Espace'],
+    ['arrowup', '↑'],
+    ['arrowdown', '↓'],
+    ['arrowleft', '←'],
+    ['arrowright', '→'],
+    ['pageup', 'Page▲'],
+    ['pagedown', 'Page▼'],
+    ['home', 'Origine'],
+    ['end', 'Fin']
+  ]);
+
+  const SHORTCUT_KEY_ALIASES = new Map([
+    ['échap', 'escape'],
+    ['esc', 'escape'],
+    ['entrer', 'enter'],
+    ['entrée', 'enter'],
+    ['return', 'enter'],
+    ['space', 'space'],
+    ['espace', 'space'],
+    ['spacebar', 'space'],
+    ['←', 'arrowleft'],
+    ['→', 'arrowright'],
+    ['↑', 'arrowup'],
+    ['↓', 'arrowdown'],
+    ['page▲', 'pageup'],
+    ['page▼', 'pagedown']
+  ]);
+
+  function slugifyProfileId(input) {
+    if (!input || typeof input !== 'string') return '';
+    return input
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 48);
+  }
+
+  function ensureUniqueProfileId(baseId, profiles) {
+    const normalized = baseId || 'profil';
+    if (!profiles || typeof profiles !== 'object') return normalized;
+    if (!profiles[normalized]) return normalized;
+    let index = 2;
+    let candidate = `${normalized}-${index}`;
+    while (profiles[candidate]) {
+      index += 1;
+      candidate = `${normalized}-${index}`;
+    }
+    return candidate;
+  }
+
+  function cloneProfileDefinition(profile) {
+    if (!profile || typeof profile !== 'object') return {};
+    if (typeof structuredClone === 'function') {
+      try {
+        return structuredClone(profile);
+      } catch (error) {
+        // ignore and fallback to JSON strategy
+      }
+    }
+    try {
+      return JSON.parse(JSON.stringify(profile));
+    } catch (error) {
+      return { ...profile };
+    }
+  }
+
+  function canonicalizeKey(token) {
+    if (!token || typeof token !== 'string') return '';
+    const trimmed = token.trim();
+    if (!trimmed) return '';
+    const lower = trimmed.toLowerCase();
+    if (SHORTCUT_KEY_ALIASES.has(lower)) {
+      return SHORTCUT_KEY_ALIASES.get(lower);
+    }
+    return lower;
+  }
+
+  function describeKey(key) {
+    const canonical = canonicalizeKey(key);
+    if (!canonical) return '';
+    if (SHORTCUT_KEY_DISPLAY.has(canonical)) {
+      return SHORTCUT_KEY_DISPLAY.get(canonical);
+    }
+    if (canonical.length === 1) {
+      return canonical.toUpperCase();
+    }
+    return canonical.charAt(0).toUpperCase() + canonical.slice(1);
+  }
+
+  function parseShortcutCombo(input) {
+    if (!input || typeof input !== 'string') return null;
+    const tokens = input.split('+').map((token) => token.trim()).filter(Boolean);
+    if (!tokens.length) return null;
+    const combo = { alt: false, shift: false, ctrl: false, meta: false, key: '' };
+    tokens.forEach((token) => {
+      const normalized = token.toLowerCase();
+      if (normalized === 'alt' || normalized === 'option') {
+        combo.alt = true;
+      } else if (normalized === 'shift') {
+        combo.shift = true;
+      } else if (normalized === 'ctrl' || normalized === 'control' || normalized === 'ctl') {
+        combo.ctrl = true;
+      } else if (normalized === 'cmd' || normalized === '⌘' || normalized === 'meta' || normalized === 'command') {
+        combo.meta = true;
+      } else if (normalized === 'cmdorctrl') {
+        combo.meta = true;
+        combo.ctrl = true;
+      } else {
+        combo.key = canonicalizeKey(token);
+      }
+    });
+    if (!combo.key) return null;
+    return combo;
+  }
+
+  function serializeShortcutCombo(combo) {
+    if (!combo || !combo.key) return '';
+    const parts = [];
+    if (combo.meta) parts.push('Cmd');
+    if (combo.ctrl) parts.push('Ctrl');
+    if (combo.alt) parts.push('Alt');
+    if (combo.shift) parts.push('Shift');
+    parts.push(describeKey(combo.key));
+    return parts.join('+');
+  }
+
+  function shortcutPartsFromCombo(comboString) {
+    const parsed = typeof comboString === 'string' ? parseShortcutCombo(comboString) : comboString;
+    if (!parsed || !parsed.key) return [];
+    const parts = [];
+    if (parsed.meta) parts.push('Cmd');
+    if (parsed.ctrl) parts.push('Ctrl');
+    if (parsed.alt) parts.push('Alt');
+    if (parsed.shift) parts.push('Shift');
+    parts.push(describeKey(parsed.key));
+    return [parts];
+  }
+
+  function normalizeEventKey(key) {
+    if (typeof key !== 'string') return '';
+    if (key === ' ') return 'space';
+    return canonicalizeKey(key);
+  }
+
+  function buildShortcutFromEvent(event) {
+    if (!event) return null;
+    const key = normalizeEventKey(event.key || event.code);
+    if (!key) return null;
+    if (key === 'shift' || key === 'alt' || key === 'control' || key === 'meta' || key === 'cmd') {
+      return null;
+    }
+    const combo = {
+      alt: event.altKey || false,
+      shift: event.shiftKey || false,
+      ctrl: event.ctrlKey || false,
+      meta: event.metaKey || false,
+      key
+    };
+    if (!combo.alt && !combo.ctrl && !combo.meta) {
+      return null;
+    }
+    return combo;
+  }
+
+  function eventMatchesShortcut(event, combo) {
+    if (!combo) return false;
+    const normalizedKey = normalizeEventKey(event.key);
+    if (!normalizedKey) return false;
+    if (normalizedKey !== combo.key) return false;
+    if (!!event.altKey !== !!combo.alt) return false;
+    if (!!event.shiftKey !== !!combo.shift) return false;
+    if (!!event.ctrlKey !== !!combo.ctrl) return false;
+    if (!!event.metaKey !== !!combo.meta) return false;
+    return true;
+  }
+
+  let activeShortcutCombos = new Map();
+  const shortcutDisplayElements = new Map();
+  const customShortcutDisplays = new Map();
+  const shortcutRecordButtons = new Map();
+  let shortcutStatusElement = null;
+  let recordingShortcutId = null;
+  let cancelRecordingHandler = null;
+
   const accessibilityProfiles = [
     {
       id: 'custom',
@@ -179,10 +381,530 @@ export function mountUI({ root, state }) {
     return true;
   }
 
+  function getShortcutOverrides(snapshot) {
+    return snapshot?.ui?.shortcuts?.overrides || state.get('ui.shortcuts.overrides') || {};
+  }
+
+  function resolveShortcutCombo(actionId, snapshot) {
+    const definition = CUSTOM_SHORTCUT_LOOKUP.get(actionId);
+    if (!definition) return { raw: '', parsed: null };
+    const overrides = getShortcutOverrides(snapshot);
+    const raw = overrides?.[actionId] || definition.default;
+    const parsed = parseShortcutCombo(raw) || parseShortcutCombo(definition.default);
+    if (!parsed) {
+      return { raw: '', parsed: null };
+    }
+    return {
+      raw: serializeShortcutCombo(parsed),
+      parsed
+    };
+  }
+
+  function updateActiveShortcuts(snapshot) {
+    const next = new Map();
+    CUSTOM_SHORTCUT_DEFINITIONS.forEach((definition) => {
+      const resolved = resolveShortcutCombo(definition.id, snapshot);
+      if (resolved.parsed) {
+        next.set(definition.id, resolved);
+      }
+    });
+    activeShortcutCombos = next;
+  }
+
+  function getShortcutDisplayParts(actionId, snapshot) {
+    const resolved = resolveShortcutCombo(actionId, snapshot);
+    return shortcutPartsFromCombo(resolved.parsed);
+  }
+
+  function renderShortcutDisplay(actionId, element, snapshot) {
+    if (!element) return;
+    const parts = getShortcutDisplayParts(actionId, snapshot);
+    element.innerHTML = '';
+    if (!parts.length) {
+      element.textContent = 'Non défini';
+      element.dataset.empty = 'true';
+      return;
+    }
+    element.dataset.empty = 'false';
+    element.append(createShortcutComboElement(parts));
+  }
+
+  function refreshShortcutDisplays(snapshot) {
+    shortcutDisplayElements.forEach((element, actionId) => {
+      renderShortcutDisplay(actionId, element, snapshot);
+    });
+    customShortcutDisplays.forEach((element, actionId) => {
+      renderShortcutDisplay(actionId, element, snapshot);
+    });
+  }
+
+  function buildShortcutSummary(snapshot) {
+    const highlightOrder = ['toggle-panel', 'view-options', 'view-shortcuts'];
+    const parts = highlightOrder
+      .map((id) => resolveShortcutCombo(id, snapshot).raw)
+      .filter(Boolean);
+    if (!parts.length) {
+      return 'Raccourcis : définissez vos propres combinaisons.';
+    }
+    return `Raccourcis : ${parts.join(' • ')}`;
+  }
+
+  function setShortcutStatus(message, tone = 'info') {
+    if (!shortcutStatusElement) return;
+    shortcutStatusElement.textContent = message || '';
+    shortcutStatusElement.dataset.tone = tone;
+  }
+
+  function stopShortcutRecording({ cancelled = false } = {}) {
+    if (cancelRecordingHandler) {
+      window.removeEventListener('keydown', cancelRecordingHandler, true);
+      cancelRecordingHandler = null;
+    }
+    if (recordingShortcutId && shortcutRecordButtons.has(recordingShortcutId)) {
+      shortcutRecordButtons.get(recordingShortcutId).classList.remove('is-recording');
+      shortcutRecordButtons.get(recordingShortcutId).removeAttribute('aria-live');
+    }
+    if (cancelled) {
+      setShortcutStatus('Enregistrement annulé.', 'info');
+    }
+    recordingShortcutId = null;
+  }
+
+  function startShortcutRecording(actionId) {
+    const definition = CUSTOM_SHORTCUT_LOOKUP.get(actionId);
+    if (!definition) return;
+    stopShortcutRecording();
+    recordingShortcutId = actionId;
+    const button = shortcutRecordButtons.get(actionId);
+    if (button) {
+      button.classList.add('is-recording');
+      button.setAttribute('aria-live', 'assertive');
+      button.focus();
+    }
+    setShortcutStatus(`Appuyez sur la nouvelle combinaison pour « ${definition.label} » (Échap pour annuler).`, 'info');
+    cancelRecordingHandler = (event) => {
+      if (!recordingShortcutId) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        stopShortcutRecording({ cancelled: true });
+        return;
+      }
+      const combo = buildShortcutFromEvent(event);
+      if (!combo) {
+        if (!event.metaKey && !event.ctrlKey && !event.altKey) {
+          setShortcutStatus('Utilisez au moins Alt, Ctrl ou Cmd pour définir le raccourci.', 'warning');
+        }
+        return;
+      }
+      event.preventDefault();
+      const serialized = serializeShortcutCombo(combo);
+      const overrides = { ...getShortcutOverrides() };
+      overrides[actionId] = serialized;
+      state.set('ui.shortcuts.overrides', overrides);
+      state.set('ui.shortcuts.lastRecorded', { id: actionId, combo: serialized, timestamp: Date.now() });
+      logActivity(`Raccourci mis à jour : ${definition.label}`, { tone: 'confirm', tags: ['raccourcis', actionId] });
+      stopShortcutRecording();
+      setShortcutStatus(`Nouveau raccourci enregistré : ${serialized}`, 'confirm');
+    };
+    window.addEventListener('keydown', cancelRecordingHandler, true);
+  }
+
+  function resetShortcut(actionId) {
+    const definition = CUSTOM_SHORTCUT_LOOKUP.get(actionId);
+    if (!definition) return;
+    const overrides = { ...getShortcutOverrides() };
+    if (overrides[actionId]) {
+      delete overrides[actionId];
+      state.set('ui.shortcuts.overrides', overrides);
+      logActivity(`Raccourci réinitialisé : ${definition.label}`, { tone: 'info', tags: ['raccourcis', actionId] });
+    }
+    stopShortcutRecording();
+    const restored = serializeShortcutCombo(parseShortcutCombo(definition.default));
+    setShortcutStatus(`Raccourci restauré : ${restored || definition.default}`, 'info');
+  }
+
   function setListIfChanged(path, next, current = state.get(path)) {
     const reference = Array.isArray(current) ? current : [];
     if (!arraysEqual(next, reference)) {
       state.set(path, next);
+    }
+  }
+
+  const MODAL_FOCUSABLE = [
+    'a[href]',
+    'area[href]',
+    'button:not([disabled])',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])'
+  ].join(',');
+
+  function getProfilesState() {
+    return state.get('profiles') || {};
+  }
+
+  function saveProfilesState(next) {
+    state.set('profiles', next);
+  }
+
+  function getFocusableIn(container) {
+    return Array.from(container.querySelectorAll(MODAL_FOCUSABLE))
+      .filter((el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true');
+  }
+
+  function openModalDialog(options = {}) {
+    const mode = options.mode || 'alert';
+    const ownerDocument = root?.ownerDocument || document;
+    const overlay = ownerDocument.createElement('div');
+    overlay.className = 'a11ytb-modal-backdrop';
+
+    const dialog = ownerDocument.createElement('form');
+    dialog.className = 'a11ytb-modal';
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.noValidate = true;
+
+    const body = ownerDocument.body;
+    const host = body || ownerDocument.documentElement || ownerDocument;
+    const stamp = Date.now();
+    let labelledBy = null;
+    let describedBy = null;
+    const titleId = `a11ytb-modal-title-${stamp}`;
+    if (options.title) {
+      const heading = ownerDocument.createElement('h3');
+      heading.className = 'a11ytb-modal-title';
+      heading.id = titleId;
+      heading.textContent = options.title;
+      dialog.append(heading);
+      labelledBy = heading.id;
+    } else if (options.ariaLabel) {
+      dialog.setAttribute('aria-label', options.ariaLabel);
+    }
+
+    if (options.description) {
+      const description = ownerDocument.createElement('p');
+      description.className = 'a11ytb-modal-description';
+      description.id = `a11ytb-modal-description-${stamp}`;
+      description.textContent = options.description;
+      dialog.append(description);
+      describedBy = description.id;
+    }
+
+    let input = null;
+    let error = null;
+    if (mode === 'prompt') {
+      const field = ownerDocument.createElement('div');
+      field.className = 'a11ytb-modal-field';
+      const inputId = `a11ytb-modal-input-${stamp}`;
+      const label = ownerDocument.createElement('label');
+      label.className = 'a11ytb-modal-label';
+      label.setAttribute('for', inputId);
+      label.textContent = options.inputLabel || 'Valeur';
+
+      if (options.multiline) {
+        input = ownerDocument.createElement('textarea');
+        input.rows = options.rows || 6;
+      } else {
+        input = ownerDocument.createElement('input');
+        input.type = options.inputType || 'text';
+      }
+      input.className = 'a11ytb-modal-input';
+      input.id = inputId;
+      input.value = options.defaultValue || '';
+      if (options.placeholder) {
+        input.placeholder = options.placeholder;
+      }
+      field.append(label, input);
+      dialog.append(field);
+
+      error = ownerDocument.createElement('p');
+      error.className = 'a11ytb-modal-error';
+      error.hidden = true;
+      dialog.append(error);
+    }
+
+    if (labelledBy) {
+      dialog.setAttribute('aria-labelledby', labelledBy);
+    }
+    if (describedBy) {
+      dialog.setAttribute('aria-describedby', describedBy);
+    }
+
+    const actions = ownerDocument.createElement('div');
+    actions.className = 'a11ytb-modal-actions';
+    const confirmBtn = ownerDocument.createElement('button');
+    confirmBtn.type = 'submit';
+    confirmBtn.className = 'a11ytb-button';
+    confirmBtn.textContent = options.confirmLabel || 'Valider';
+    actions.append(confirmBtn);
+
+    let cancelBtn = null;
+    if (mode !== 'alert') {
+      cancelBtn = ownerDocument.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'a11ytb-button a11ytb-button--ghost';
+      cancelBtn.textContent = options.cancelLabel || 'Annuler';
+      actions.append(cancelBtn);
+    }
+
+    dialog.append(actions);
+    overlay.append(dialog);
+    host.append(overlay);
+
+    const releaseInert = applyInertToSiblings(overlay, { ownerDocument });
+    if (body) {
+      body.classList.add('a11ytb-modal-open');
+    }
+
+    const previouslyFocused = ownerDocument.activeElement;
+    let resolveDialog;
+    const promise = new Promise((resolve) => {
+      resolveDialog = resolve;
+    });
+
+    function cleanup(result) {
+      dialog.removeEventListener('keydown', onKeyDown, true);
+      overlay.removeEventListener('click', onBackdropClick);
+      overlay.remove();
+      if (typeof releaseInert === 'function') {
+        releaseInert();
+      }
+      if (!ownerDocument.querySelector('.a11ytb-modal-backdrop') && body) {
+        body.classList.remove('a11ytb-modal-open');
+      }
+      if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+        try {
+          previouslyFocused.focus({ preventScroll: true });
+        } catch (error) {
+          previouslyFocused.focus();
+        }
+      }
+      resolveDialog(result);
+    }
+
+    function onKeyDown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (mode === 'alert') {
+          cleanup(undefined);
+        } else {
+          cleanup(null);
+        }
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusables = getFocusableIn(dialog);
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey) {
+        if (ownerDocument.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (ownerDocument.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    function onBackdropClick(event) {
+      if (event.target === overlay && mode !== 'alert') {
+        event.preventDefault();
+        cleanup(null);
+      }
+    }
+
+    dialog.addEventListener('keydown', onKeyDown, true);
+    overlay.addEventListener('click', onBackdropClick);
+
+    dialog.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (mode === 'prompt') {
+        const rawValue = input.value;
+        const value = options.trimValue === false ? rawValue : rawValue.trim();
+        if (!value && options.requireValue !== false) {
+          if (error) {
+            error.hidden = false;
+            error.textContent = options.emptyMessage || 'Veuillez renseigner une valeur.';
+          }
+          try {
+            input.focus({ preventScroll: true });
+          } catch (focusError) {
+            input.focus();
+          }
+          return;
+        }
+        cleanup(value);
+      } else {
+        cleanup(true);
+      }
+    });
+
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        cleanup(null);
+      });
+    }
+
+    setTimeout(() => {
+      const focusTarget = mode === 'prompt' && input ? input : confirmBtn;
+      try {
+        focusTarget.focus({ preventScroll: true });
+      } catch (error) {
+        focusTarget.focus();
+      }
+    }, 0);
+
+    return promise;
+  }
+
+  async function duplicateProfile(profileId) {
+    const profiles = getProfilesState();
+    const original = profiles?.[profileId];
+    if (!original) return;
+    const defaultName = `${original.name || profileId} (copie)`;
+    const nameInput = await openModalDialog({
+      mode: 'prompt',
+      title: 'Dupliquer le profil',
+      description: `Créer une copie de « ${original.name || profileId} ».`,
+      defaultValue: defaultName,
+      confirmLabel: 'Créer',
+      cancelLabel: 'Annuler',
+      inputLabel: 'Nom du nouveau profil',
+      requireValue: true
+    });
+    if (!nameInput) return;
+    const trimmedName = nameInput;
+    const clone = cloneProfileDefinition(original);
+    clone.name = trimmedName;
+    clone.preset = false;
+    clone.createdAt = Date.now();
+    clone.source = profileId;
+    const baseId = slugifyProfileId(trimmedName) || `profil-${Date.now()}`;
+    const newId = ensureUniqueProfileId(baseId, profiles);
+    const next = { ...profiles, [newId]: clone };
+    saveProfilesState(next);
+    logActivity(`Profil dupliqué : ${trimmedName}`, { tone: 'confirm', tags: ['profils', 'duplication'] });
+  }
+
+  async function exportProfile(profileId) {
+    const profiles = getProfilesState();
+    const profile = profiles?.[profileId];
+    if (!profile) return;
+    const payload = JSON.stringify({ id: profileId, ...profile }, null, 2);
+    const copied = await copyToClipboard(payload);
+    if (copied) {
+      logActivity(`Profil copié : ${profile.name || profileId}`, { tone: 'confirm', tags: ['profils', 'export'] });
+    } else {
+      downloadText(`a11ytb-profile-${profileId}.json`, payload, 'application/json');
+      logActivity(`Profil exporté : ${profile.name || profileId}`, { tone: 'info', tags: ['profils', 'export'] });
+    }
+  }
+
+  async function deleteProfile(profileId) {
+    const profiles = getProfilesState();
+    const profile = profiles?.[profileId];
+    if (!profile || profile.preset) return;
+    const name = profile.name || profileId;
+    const confirmed = await openModalDialog({
+      mode: 'confirm',
+      title: 'Supprimer le profil',
+      description: `Confirmez la suppression de « ${name} ».`,
+      confirmLabel: 'Supprimer',
+      cancelLabel: 'Annuler'
+    });
+    if (!confirmed) return;
+    const next = { ...profiles };
+    delete next[profileId];
+    saveProfilesState(next);
+    if (state.get('ui.lastProfile') === profileId) {
+      state.set('ui.lastProfile', null);
+    }
+    logActivity(`Profil supprimé : ${name}`, { tone: 'warning', tags: ['profils', 'suppression'] });
+  }
+
+  async function renameProfile(profileId) {
+    const profiles = getProfilesState();
+    const profile = profiles?.[profileId];
+    if (!profile || profile.preset) return;
+    const currentName = profile.name || profileId;
+    const nameInput = await openModalDialog({
+      mode: 'prompt',
+      title: 'Renommer le profil',
+      description: `Renommer « ${currentName} ».`,
+      defaultValue: currentName,
+      confirmLabel: 'Renommer',
+      cancelLabel: 'Annuler',
+      inputLabel: 'Nouveau nom',
+      requireValue: true
+    });
+    if (!nameInput || nameInput === currentName) return;
+    const trimmed = nameInput;
+    const next = { ...profiles, [profileId]: { ...profile, name: trimmed } };
+    saveProfilesState(next);
+    logActivity(`Profil renommé : ${trimmed}`, { tone: 'info', tags: ['profils', 'renommage'] });
+  }
+
+  function normalizeImportedProfile(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const settings = raw.settings && typeof raw.settings === 'object' ? { ...raw.settings } : {};
+    const normalized = {
+      name: typeof raw.name === 'string' ? raw.name.trim() : undefined,
+      summary: typeof raw.summary === 'string' ? raw.summary : undefined,
+      description: typeof raw.description === 'string' ? raw.description : undefined,
+      tags: Array.isArray(raw.tags) ? raw.tags.filter(Boolean).map(String) : undefined,
+      tone: typeof raw.tone === 'string' ? raw.tone : undefined,
+      activity: typeof raw.activity === 'string' ? raw.activity : undefined,
+      settings,
+      preset: false,
+      source: raw.source || null,
+      createdAt: Date.now()
+    };
+    return normalized;
+  }
+
+  async function importProfileFromPrompt() {
+    const input = await openModalDialog({
+      mode: 'prompt',
+      title: 'Importer un profil',
+      description: 'Collez le JSON du profil à importer.',
+      confirmLabel: 'Importer',
+      cancelLabel: 'Annuler',
+      inputLabel: 'JSON du profil',
+      multiline: true,
+      trimValue: false,
+      requireValue: true,
+      emptyMessage: 'Veuillez coller un JSON valide.'
+    });
+    if (!input) return;
+    try {
+      const parsed = JSON.parse(input);
+      const normalized = normalizeImportedProfile(parsed);
+      if (!normalized) {
+        await openModalDialog({
+          mode: 'alert',
+          title: 'Import impossible',
+          description: 'Profil invalide : paramètres manquants.'
+        });
+        return;
+      }
+      const profiles = getProfilesState();
+      const baseId = slugifyProfileId(parsed.id || normalized.name) || `profil-${Date.now()}`;
+      const profileId = ensureUniqueProfileId(baseId, profiles);
+      const next = { ...profiles, [profileId]: normalized };
+      saveProfilesState(next);
+      const label = normalized.name || profileId;
+      logActivity(`Profil importé : ${label}`, { tone: 'confirm', tags: ['profils', 'import'] });
+    } catch (error) {
+      console.warn('a11ytb: profil importé invalide.', error);
+      await openModalDialog({
+        mode: 'alert',
+        title: 'Import impossible',
+        description: 'Impossible de lire ce profil. Vérifiez le format JSON.'
+      });
     }
   }
 
@@ -294,7 +1016,7 @@ export function mountUI({ root, state }) {
   statusTitle.textContent = 'État en temps réel';
   const statusDescription = document.createElement('p');
   statusDescription.className = 'a11ytb-status-description';
-  statusDescription.textContent = 'Suivez la disponibilité des modules Lecture vocale, Dictée, Braille, Contraste et Espacements.';
+  statusDescription.textContent = 'Consultez l’indice global de conformité et l’état des modules Lecture vocale, Dictée, Braille, Contraste et Espacements.';
   statusHeader.append(statusTitle, statusDescription);
 
   const statusGrid = document.createElement('div');
@@ -368,7 +1090,7 @@ export function mountUI({ root, state }) {
 
       card.append(headerRow, value, detail, meta, announcement);
       statusGrid.append(card);
-      entry = { card, badge, risk, value, detail, label, latencyValue, compatValue, announcement };
+      entry = { card, badge, risk, value, detail, label, latencyValue, compatValue, latencyTerm, compatTerm, announcement };
       statusCards.set(summary.id, entry);
     }
     return entry;
@@ -410,8 +1132,14 @@ export function mountUI({ root, state }) {
           entry.risk.hidden = true;
         }
       }
+      if (entry.latencyTerm && summary.metaLabels?.latency) {
+        entry.latencyTerm.textContent = summary.metaLabels.latency;
+      }
       if (entry.latencyValue) {
         entry.latencyValue.textContent = insights.latencyLabel || 'Non mesuré';
+      }
+      if (entry.compatTerm && summary.metaLabels?.compat) {
+        entry.compatTerm.textContent = summary.metaLabels.compat;
       }
       if (entry.compatValue) {
         entry.compatValue.textContent = insights.compatLabel || 'Pré-requis non déclarés';
@@ -617,9 +1345,25 @@ export function mountUI({ root, state }) {
   profilesDescription.className = 'a11ytb-section-description';
   profilesDescription.textContent = 'Appliquez des réglages combinés en un clic pour différents besoins (vision basse, dyslexie, etc.).';
   profilesHeader.append(profilesTitle, profilesDescription);
+  const profilesToolbar = document.createElement('div');
+  profilesToolbar.className = 'a11ytb-profile-toolbar';
+  const importProfileButton = document.createElement('button');
+  importProfileButton.type = 'button';
+  importProfileButton.className = 'a11ytb-button a11ytb-button--ghost';
+  importProfileButton.dataset.profileAction = 'import';
+  importProfileButton.textContent = 'Importer un profil';
+  importProfileButton.setAttribute('aria-label', 'Importer un profil (coller un JSON)');
+  profilesToolbar.append(importProfileButton);
+  profilesToolbar.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-profile-action]');
+    if (!button) return;
+    if (button.dataset.profileAction === 'import') {
+      await importProfileFromPrompt();
+    }
+  });
   const profilesList = document.createElement('div');
   profilesList.className = 'a11ytb-profile-grid';
-  profilesSection.append(profilesHeader, profilesList);
+  profilesSection.append(profilesHeader, profilesToolbar, profilesList);
 
   const configSection = document.createElement('section');
   configSection.className = 'a11ytb-options-section';
@@ -840,17 +1584,82 @@ export function mountUI({ root, state }) {
   const shortcutsGrid = document.createElement('div');
   shortcutsGrid.className = 'a11ytb-shortcuts-grid';
 
+  const customShortcutsPanel = document.createElement('div');
+  customShortcutsPanel.className = 'a11ytb-shortcuts-custom-panel';
+  const customShortcutsTitle = document.createElement('h4');
+  customShortcutsTitle.className = 'a11ytb-shortcuts-custom-title';
+  customShortcutsTitle.textContent = 'Personnalisez les raccourcis globaux';
+  const customShortcutsIntro = document.createElement('p');
+  customShortcutsIntro.className = 'a11ytb-shortcuts-custom-intro';
+  customShortcutsIntro.textContent = 'Définissez vos propres combinaisons pour ouvrir la boîte à outils et naviguer entre les vues.';
+  shortcutStatusElement = document.createElement('p');
+  shortcutStatusElement.className = 'a11ytb-shortcuts-status';
+  shortcutStatusElement.dataset.tone = 'info';
+  shortcutStatusElement.textContent = 'Cliquez sur « Définir » puis saisissez la nouvelle combinaison (Alt/Ctrl/Cmd requis).';
+
+  const customShortcutsList = document.createElement('ul');
+  customShortcutsList.className = 'a11ytb-shortcuts-custom-list';
+
+  CUSTOM_SHORTCUT_DEFINITIONS.forEach((definition) => {
+    const item = document.createElement('li');
+    item.className = 'a11ytb-shortcuts-custom-item';
+    const label = document.createElement('span');
+    label.className = 'a11ytb-shortcuts-custom-label';
+    label.textContent = definition.label;
+    const combo = document.createElement('span');
+    combo.className = 'a11ytb-shortcuts-custom-combo';
+    customShortcutDisplays.set(definition.id, combo);
+    renderShortcutDisplay(definition.id, combo, state.get());
+
+    const actions = document.createElement('div');
+    actions.className = 'a11ytb-shortcuts-custom-actions';
+
+    const recordBtn = document.createElement('button');
+    recordBtn.type = 'button';
+    recordBtn.className = 'a11ytb-button a11ytb-button--ghost';
+    recordBtn.dataset.shortcutAction = 'record';
+    recordBtn.dataset.shortcutId = definition.id;
+    recordBtn.textContent = 'Définir…';
+    shortcutRecordButtons.set(definition.id, recordBtn);
+
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'a11ytb-button a11ytb-button--ghost';
+    resetBtn.dataset.shortcutAction = 'reset';
+    resetBtn.dataset.shortcutId = definition.id;
+    resetBtn.textContent = 'Réinitialiser';
+
+    actions.append(recordBtn, resetBtn);
+    item.append(label, combo, actions);
+    customShortcutsList.append(item);
+  });
+
+  customShortcutsPanel.append(customShortcutsTitle, customShortcutsIntro, customShortcutsList, shortcutStatusElement);
+
+  customShortcutsPanel.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-shortcut-action]');
+    if (!button) return;
+    const action = button.dataset.shortcutAction;
+    const shortcutId = button.dataset.shortcutId;
+    if (!shortcutId) return;
+    if (action === 'record') {
+      startShortcutRecording(shortcutId);
+    } else if (action === 'reset') {
+      resetShortcut(shortcutId);
+    }
+  });
+
   const shortcutGroups = [
     {
       title: 'Navigation du panneau',
       description: 'Raccourcis globaux accessibles depuis toute la page.',
       shortcuts: [
-        { combo: [['Alt', 'Shift', 'A']], description: 'Ouvrir ou fermer la boîte à outils.' },
-        { combo: [['Alt', 'Shift', 'M']], description: 'Afficher la vue Modules.' },
-        { combo: [['Alt', 'Shift', 'O']], description: 'Afficher la vue Options & Profils.' },
-        { combo: [['Alt', 'Shift', 'G']], description: 'Afficher la vue Organisation.' },
-        { combo: [['Alt', 'Shift', 'P']], description: 'Afficher la vue Guides.' },
-        { combo: [['Alt', 'Shift', 'H']], description: 'Afficher cette vue Raccourcis.' }
+        { id: 'toggle-panel', description: 'Ouvrir ou fermer la boîte à outils.' },
+        { id: 'view-modules', description: 'Afficher la vue Modules.' },
+        { id: 'view-options', description: 'Afficher la vue Options & Profils.' },
+        { id: 'view-organize', description: 'Afficher la vue Organisation.' },
+        { id: 'view-guides', description: 'Afficher la vue Guides.' },
+        { id: 'view-shortcuts', description: 'Afficher cette vue Raccourcis.' }
       ]
     },
     {
@@ -890,7 +1699,12 @@ export function mountUI({ root, state }) {
     group.shortcuts.forEach((shortcut) => {
       const dt = document.createElement('dt');
       dt.className = 'a11ytb-shortcut-keys';
-      dt.append(createShortcutComboElement(shortcut.combo));
+      if (shortcut.id) {
+        shortcutDisplayElements.set(shortcut.id, dt);
+        renderShortcutDisplay(shortcut.id, dt, state.get());
+      } else if (shortcut.combo) {
+        dt.append(createShortcutComboElement(shortcut.combo));
+      }
       const dd = document.createElement('dd');
       dd.className = 'a11ytb-shortcut-description';
       dd.textContent = shortcut.description;
@@ -900,7 +1714,7 @@ export function mountUI({ root, state }) {
     shortcutsGrid.append(card);
   });
 
-  shortcutsSection.append(shortcutsHeader, shortcutsGrid);
+  shortcutsSection.append(shortcutsHeader, customShortcutsPanel, shortcutsGrid);
   shortcutsScroll.append(shortcutsSection);
   shortcutsView.append(shortcutsScroll);
 
@@ -910,7 +1724,7 @@ export function mountUI({ root, state }) {
   footer.className = 'a11ytb-header';
   const footerTitle = document.createElement('div');
   footerTitle.className = 'a11ytb-title';
-  footerTitle.textContent = 'Raccourcis : Alt+Shift+A • Alt+Shift+P • Alt+Shift+H';
+  footerTitle.textContent = buildShortcutSummary(state.get());
 
   const activity = document.createElement('details');
   activity.className = 'a11ytb-activity';
@@ -1036,6 +1850,27 @@ export function mountUI({ root, state }) {
   const adminToolbarCounts = { active: null, hidden: null, pinned: null };
   const organizeFilterToggles = new Map();
   const collectionButtons = new Map();
+
+  function focusModuleCard(moduleId) {
+    if (!moduleId) return;
+    const blockEntry = blocks.find((block) => block.moduleId === moduleId);
+    if (!blockEntry) return;
+    const element = moduleElements.get(blockEntry.id);
+    if (!element) return;
+    if (!element.hasAttribute('tabindex')) {
+      element.setAttribute('tabindex', '-1');
+    }
+    element.classList.add('is-highlighted');
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    try {
+      element.focus({ preventScroll: true });
+    } catch (error) {
+      element.focus();
+    }
+    setTimeout(() => {
+      element.classList.remove('is-highlighted');
+    }, 1600);
+  }
 
   const organizeScroll = document.createElement('div');
   organizeScroll.className = 'a11ytb-organize-scroll';
@@ -1667,7 +2502,8 @@ export function mountUI({ root, state }) {
       tone,
       severity,
       module: moduleId,
-      tags
+      tags,
+      payload: entry.payload || null
     };
   }
 
@@ -3144,12 +3980,61 @@ export function mountUI({ root, state }) {
         card.append(description);
       }
 
+      if (profile?.source) {
+        const origin = document.createElement('p');
+        origin.className = 'a11ytb-profile-origin';
+        const sourceProfile = data[profile.source];
+        const sourceLabel = sourceProfile?.name || profile.source;
+        origin.textContent = `Issu de : ${sourceLabel}`;
+        card.append(origin);
+      }
+
+      const actions = document.createElement('div');
+      actions.className = 'a11ytb-profile-actions';
+
       const applyBtn = document.createElement('button');
       applyBtn.type = 'button';
       applyBtn.className = 'a11ytb-button a11ytb-button--ghost';
-      applyBtn.dataset.profile = id;
-      applyBtn.textContent = id === lastProfile ? 'Réappliquer le profil' : 'Appliquer ce profil';
-      card.append(applyBtn);
+      applyBtn.dataset.profileAction = 'apply';
+      applyBtn.dataset.profileId = id;
+      applyBtn.textContent = id === lastProfile ? 'Réappliquer' : 'Appliquer';
+      actions.append(applyBtn);
+
+      const duplicateBtn = document.createElement('button');
+      duplicateBtn.type = 'button';
+      duplicateBtn.className = 'a11ytb-button a11ytb-button--ghost';
+      duplicateBtn.dataset.profileAction = 'duplicate';
+      duplicateBtn.dataset.profileId = id;
+      duplicateBtn.textContent = 'Dupliquer';
+      actions.append(duplicateBtn);
+
+      const exportBtn = document.createElement('button');
+      exportBtn.type = 'button';
+      exportBtn.className = 'a11ytb-button a11ytb-button--ghost';
+      exportBtn.dataset.profileAction = 'export';
+      exportBtn.dataset.profileId = id;
+      exportBtn.textContent = 'Partager';
+      actions.append(exportBtn);
+
+      if (!profile?.preset) {
+        const renameBtn = document.createElement('button');
+        renameBtn.type = 'button';
+        renameBtn.className = 'a11ytb-button a11ytb-button--ghost';
+        renameBtn.dataset.profileAction = 'rename';
+        renameBtn.dataset.profileId = id;
+        renameBtn.textContent = 'Renommer';
+        actions.append(renameBtn);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'a11ytb-button a11ytb-button--ghost';
+        deleteBtn.dataset.profileAction = 'delete';
+        deleteBtn.dataset.profileId = id;
+        deleteBtn.textContent = 'Supprimer';
+        actions.append(deleteBtn);
+      }
+
+      card.append(actions);
 
       profilesList.append(card);
     });
@@ -3228,6 +4113,34 @@ export function mountUI({ root, state }) {
       if (meta.childNodes.length) {
         li.append(meta);
       }
+      if (entry.payload?.type === 'audit-report') {
+        const totals = entry.payload.totals || {};
+        const detailLine = document.createElement('p');
+        detailLine.className = 'a11ytb-activity-detail';
+        if (entry.payload.outcome === 'error') {
+          detailLine.textContent = entry.payload.error || 'Analyse indisponible.';
+        } else {
+          const critical = totals.critical || 0;
+          const serious = totals.serious || 0;
+          const recommendations = (totals.moderate || 0) + (totals.minor || 0);
+          const parts = [];
+          if (critical > 0) parts.push(`${critical} critique${critical > 1 ? 's' : ''}`);
+          if (serious > 0) parts.push(`${serious} majeure${serious > 1 ? 's' : ''}`);
+          if (recommendations > 0) parts.push(`${recommendations} recommandation${recommendations > 1 ? 's' : ''}`);
+          detailLine.textContent = parts.length ? `Violations : ${parts.join(' • ')}` : 'Aucune violation détectée.';
+        }
+        li.append(detailLine);
+
+        const inlineActions = document.createElement('div');
+        inlineActions.className = 'a11ytb-activity-inline-actions';
+        const openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.className = 'a11ytb-btn-link';
+        openBtn.dataset.action = 'activity-open-audit';
+        openBtn.textContent = entry.payload.outcome === 'error' ? 'Réessayer' : 'Voir le rapport';
+        inlineActions.append(openBtn);
+        li.append(inlineActions);
+      }
       activityList.append(li);
     });
   }
@@ -3247,7 +4160,8 @@ export function mountUI({ root, state }) {
       tone,
       severity,
       module: moduleId,
-      tags
+      tags,
+      payload: options.payload || null
     };
     const next = [entry, ...current].slice(0, 50);
     state.set('ui.activity', next);
@@ -3293,7 +4207,8 @@ export function mountUI({ root, state }) {
       module: entry.module,
       severity: entry.severity,
       tone: entry.tone,
-      tags: entry.tags
+      tags: entry.tags,
+      payload: entry.payload || null
     })), null, 2);
   }
 
@@ -3307,14 +4222,15 @@ export function mountUI({ root, state }) {
   }
 
   function serializeActivityToCSV(entries) {
-    const header = ['timestamp', 'message', 'module', 'severity', 'tone', 'tags'];
+    const header = ['timestamp', 'message', 'module', 'severity', 'tone', 'tags', 'payload'];
     const rows = entries.map(entry => [
       new Date(entry.timestamp || Date.now()).toISOString(),
       entry.message,
       entry.module || '',
       entry.severity || '',
       entry.tone || '',
-      Array.isArray(entry.tags) ? entry.tags.join('|') : ''
+      Array.isArray(entry.tags) ? entry.tags.join('|') : '',
+      entry.payload ? JSON.stringify(entry.payload) : ''
     ]);
     return [header.join(','), ...rows.map(row => row.map(escapeCsvValue).join(','))].join('\n');
   }
@@ -3401,6 +4317,7 @@ export function mountUI({ root, state }) {
       if (activeViewId === 'options') {
         teardownOptionsFocusTrap();
       }
+      stopShortcutRecording();
       const target = (lastFocusedElement && typeof lastFocusedElement.focus === 'function') ? lastFocusedElement : fab;
       target.focus();
       lastFocusedElement = null;
@@ -3418,37 +4335,61 @@ export function mountUI({ root, state }) {
   header.querySelector('[data-action="dock-right"]').addEventListener('click', () => state.set('ui.dock', 'right'));
   header.querySelector('[data-action="dock-bottom"]').addEventListener('click', () => state.set('ui.dock', 'bottom'));
 
-  const viewHotkeys = new Map([
-    ['m', 'modules'],
-    ['o', 'options'],
-    ['g', 'organize'],
-    ['p', 'guides'],
-    ['h', 'shortcuts']
-  ]);
-
-  window.addEventListener('keydown', (e) => {
-    if (!e.altKey || !e.shiftKey || e.defaultPrevented) return;
-    const key = typeof e.key === 'string' ? e.key.toLowerCase() : '';
-    if (key === 'a') {
-      e.preventDefault();
+  function executeShortcut(actionId) {
+    const definition = CUSTOM_SHORTCUT_LOOKUP.get(actionId);
+    if (!definition) return;
+    if (actionId === 'toggle-panel') {
       toggle();
       return;
     }
-    const targetView = viewHotkeys.get(key);
+    const targetView = definition.view;
     if (!targetView) return;
-    e.preventDefault();
     if (panel.dataset.open !== 'true') {
       toggle(true);
     }
     state.set('ui.view', targetView);
+  }
+
+  window.addEventListener('keydown', (event) => {
+    if (event.defaultPrevented) return;
+    if (recordingShortcutId) return;
+    const active = document.activeElement;
+    if (active && typeof active.closest === 'function') {
+      const isEditable = active.closest('input, textarea, select, [contenteditable="true"]');
+      if (isEditable && !event.altKey && !event.ctrlKey && !event.metaKey) {
+        return;
+      }
+    }
+    let handled = false;
+    activeShortcutCombos.forEach((entry, actionId) => {
+      if (handled) return;
+      if (eventMatchesShortcut(event, entry.parsed)) {
+        event.preventDefault();
+        executeShortcut(actionId);
+        handled = true;
+      }
+    });
   });
 
   overlay.addEventListener('click', () => toggle(false));
 
-  profilesList.addEventListener('click', (event) => {
-    const btn = event.target.closest('[data-profile]');
-    if (!btn) return;
-    applyProfile(btn.dataset.profile);
+  profilesList.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-profile-action]');
+    if (!button) return;
+    const action = button.dataset.profileAction;
+    const profileId = button.dataset.profileId;
+    if (!profileId) return;
+    if (action === 'apply') {
+      applyProfile(profileId);
+    } else if (action === 'duplicate') {
+      await duplicateProfile(profileId);
+    } else if (action === 'export') {
+      await exportProfile(profileId);
+    } else if (action === 'rename') {
+      await renameProfile(profileId);
+    } else if (action === 'delete') {
+      await deleteProfile(profileId);
+    }
   });
 
   activity.addEventListener('click', async (event) => {
@@ -3471,6 +4412,10 @@ export function mountUI({ root, state }) {
       const payload = serializeActivityToCSV(entries);
       downloadText('a11ytb-activity.csv', payload, 'text/csv');
       logActivity('Journal exporté (CSV)', { tone: 'confirm', module: 'activity', tags: ['export', 'csv'] });
+    } else if (action.dataset.action === 'activity-open-audit') {
+      toggle(true);
+      state.set('ui.view', 'modules');
+      focusModuleCard('audit');
     }
   });
 
@@ -3578,6 +4523,9 @@ export function mountUI({ root, state }) {
     updateActivityLog();
     syncView();
     renderProfiles(snapshot);
+    updateActiveShortcuts(snapshot);
+    refreshShortcutDisplays(snapshot);
+    footerTitle.textContent = buildShortcutSummary(snapshot);
     optionBindings.forEach((binding) => binding(snapshot));
   });
 
@@ -3589,5 +4537,8 @@ export function mountUI({ root, state }) {
   updateActivityLog();
   syncView();
   renderProfiles(initialSnapshot);
+  updateActiveShortcuts(initialSnapshot);
+  refreshShortcutDisplays(initialSnapshot);
+  footerTitle.textContent = buildShortcutSummary(initialSnapshot);
   optionBindings.forEach((binding) => binding(initialSnapshot));
 }

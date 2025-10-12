@@ -6,6 +6,127 @@ const STATUS_TONE_ALERT = 'alert';
 const STATUS_TONE_WARNING = 'warning';
 const STATUS_TONE_MUTED = 'muted';
 
+const SCORE_PRIORITY = new Map([
+  ['AAA', 0],
+  ['AA', 1],
+  ['A', 2],
+  ['B', 3],
+  ['C', 4]
+]);
+
+function normalizeScore(value) {
+  if (typeof value !== 'string') return 'AAA';
+  const upper = value.trim().toUpperCase();
+  return SCORE_PRIORITY.has(upper) ? upper : 'AAA';
+}
+
+function pickWorstScore(current, candidate) {
+  const normalizedCurrent = normalizeScore(current);
+  const normalizedCandidate = normalizeScore(candidate);
+  const currentRank = SCORE_PRIORITY.get(normalizedCurrent) ?? 0;
+  const candidateRank = SCORE_PRIORITY.get(normalizedCandidate) ?? 0;
+  return candidateRank > currentRank ? normalizedCandidate : normalizedCurrent;
+}
+
+function toneFromScore(score) {
+  const rank = SCORE_PRIORITY.get(normalizeScore(score)) ?? 0;
+  if (rank >= 3) return STATUS_TONE_ALERT;
+  if (rank === 2) return STATUS_TONE_WARNING;
+  if (rank === 1) return STATUS_TONE_ACTIVE;
+  return STATUS_TONE_DEFAULT;
+}
+
+function summarizeAuditForScore(snapshot = {}) {
+  const summary = snapshot?.audit?.summary;
+  if (!summary) {
+    if (snapshot?.audit?.status === 'error') {
+      return 'A';
+    }
+    return 'AAA';
+  }
+  switch (summary.outcome) {
+    case 'critical':
+      return 'A';
+    case 'serious':
+      return 'AA';
+    case 'moderate':
+    case 'minor':
+      return 'AA';
+    case 'pass':
+      return 'AAA';
+    default:
+      return 'AA';
+  }
+}
+
+function buildGlobalScoreSummary(snapshot = {}) {
+  const runtimeEntries = snapshot?.runtime?.modules ?? {};
+  let tracked = 0;
+  let ready = 0;
+  let errors = 0;
+  let warnings = 0;
+  let worstScore = 'AAA';
+
+  Object.keys(runtimeEntries).forEach((moduleId) => {
+    const runtime = runtimeEntries[moduleId];
+    if (!runtime || runtime.enabled === false) {
+      return;
+    }
+    tracked += 1;
+    if (runtime.state === 'ready') {
+      ready += 1;
+    }
+    if (runtime.state === 'error') {
+      errors += 1;
+    }
+    const metrics = computeModuleMetrics(runtime, { label: runtime.manifestName || moduleId });
+    worstScore = pickWorstScore(worstScore, metrics.riskLevel);
+    const failureCount = Number.isFinite(metrics.failures) ? metrics.failures : Number(runtime.metrics?.failures) || 0;
+    if (failureCount > 0 && runtime.state !== 'error') {
+      warnings += 1;
+    }
+  });
+
+  const auditScore = summarizeAuditForScore(snapshot);
+  worstScore = pickWorstScore(worstScore, auditScore);
+
+  const totalIncidents = errors + warnings;
+  const detailParts = [];
+  if (tracked > 0) {
+    detailParts.push(`${ready}/${tracked} modules prêts`);
+  }
+  if (errors > 0) {
+    detailParts.push(`${errors} en erreur`);
+  }
+  if (warnings > 0) {
+    detailParts.push(`${warnings} à surveiller`);
+  }
+  if (!detailParts.length) {
+    detailParts.push('Aucun incident déclaré');
+  }
+
+  return {
+    id: 'global-score',
+    label: 'Indice de conformité',
+    badge: 'Score consolidé',
+    value: `Indice ${worstScore}`,
+    detail: detailParts.join(' · '),
+    tone: toneFromScore(worstScore),
+    live: 'polite',
+    metaLabels: {
+      latency: 'Modules prêts',
+      compat: 'Incidents actifs'
+    },
+    insights: {
+      riskLevel: worstScore,
+      riskDescription: `Indice global ${worstScore}.`,
+      announcement: `Indice global ${worstScore}`,
+      latencyLabel: tracked > 0 ? `${ready}/${tracked}` : '0/0',
+      compatLabel: totalIncidents > 0 ? `${totalIncidents} incident${totalIncidents > 1 ? 's' : ''}` : 'Aucun incident'
+    }
+  };
+}
+
 function isEmpty(value) {
   return value === null || value === undefined || value === '';
 }
@@ -504,6 +625,7 @@ function buildSpacingSummary(snapshot = {}) {
 
 export function summarizeStatuses(snapshot = {}) {
   return [
+    buildGlobalScoreSummary(snapshot),
     buildAuditSummary(snapshot),
     buildTtsSummary(snapshot),
     buildSttSummary(snapshot),

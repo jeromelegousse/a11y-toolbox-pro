@@ -5,6 +5,9 @@ export const manifest = {
   description: 'Convertit un texte latin simplifié en caractères braille Unicode.',
   category: 'conversion',
   keywords: ['braille', 'transcription'],
+  runtime: {
+    preload: 'pointer'
+  },
   defaults: {
     state: {
       braille: { output: '' }

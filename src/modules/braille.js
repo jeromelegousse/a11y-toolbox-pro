@@ -60,6 +60,11 @@ const braille = {
     };
     if (!window.a11ytb) window.a11ytb = {};
     window.a11ytb.braille = api;
+  },
+  unmount() {
+    if (window.a11ytb) {
+      delete window.a11ytb.braille;
+    }
   }
 };
 
