@@ -279,7 +279,14 @@ export function mountUI({ root, state }) {
       const badge = document.createElement('span');
       badge.className = 'a11ytb-badge';
 
-      headerRow.append(label, badge);
+      const risk = document.createElement('span');
+      risk.className = 'a11ytb-status-risk';
+      risk.dataset.ref = 'risk';
+      risk.setAttribute('role', 'status');
+      risk.setAttribute('aria-live', 'polite');
+      risk.hidden = true;
+
+      headerRow.append(label, badge, risk);
 
       const value = document.createElement('p');
       value.className = 'a11ytb-status-value';
@@ -292,9 +299,32 @@ export function mountUI({ root, state }) {
       detail.className = 'a11ytb-status-detail';
       detail.dataset.ref = 'detail';
 
-      card.append(headerRow, value, detail);
+      const meta = document.createElement('dl');
+      meta.className = 'a11ytb-status-meta';
+
+      const latencyTerm = document.createElement('dt');
+      latencyTerm.textContent = 'Latence moyenne';
+      const latencyValue = document.createElement('dd');
+      latencyValue.dataset.ref = 'latency';
+      latencyValue.textContent = 'Non mesuré';
+
+      const compatTerm = document.createElement('dt');
+      compatTerm.textContent = 'Compatibilité';
+      const compatValue = document.createElement('dd');
+      compatValue.dataset.ref = 'compat';
+      compatValue.textContent = 'Pré-requis non déclarés';
+
+      meta.append(latencyTerm, latencyValue, compatTerm, compatValue);
+
+      const announcement = document.createElement('span');
+      announcement.className = 'a11ytb-sr-only';
+      announcement.dataset.ref = 'announcement';
+      announcement.setAttribute('role', 'status');
+      announcement.setAttribute('aria-live', 'polite');
+
+      card.append(headerRow, value, detail, meta, announcement);
       statusGrid.append(card);
-      entry = { card, badge, value, detail, label };
+      entry = { card, badge, risk, value, detail, label, latencyValue, compatValue, announcement };
       statusCards.set(summary.id, entry);
     }
     return entry;
@@ -321,6 +351,29 @@ export function mountUI({ root, state }) {
       } else {
         entry.detail.textContent = '';
         entry.detail.hidden = true;
+      }
+      const insights = summary.insights || {};
+      if (entry.risk) {
+        if (insights.riskLevel) {
+          entry.risk.textContent = insights.riskLevel;
+          entry.risk.dataset.score = insights.riskLevel;
+          entry.risk.setAttribute('aria-label', insights.riskDescription || '');
+          entry.risk.hidden = false;
+        } else {
+          entry.risk.textContent = '';
+          entry.risk.dataset.score = '';
+          entry.risk.setAttribute('aria-label', '');
+          entry.risk.hidden = true;
+        }
+      }
+      if (entry.latencyValue) {
+        entry.latencyValue.textContent = insights.latencyLabel || 'Non mesuré';
+      }
+      if (entry.compatValue) {
+        entry.compatValue.textContent = insights.compatLabel || 'Pré-requis non déclarés';
+      }
+      if (entry.announcement) {
+        entry.announcement.textContent = insights.announcement || '';
       }
     });
   }
