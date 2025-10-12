@@ -3,7 +3,7 @@ import { applyInertToSiblings } from './utils/inert.js';
 import { summarizeStatuses } from './status-center.js';
 import { buildGuidedChecklists, toggleManualChecklistStep } from './guided-checklists.js';
 import { normalizeAudioEvents } from './audio-config.js';
-import { updateDependencyDisplay } from './utils/dependency-display.js';
+import { moduleCollections } from './module-collections.js';
 
 const DEFAULT_BLOCK_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h7v7H4V5zm9 0h7v7h-7V5zM4 12h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>';
 
@@ -889,12 +889,57 @@ export function mountUI({ root, state }) {
   const blockIds = blocks.map(block => block.id);
   const allowedIds = new Set(blockIds);
   const blockIndex = new Map(blockIds.map((id, index) => [id, index]));
+  const moduleToBlockIds = new Map();
+
+  blocks.forEach((block) => {
+    const moduleId = block.moduleId;
+    if (!moduleId) return;
+    if (!moduleToBlockIds.has(moduleId)) {
+      moduleToBlockIds.set(moduleId, []);
+    }
+    moduleToBlockIds.get(moduleId).push(block.id);
+  });
+
+  const allManifests = listModuleManifests();
+  const manifestByModuleId = new Map(allManifests.map((manifest) => [manifest.id, manifest]));
+
+  const collectionDefinitions = moduleCollections.filter((entry) => entry && entry.id && Array.isArray(entry.modules) && entry.modules.length);
+  const moduleCollectionsIndex = new Map();
+  const collectionBlockIds = new Map();
+
+  collectionDefinitions.forEach((collection) => {
+    const members = Array.from(new Set(collection.modules.filter(Boolean)));
+    collectionBlockIds.set(collection.id, members.flatMap((moduleId) => moduleToBlockIds.get(moduleId) ?? []));
+    members.forEach((moduleId) => {
+      if (!moduleCollectionsIndex.has(moduleId)) {
+        moduleCollectionsIndex.set(moduleId, new Set());
+      }
+      moduleCollectionsIndex.get(moduleId).add(collection.id);
+    });
+  });
+
+  function getCollectionsForBlock(blockId) {
+    const block = blockInfo.get(blockId);
+    if (!block?.moduleId) return [];
+    const memberships = moduleCollectionsIndex.get(block.moduleId);
+    return memberships ? Array.from(memberships) : [];
+  }
+
+  function getBlocksDisabledByCollections(disabledCollections) {
+    const disabled = new Set();
+    disabledCollections.forEach((collectionId) => {
+      const blocksForCollection = collectionBlockIds.get(collectionId) || [];
+      blocksForCollection.forEach((blockId) => disabled.add(blockId));
+    });
+    return disabled;
+  }
 
   const moduleElements = new Map();
   const adminItems = new Map();
   const dependencyViews = new Map();
   const adminToolbarCounts = { active: null, hidden: null, pinned: null };
   const organizeFilterToggles = new Map();
+  const collectionButtons = new Map();
 
   const organizeScroll = document.createElement('div');
   organizeScroll.className = 'a11ytb-organize-scroll';
@@ -920,6 +965,108 @@ export function mountUI({ root, state }) {
   organizePointerHint.className = 'a11ytb-admin-help';
   organizePointerHint.id = 'a11ytb-organize-pointer';
   organizePointerHint.textContent = 'À la souris ou au tactile : maintenez la carte enfoncée pour la déplacer, relâchez pour déposer.';
+
+  let collectionsPanel = null;
+  let collectionsSummary = null;
+
+  if (collectionDefinitions.length) {
+    collectionsPanel = document.createElement('details');
+    collectionsPanel.className = 'a11ytb-collections-panel';
+    collectionsPanel.setAttribute('data-ref', 'collections-panel');
+    collectionsPanel.innerHTML = '';
+
+    const summary = document.createElement('summary');
+    summary.className = 'a11ytb-collections-summary';
+    summary.textContent = 'Collections de modules';
+    collectionsSummary = summary;
+    collectionsPanel.append(summary);
+
+    const intro = document.createElement('p');
+    intro.className = 'a11ytb-admin-help';
+    intro.textContent = 'Activez ou désactivez plusieurs modules en une action.';
+    collectionsPanel.append(intro);
+
+    const list = document.createElement('div');
+    list.className = 'a11ytb-collections-list';
+
+    collectionDefinitions.forEach((collection) => {
+      const card = document.createElement('article');
+      card.className = 'a11ytb-config-card a11ytb-collection-card';
+      card.dataset.collectionId = collection.id;
+
+      const title = document.createElement('h4');
+      title.className = 'a11ytb-config-title';
+      title.textContent = collection.label || collection.id;
+
+      const description = document.createElement('p');
+      description.className = 'a11ytb-config-description';
+      description.textContent = collection.description || '';
+
+      const members = document.createElement('ul');
+      members.className = 'a11ytb-collection-members';
+      const moduleLabels = (collection.modules || []).map((moduleId) => {
+        const manifest = manifestByModuleId.get(moduleId);
+        if (manifest?.name) return manifest.name;
+        const blockId = moduleToBlockIds.get(moduleId)?.[0];
+        const block = blockId ? blockInfo.get(blockId) : null;
+        return block?.title || moduleId;
+      }).filter(Boolean);
+      moduleLabels.forEach((label) => {
+        const item = document.createElement('li');
+        item.textContent = label;
+        members.append(item);
+      });
+      if (!moduleLabels.length) {
+        const emptyItem = document.createElement('li');
+        emptyItem.textContent = 'Aucun module associé';
+        members.append(emptyItem);
+      }
+
+      const controls = document.createElement('div');
+      controls.className = 'a11ytb-collection-actions';
+
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'a11ytb-button a11ytb-collection-toggle';
+      toggle.dataset.collectionId = collection.id;
+      toggle.dataset.collectionLabel = collection.label || collection.id;
+      toggle.setAttribute('aria-pressed', 'true');
+      toggle.textContent = `Désactiver ${collection.label || collection.id}`;
+
+      toggle.addEventListener('click', () => {
+        const prefs = getPreferences();
+        const disabledList = Array.isArray(prefs.collections?.disabled) ? prefs.collections.disabled : [];
+        const disabledSet = new Set(disabledList);
+        const isCurrentlyDisabled = disabledSet.has(collection.id);
+        if (isCurrentlyDisabled) {
+          disabledSet.delete(collection.id);
+        } else {
+          disabledSet.add(collection.id);
+        }
+        const next = Array.from(disabledSet);
+        if (!arraysEqual(next, disabledList)) {
+          setListIfChanged('ui.collections.disabled', next, disabledList);
+          markProfileAsCustom();
+          const actionLabel = isCurrentlyDisabled ? 'Collection activée' : 'Collection désactivée';
+          logActivity(`${actionLabel} : ${collection.label || collection.id}`, { tone: isCurrentlyDisabled ? 'confirm' : 'toggle', tags: ['organisation'] });
+          const modulesText = moduleLabels.length ? ` Modules concernés : ${moduleLabels.join(', ')}.` : '';
+          announceOrganize(`${actionLabel} : ${collection.label || collection.id}.${modulesText}`.trim());
+        }
+      });
+
+      controls.append(toggle);
+      collectionButtons.set(collection.id, toggle);
+
+      card.append(title);
+      if (collection.description) {
+        card.append(description);
+      }
+      card.append(members, controls);
+      list.append(card);
+    });
+
+    collectionsPanel.append(list);
+  }
 
   const organizeToolbar = document.createElement('div');
   organizeToolbar.className = 'a11ytb-admin-toolbar';
@@ -994,7 +1141,12 @@ export function mountUI({ root, state }) {
   organizeLive.setAttribute('role', 'status');
   organizeLive.setAttribute('aria-live', 'polite');
 
-  organizeSection.append(organizeHeader, organizeKeyboardHint, organizePointerHint, organizeToolbar, adminList);
+  const organizeChildren = [organizeHeader, organizeKeyboardHint, organizePointerHint];
+  if (collectionsPanel) {
+    organizeChildren.push(collectionsPanel);
+  }
+  organizeChildren.push(organizeToolbar, adminList);
+  organizeSection.append(...organizeChildren);
   organizeScroll.append(organizeSection);
   organizeView.append(organizeScroll, organizeLive);
   blocks.forEach(block => {
@@ -1004,7 +1156,7 @@ export function mountUI({ root, state }) {
   });
 
   const optionBindings = [];
-  const manifestsWithConfig = listModuleManifests().filter((manifest) => manifest?.config?.fields?.length);
+  const manifestsWithConfig = allManifests.filter((manifest) => manifest?.config?.fields?.length);
 
   if (manifestsWithConfig.length) {
     manifestsWithConfig.forEach((manifest) => {
@@ -1364,7 +1516,10 @@ export function mountUI({ root, state }) {
       organizeFilter: ui.organizeFilter === 'pinned' || ui.organizeFilter === 'hidden' ? ui.organizeFilter : 'all',
       view: ui.view || 'modules',
       activeProfile: ui.activeProfile || 'custom',
-      priorities: normalizePriorityObject(ui.priorities)
+      priorities: normalizePriorityObject(ui.priorities),
+      collections: {
+        disabled: Array.isArray(ui.collections?.disabled) ? [...ui.collections.disabled] : []
+      }
     };
   }
 
@@ -1942,6 +2097,8 @@ export function mountUI({ root, state }) {
     const disabledSet = new Set(prefs.disabled);
     const hiddenSet = new Set(prefs.hidden);
     const pinnedSet = new Set(prefs.pinned);
+    const disabledCollectionsSet = new Set(prefs.collections.disabled);
+    const disabledByCollection = getBlocksDisabledByCollections(disabledCollectionsSet);
     const currentFilter = prefs.organizeFilter;
     const validPriorities = {};
     Object.entries(prefs.priorities || {}).forEach(([id, priority]) => {
@@ -1975,7 +2132,15 @@ export function mountUI({ root, state }) {
       const id = item.dataset.blockId;
       if (!id) return;
       const title = item.dataset.title || id;
-      const enabled = !disabledSet.has(id);
+      const collectionMembership = getCollectionsForBlock(id);
+      if (collectionMembership.length) {
+        item.dataset.collections = collectionMembership.join(',');
+      } else {
+        delete item.dataset.collections;
+      }
+      const collectionDisabled = disabledByCollection.has(id);
+      const manualDisabled = disabledSet.has(id);
+      const enabled = !manualDisabled && !collectionDisabled;
       const hidden = hiddenSet.has(id);
       const pinned = pinnedSet.has(id);
       const showItem = currentFilter === 'all'
@@ -1993,10 +2158,14 @@ export function mountUI({ root, state }) {
         item.tabIndex = -1;
       }
       const checkbox = item.querySelector('input[type="checkbox"][data-ref="toggle"]');
-      if (checkbox && checkbox.checked !== enabled) {
-        checkbox.checked = enabled;
+      if (checkbox) {
+        if (checkbox.checked !== enabled) {
+          checkbox.checked = enabled;
+        }
+        checkbox.disabled = collectionDisabled;
       }
       item.classList.toggle('is-disabled', !enabled);
+      item.classList.toggle('is-disabled-by-collection', collectionDisabled);
       item.classList.toggle('is-hidden', hidden);
       item.classList.toggle('is-pinned', pinned);
       item.setAttribute('aria-disabled', String(!enabled));
@@ -2005,7 +2174,12 @@ export function mountUI({ root, state }) {
       const hiddenBadge = item.querySelector('[data-ref="badge-hidden"]');
       if (hiddenBadge) hiddenBadge.hidden = !hidden;
       const disabledBadge = item.querySelector('[data-ref="badge-disabled"]');
-      if (disabledBadge) disabledBadge.hidden = enabled;
+      if (disabledBadge) {
+        disabledBadge.hidden = enabled;
+        if (!enabled) {
+          disabledBadge.textContent = collectionDisabled ? 'Désactivé (collection)' : 'Désactivé';
+        }
+      }
       const statusContainer = item.querySelector('.a11ytb-admin-status');
       if (statusContainer) {
         const shouldHideStatus = !(pinned || hidden || !enabled);
@@ -2034,8 +2208,9 @@ export function mountUI({ root, state }) {
         } else {
           pinBtn.disabled = true;
           pinBtn.setAttribute('aria-disabled', 'true');
-          pinBtn.setAttribute('aria-label', `Impossible de modifier l’épingle du module ${title} tant qu’il est désactivé`);
-          pinBtn.title = 'Module désactivé : action indisponible';
+          const reason = collectionDisabled ? 'désactivé par une collection' : 'désactivé';
+          pinBtn.setAttribute('aria-label', `Impossible de modifier l’épingle du module ${title} tant qu’il est ${reason}`);
+          pinBtn.title = collectionDisabled ? 'Module désactivé via collection : action indisponible' : 'Module désactivé : action indisponible';
         }
       }
       const hideBtn = item.querySelector('[data-admin-action="hide"]');
@@ -2043,15 +2218,22 @@ export function mountUI({ root, state }) {
         const hideLabel = `${hidden ? 'Afficher' : 'Masquer'} le module ${title}`.trim();
         hideBtn.setAttribute('aria-pressed', String(hidden));
         hideBtn.classList.toggle('is-active', hidden);
-        const accessibleLabel = enabled ? hideLabel : `${hideLabel} (module désactivé)`;
+        const accessibleLabel = enabled
+          ? hideLabel
+          : `${hideLabel} (${collectionDisabled ? 'module désactivé par une collection' : 'module désactivé'})`;
         hideBtn.setAttribute('aria-label', accessibleLabel);
         hideBtn.title = accessibleLabel;
-        hideBtn.disabled = false;
-        hideBtn.removeAttribute('aria-disabled');
+        hideBtn.disabled = collectionDisabled;
+        if (collectionDisabled) {
+          hideBtn.setAttribute('aria-disabled', 'true');
+        } else {
+          hideBtn.removeAttribute('aria-disabled');
+        }
       }
     });
+    const disabledUnion = new Set([...disabledSet, ...disabledByCollection]);
     if (adminToolbarCounts.active) {
-      adminToolbarCounts.active.textContent = String(Math.max(0, blockIds.length - disabledSet.size));
+      adminToolbarCounts.active.textContent = String(Math.max(0, blockIds.length - disabledUnion.size));
     }
     if (adminToolbarCounts.hidden) {
       adminToolbarCounts.hidden.textContent = String(hiddenSet.size);
@@ -2076,17 +2258,27 @@ export function mountUI({ root, state }) {
     updateAdminPositions();
   }
 
-  function syncDependencySections(snapshot = state.get()) {
-    const runtimeModules = snapshot?.runtime?.modules || {};
-    dependencyViews.forEach((views, moduleId) => {
-      if (!Array.isArray(views) || !views.length) return;
-      const runtimeInfo = runtimeModules?.[moduleId] || state.get(`runtime.modules.${moduleId}`) || {};
-      const dependencies = Array.isArray(runtimeInfo.dependencies) ? runtimeInfo.dependencies : [];
-      views.forEach((view) => {
-        const moduleName = runtimeInfo.manifestName || view.moduleName || moduleId;
-        updateDependencyDisplay(view, dependencies, { moduleName });
-      });
+  function syncCollectionPanel() {
+    if (!collectionButtons.size) return;
+    const prefs = getPreferences();
+    const disabledSet = new Set(prefs.collections.disabled);
+    collectionButtons.forEach((button, collectionId) => {
+      const enabled = !disabledSet.has(collectionId);
+      const label = button.dataset.collectionLabel || collectionId;
+      button.setAttribute('aria-pressed', String(enabled));
+      button.classList.toggle('is-active', enabled);
+      const action = enabled ? 'Désactiver' : 'Activer';
+      const text = `${action} ${label}`.trim();
+      button.textContent = text;
+      const accessibleLabel = `${action} la collection ${label}`.trim();
+      button.setAttribute('aria-label', accessibleLabel);
+      button.title = accessibleLabel;
     });
+    if (collectionsSummary) {
+      const total = collectionButtons.size;
+      const active = total - disabledSet.size;
+      collectionsSummary.textContent = `Collections de modules (${active}/${total} actives)`;
+    }
   }
 
   function applyPresetProfile(profileId, { viaUser = false } = {}) {
@@ -2106,18 +2298,34 @@ export function mountUI({ root, state }) {
     const working = {
       disabled: new Set(prefs.disabled),
       hidden: new Set(prefs.hidden),
-      pinned: [...prefs.pinned]
+      pinned: [...prefs.pinned],
+      collectionsDisabled: new Set(prefs.collections.disabled)
     };
 
     const ensureEnabled = (ids = []) => {
       let changed = false;
+      let collectionsChanged = false;
       ids.forEach(id => {
         if (working.disabled.delete(id)) changed = true;
+        const moduleId = blockInfo.get(id)?.moduleId;
+        if (!moduleId) return;
+        const memberships = moduleCollectionsIndex.get(moduleId);
+        if (!memberships) return;
+        memberships.forEach((collectionId) => {
+          if (working.collectionsDisabled.delete(collectionId)) {
+            collectionsChanged = true;
+          }
+        });
       });
       if (changed) {
         const next = Array.from(working.disabled);
         setListIfChanged('ui.disabled', next, prefs.disabled);
         prefs.disabled = next;
+      }
+      if (collectionsChanged) {
+        const nextCollections = Array.from(working.collectionsDisabled);
+        setListIfChanged('ui.collections.disabled', nextCollections, prefs.collections.disabled);
+        prefs.collections.disabled = nextCollections;
       }
     };
 
@@ -2184,6 +2392,8 @@ export function mountUI({ root, state }) {
     const pinnedSet = new Set(prefs.pinned);
     const hiddenSet = new Set(prefs.hidden);
     const disabledSet = new Set(prefs.disabled);
+    const disabledCollectionsSet = new Set(prefs.collections.disabled);
+    const disabledByCollection = getBlocksDisabledByCollections(disabledCollectionsSet);
 
     const validPriorities = {};
     Object.entries(prefs.priorities || {}).forEach(([id, priority]) => {
@@ -2241,7 +2451,8 @@ export function mountUI({ root, state }) {
       const matchesCategory = prefs.category === 'all' || el.dataset.category === prefs.category;
       const matchesSearch = !searchTerm || keywords.includes(searchTerm);
       const isHidden = hiddenSet.has(id);
-      const isDisabled = disabledSet.has(id);
+      const isDisabledByCollection = disabledByCollection.has(id);
+      const isDisabled = disabledSet.has(id) || isDisabledByCollection;
       const shouldShow = matchesCategory && matchesSearch && (!isHidden && !isDisabled || prefs.showHidden);
       if (shouldShow) {
         el.removeAttribute('hidden');
@@ -2252,7 +2463,13 @@ export function mountUI({ root, state }) {
       }
       el.classList.toggle('is-hidden', isHidden);
       el.classList.toggle('is-disabled', isDisabled);
+      el.classList.toggle('is-disabled-by-collection', isDisabledByCollection);
       el.dataset.disabled = String(isDisabled);
+      if (isDisabledByCollection) {
+        el.dataset.disabledCollection = 'true';
+      } else {
+        delete el.dataset.disabledCollection;
+      }
       el.classList.toggle('is-pinned', pinnedSet.has(id));
       const pinBtn = el.querySelector('[data-module-action="toggle-pin"]');
       const hideBtn = el.querySelector('[data-module-action="toggle-hide"]');
@@ -2271,6 +2488,11 @@ export function mountUI({ root, state }) {
       if (overlay) {
         if (isDisabled && shouldShow) {
           overlay.hidden = false;
+          const reason = isDisabledByCollection ? 'Module désactivé par collection' : 'Module désactivé';
+          const message = overlay.querySelector('.a11ytb-module-overlay-inner span:last-child');
+          if (message) {
+            message.textContent = reason;
+          }
         } else {
           overlay.hidden = true;
         }
@@ -2927,7 +3149,7 @@ export function mountUI({ root, state }) {
   state.on((snapshot) => {
     syncFilters();
     syncAdminList();
-    syncDependencySections(snapshot);
+    syncCollectionPanel();
     applyModuleLayout();
     updateActivityLog();
     syncView();
@@ -2938,7 +3160,7 @@ export function mountUI({ root, state }) {
   const initialSnapshot = state.get();
   syncFilters();
   syncAdminList();
-  syncDependencySections(initialSnapshot);
+  syncCollectionPanel();
   applyModuleLayout();
   updateActivityLog();
   syncView();

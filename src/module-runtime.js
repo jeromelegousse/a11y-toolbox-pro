@@ -1,47 +1,23 @@
 import { getModule, listBlocks } from './registry.js';
 
-const DEPENDENCY_STATUS_LABELS = {
-  ok: 'OK',
-  missing: 'Manquant',
-  incompatible: 'Version incompatible'
-};
-
-const DEPENDENCY_STATUS_TONE = {
-  missing: 'alert',
-  incompatible: 'warning'
-};
-
-function parseSemver(version) {
-  if (typeof version !== 'string') {
-    return { major: 0, minor: 0, patch: 0, pre: null };
-  }
-  const normalized = version.trim();
-  const [main = '0.0.0', pre = null] = normalized.split('-', 2);
-  const [major = '0', minor = '0', patch = '0'] = main.split('.', 3);
-  return {
-    major: Number.parseInt(major, 10) || 0,
-    minor: Number.parseInt(minor, 10) || 0,
-    patch: Number.parseInt(patch, 10) || 0,
-    pre: pre ?? null
-  };
-}
-
-function compareSemver(a, b) {
-  const left = parseSemver(a);
-  const right = parseSemver(b);
-  if (left.major !== right.major) return left.major > right.major ? 1 : -1;
-  if (left.minor !== right.minor) return left.minor > right.minor ? 1 : -1;
-  if (left.patch !== right.patch) return left.patch > right.patch ? 1 : -1;
-  if (left.pre === right.pre) return 0;
-  if (!left.pre) return 1;
-  if (!right.pre) return -1;
-  return left.pre.localeCompare(right.pre);
-}
-
-export function setupModuleRuntime({ state, catalog }) {
+export function setupModuleRuntime({ state, catalog, collections = [] }) {
   const loaders = new Map(catalog.map((entry) => [entry.id, entry.loader]));
   const manifests = new Map(catalog.map((entry) => [entry.id, entry.manifest]));
   const moduleToBlocks = new Map();
+  const moduleToCollections = new Map();
+
+  collections.forEach((collection) => {
+    if (!collection || typeof collection !== 'object') return;
+    const { id, modules } = collection;
+    if (!id) return;
+    const members = Array.isArray(modules) ? modules.filter(Boolean) : [];
+    members.forEach((moduleId) => {
+      if (!moduleToCollections.has(moduleId)) {
+        moduleToCollections.set(moduleId, new Set());
+      }
+      moduleToCollections.get(moduleId).add(id);
+    });
+  });
   listBlocks().forEach((block) => {
     if (!block || !block.moduleId) return;
     if (!moduleToBlocks.has(block.moduleId)) {
@@ -49,6 +25,23 @@ export function setupModuleRuntime({ state, catalog }) {
     }
     moduleToBlocks.get(block.moduleId).push(block.id);
   });
+
+  function getCollectionsForModule(moduleId) {
+    const memberships = moduleToCollections.get(moduleId);
+    if (!memberships) return [];
+    return Array.from(memberships);
+  }
+
+  function isModuleCollectionEnabled(moduleId, disabledCollections) {
+    const memberships = moduleToCollections.get(moduleId);
+    if (!memberships || memberships.size === 0) return true;
+    for (const collectionId of memberships) {
+      if (disabledCollections.has(collectionId)) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   const initialized = new Set();
   const loading = new Map();
@@ -257,15 +250,19 @@ export function setupModuleRuntime({ state, catalog }) {
     return promise;
   }
 
-  function isModuleEnabled(blockIds, disabledSet) {
-    return blockIds.some((blockId) => !disabledSet.has(blockId));
+  function isModuleEnabled(blockIds, disabledSet, disabledCollections, moduleId) {
+    const enabledByBlocks = blockIds.some((blockId) => !disabledSet.has(blockId));
+    if (!enabledByBlocks) return false;
+    return isModuleCollectionEnabled(moduleId, disabledCollections);
   }
 
   let lastDisabled = new Set(state.get('ui.disabled') ?? []);
+  const initialCollections = state.get('ui.collections.disabled');
+  let lastDisabledCollections = new Set(Array.isArray(initialCollections) ? initialCollections : []);
+
   moduleToBlocks.forEach((blockIds, moduleId) => {
-    const enabled = isModuleEnabled(blockIds, lastDisabled);
-    updateModuleRuntime(moduleId, { blockIds, enabled });
-    applyModuleMetadata(moduleId);
+    const enabled = isModuleEnabled(blockIds, lastDisabled, lastDisabledCollections, moduleId);
+    updateModuleRuntime(moduleId, { blockIds, collections: getCollectionsForModule(moduleId), enabled });
     if (enabled) {
       loadModule(moduleId).catch(() => {});
     }
@@ -276,16 +273,20 @@ export function setupModuleRuntime({ state, catalog }) {
     .filter((id) => !moduleToBlocks.has(id));
 
   modulesWithoutBlocks.forEach((moduleId) => {
-    updateModuleRuntime(moduleId, { blockIds: [], enabled: true });
-    applyModuleMetadata(moduleId);
-    loadModule(moduleId).catch(() => {});
+    const enabled = isModuleCollectionEnabled(moduleId, lastDisabledCollections);
+    updateModuleRuntime(moduleId, { blockIds: [], collections: getCollectionsForModule(moduleId), enabled });
+    if (enabled) {
+      loadModule(moduleId).catch(() => {});
+    }
   });
 
   state.on((snapshot) => {
     const nextDisabled = new Set(snapshot?.ui?.disabled ?? []);
+    const nextCollectionList = snapshot?.ui?.collections?.disabled;
+    const nextDisabledCollections = new Set(Array.isArray(nextCollectionList) ? nextCollectionList : []);
     moduleToBlocks.forEach((blockIds, moduleId) => {
-      const wasEnabled = isModuleEnabled(blockIds, lastDisabled);
-      const isEnabled = isModuleEnabled(blockIds, nextDisabled);
+      const wasEnabled = isModuleEnabled(blockIds, lastDisabled, lastDisabledCollections, moduleId);
+      const isEnabled = isModuleEnabled(blockIds, nextDisabled, nextDisabledCollections, moduleId);
       if (wasEnabled !== isEnabled) {
         updateModuleRuntime(moduleId, { enabled: isEnabled });
       }
@@ -294,11 +295,17 @@ export function setupModuleRuntime({ state, catalog }) {
       }
     });
     modulesWithoutBlocks.forEach((moduleId) => {
-      if (!loading.has(moduleId) && !initialized.has(moduleId)) {
+      const wasEnabled = isModuleCollectionEnabled(moduleId, lastDisabledCollections);
+      const isEnabled = isModuleCollectionEnabled(moduleId, nextDisabledCollections);
+      if (wasEnabled !== isEnabled) {
+        updateModuleRuntime(moduleId, { enabled: isEnabled });
+      }
+      if (isEnabled && !loading.has(moduleId) && !initialized.has(moduleId)) {
         loadModule(moduleId).catch(() => {});
       }
     });
     lastDisabled = nextDisabled;
+    lastDisabledCollections = nextDisabledCollections;
   });
 
   if (!window.a11ytb) window.a11ytb = {};
