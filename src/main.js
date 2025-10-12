@@ -94,6 +94,11 @@ const baseInitial = {
     priorities: {},
     showHidden: false,
     organizeFilter: 'all',
+    availableModules: {
+      profile: 'all',
+      collection: 'all',
+      compatibility: 'all'
+    },
     activity: [],
     view: 'modules',
     lastProfile: null,
@@ -207,6 +212,7 @@ const ensureDefaults = [
   ['ui.priorities', initial.ui.priorities],
   ['ui.showHidden', initial.ui.showHidden],
   ['ui.organizeFilter', initial.ui.organizeFilter],
+  ['ui.availableModules', initial.ui.availableModules],
   ['ui.activity', initial.ui.activity],
   ['ui.view', initial.ui.view],
   ['ui.lastProfile', initial.ui.lastProfile],
