@@ -1,3 +1,5 @@
+import { formatTimestamp, summarizeReport } from './modules/audit-report.js';
+
 const STATUS_TONE_DEFAULT = 'info';
 const STATUS_TONE_ACTIVE = 'active';
 const STATUS_TONE_ALERT = 'alert';
@@ -16,129 +18,96 @@ function getRuntimeInfo(snapshot, moduleId) {
   return snapshot?.runtime?.modules?.[moduleId] ?? {};
 }
 
-function getLatencyFromMetrics(metrics = {}) {
-  if (!metrics) return null;
-  const combined = metrics.timings?.combinedAverage;
-  if (isFiniteNumber(combined)) return combined;
-  const loadAverage = metrics.timings?.load?.average;
-  const initAverage = metrics.timings?.init?.average;
-  if (isFiniteNumber(loadAverage) || isFiniteNumber(initAverage)) {
-    return (loadAverage ?? 0) + (initAverage ?? 0);
+function toneToStatusTone(tone) {
+  switch ((tone || '').toLowerCase()) {
+    case 'alert':
+      return STATUS_TONE_ALERT;
+    case 'warning':
+      return STATUS_TONE_WARNING;
+    case 'confirm':
+      return STATUS_TONE_ACTIVE;
+    default:
+      return STATUS_TONE_DEFAULT;
   }
-  return null;
 }
 
-function formatLatency(value) {
-  if (!isFiniteNumber(value)) return 'Non mesuré';
-  if (value < 1) return '< 1 ms';
-  return `${Math.round(value)} ms`;
-}
-
-function pluralize(count, singular, plural) {
-  return `${count} ${count > 1 ? plural : singular}`;
-}
-
-export function getModuleCompatibilityScore(runtimeEntry = {}) {
-  const compatScore = runtimeEntry?.metrics?.compat?.score;
-  if (compatScore === 'AA' || compatScore === 'AAA') {
-    return compatScore;
-  }
-  const missingFeatures = runtimeEntry?.metrics?.compat?.missing?.features ?? [];
-  const missingBrowsers = runtimeEntry?.metrics?.compat?.missing?.browsers ?? [];
-  return missingFeatures.length || missingBrowsers.length ? 'AA' : 'AAA';
-}
-
-export function computeModuleMetrics(runtimeEntry = {}, { label } = {}) {
-  const metrics = runtimeEntry?.metrics ?? {};
-  const latencyValue = getLatencyFromMetrics(metrics);
-  const latencyLabel = formatLatency(latencyValue);
-  const compat = metrics.compat ?? {};
-  const missingFeatures = Array.isArray(compat.missing?.features) ? compat.missing.features : [];
-  const missingBrowsers = Array.isArray(compat.missing?.browsers) ? compat.missing.browsers : [];
-  const unknownFeatures = Array.isArray(compat.unknown?.features) ? compat.unknown.features : [];
-  const unknownBrowsers = Array.isArray(compat.unknown?.browsers) ? compat.unknown.browsers : [];
-  const hasCompatDeclaration = Boolean(
-    (compat.required?.features && compat.required.features.length) ||
-    (compat.required?.browsers && compat.required.browsers.length) ||
-    missingFeatures.length ||
-    missingBrowsers.length ||
-    unknownFeatures.length ||
-    unknownBrowsers.length
-  );
-
-  const compatMissing = [...missingFeatures, ...missingBrowsers];
-  const compatUnknown = [...unknownFeatures, ...unknownBrowsers];
-
-  let compatLabel = 'Pré-requis non déclarés';
-  if (compatMissing.length) {
-    compatLabel = `Pré-requis manquants : ${compatMissing.join(', ')}`;
-  } else if (compatUnknown.length) {
-    compatLabel = `Pré-requis à vérifier : ${compatUnknown.join(', ')}`;
-  } else if (hasCompatDeclaration) {
-    compatLabel = 'Pré-requis satisfaits';
-  }
-
-  const attempts = metrics.attempts ?? 0;
-  const successes = metrics.successes ?? 0;
-  const retryCount = metrics.retryCount ?? Math.max(0, attempts - successes);
-  const failures = metrics.failures ?? 0;
-
-  const compatScore = getModuleCompatibilityScore(runtimeEntry);
-  let riskLevel = 'AAA';
-  if (
-    compatScore !== 'AAA' ||
-    compatMissing.length ||
-    failures > 0 ||
-    retryCount > 0 ||
-    runtimeEntry?.state === 'error' ||
-    (isFiniteNumber(latencyValue) && latencyValue > 800)
-  ) {
-    riskLevel = 'AA';
-  }
-
-  const riskDescription =
-    riskLevel === 'AAA'
-      ? 'Indice de risque AAA — fonctionnement optimal.'
-      : 'Indice de risque AA — surveillance recommandée.';
-
-  const announcementParts = [];
-  if (label) {
-    announcementParts.push(`${label} :`);
-  }
-  announcementParts.push(`indice ${riskLevel}`);
-  announcementParts.push(latencyLabel === 'Non mesuré' ? 'latence non mesurée' : `latence ${latencyLabel}`);
-  if (compatMissing.length) {
-    announcementParts.push(`pré-requis manquants ${compatMissing.join(', ')}`);
-  } else if (compatUnknown.length) {
-    announcementParts.push(`pré-requis à contrôler ${compatUnknown.join(', ')}`);
-  } else if (hasCompatDeclaration) {
-    announcementParts.push('pré-requis satisfaits');
-  }
-  if (failures > 0) {
-    announcementParts.push(`${pluralize(failures, 'échec', 'échecs')} lors du chargement`);
-  }
-  if (retryCount > 0) {
-    announcementParts.push(`${pluralize(retryCount, 'réessai', 'réessais')} enregistrés`);
-  }
-  const announcement = `${announcementParts.join(', ')}.`;
-
-  return {
-    averageLatency: latencyValue,
-    latencyLabel,
-    compatLabel,
-    compatMissing,
-    compatUnknown,
-    compatScore,
-    riskLevel,
-    riskDescription,
-    failures,
-    retryCount,
-    announcement
+function buildAuditSummary(snapshot = {}) {
+  const audit = snapshot.audit ?? {};
+  const runtime = getRuntimeInfo(snapshot, 'audit');
+  const enabled = runtime.enabled ?? true;
+  const moduleState = runtime.state ?? 'idle';
+  const summary = {
+    id: 'audit',
+    label: 'Audit accessibilité',
+    badge: '',
+    value: '',
+    detail: '',
+    tone: STATUS_TONE_DEFAULT,
+    live: 'polite'
   };
-}
 
-function finalizeSummary(summary, runtime) {
-  summary.insights = computeModuleMetrics(runtime, { label: summary.label });
+  if (!enabled) {
+    summary.badge = 'Module désactivé';
+    summary.value = 'Audit désactivé';
+    summary.detail = 'Réactivez la carte « Audit accessibilité » pour lancer une analyse.';
+    summary.tone = STATUS_TONE_MUTED;
+    return summary;
+  }
+
+  if (moduleState === 'loading') {
+    summary.badge = 'Chargement…';
+    summary.value = 'Initialisation de l’audit';
+    summary.detail = 'Le module d’audit charge axe-core.';
+    summary.tone = STATUS_TONE_DEFAULT;
+    return summary;
+  }
+
+  if (moduleState === 'error') {
+    summary.badge = 'Erreur de chargement';
+    summary.value = 'Module indisponible';
+    summary.detail = runtime.error || 'Impossible de charger le module d’audit.';
+    summary.tone = STATUS_TONE_ALERT;
+    return summary;
+  }
+
+  if (audit.status === 'running') {
+    summary.badge = 'Analyse en cours';
+    summary.value = 'Inspection de la page';
+    summary.detail = 'axe-core parcourt le DOM pour détecter les violations.';
+    summary.tone = STATUS_TONE_ACTIVE;
+    summary.live = 'assertive';
+    return summary;
+  }
+
+  if (audit.status === 'error') {
+    summary.badge = 'Échec de l’audit';
+    summary.value = 'Analyse interrompue';
+    summary.detail = audit.error || 'Une erreur est survenue pendant l’analyse axe-core.';
+    summary.tone = STATUS_TONE_WARNING;
+    return summary;
+  }
+
+  if (!audit.lastReport) {
+    summary.badge = 'Audit prêt';
+    summary.value = 'En attente';
+    summary.detail = 'Lancez une analyse depuis la carte Audit pour obtenir un rapport détaillé.';
+    summary.tone = STATUS_TONE_DEFAULT;
+    return summary;
+  }
+
+  const reportSummary = audit.summary && audit.summary.totals
+    ? audit.summary
+    : summarizeReport(audit.lastReport);
+  const timestamp = formatTimestamp(audit.lastRun);
+  summary.badge = 'Dernier audit';
+  summary.value = reportSummary.headline || 'Audit réalisé';
+  const detailParts = [];
+  if (timestamp) detailParts.push(`Le ${timestamp}`);
+  if (reportSummary.detail) detailParts.push(reportSummary.detail);
+  detailParts.push('Export disponible dans le journal d’activité.');
+  summary.detail = detailParts.join(' · ');
+  summary.tone = toneToStatusTone(reportSummary.tone);
+
   return summary;
 }
 
@@ -451,6 +420,7 @@ function buildSpacingSummary(snapshot = {}) {
 
 export function summarizeStatuses(snapshot = {}) {
   return [
+    buildAuditSummary(snapshot),
     buildTtsSummary(snapshot),
     buildSttSummary(snapshot),
     buildBrailleSummary(snapshot),

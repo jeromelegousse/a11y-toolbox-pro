@@ -1,4 +1,5 @@
 import { manifest as audioFeedbackManifest } from './modules/audio-feedback.manifest.js';
+import { manifest as auditManifest } from './modules/audit.manifest.js';
 import { manifest as ttsManifest } from './modules/tts.manifest.js';
 import { manifest as sttManifest } from './modules/stt.manifest.js';
 import { manifest as brailleManifest } from './modules/braille.manifest.js';
@@ -6,6 +7,11 @@ import { manifest as contrastManifest } from './modules/contrast.manifest.js';
 import { manifest as spacingManifest } from './modules/spacing.manifest.js';
 
 export const moduleCatalog = [
+  {
+    id: auditManifest.id,
+    manifest: auditManifest,
+    loader: () => import('./modules/audit.js')
+  },
   {
     id: audioFeedbackManifest.id,
     manifest: audioFeedbackManifest,
