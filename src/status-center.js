@@ -6,6 +6,10 @@ const STATUS_TONE_ALERT = 'alert';
 const STATUS_TONE_WARNING = 'warning';
 const STATUS_TONE_MUTED = 'muted';
 
+function isFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
 function isEmpty(value) {
   return value === null || value === undefined || value === '';
 }
@@ -127,14 +131,14 @@ function buildTtsSummary(snapshot = {}) {
     summary.value = 'Synthèse désactivée';
     summary.detail = 'Réactivez la carte « Lecture vocale » depuis l’onglet Organisation.';
     summary.tone = STATUS_TONE_MUTED;
-    return summary;
+    return finalizeSummary(summary, runtime);
   }
 
   if (moduleState === 'loading') {
     summary.badge = 'Chargement…';
     summary.value = 'Initialisation du module';
     summary.detail = 'Le module de synthèse vocale se charge.';
-    return summary;
+    return finalizeSummary(summary, runtime);
   }
 
   if (moduleState === 'error') {
@@ -142,7 +146,7 @@ function buildTtsSummary(snapshot = {}) {
     summary.value = 'Module indisponible';
     summary.detail = runtime.error || 'Impossible de charger la synthèse vocale.';
     summary.tone = STATUS_TONE_ALERT;
-    return summary;
+    return finalizeSummary(summary, runtime);
   }
 
   summary.badge = 'Module prêt';
@@ -177,7 +181,7 @@ function buildTtsSummary(snapshot = {}) {
     }
   }
 
-  return summary;
+  return finalizeSummary(summary, runtime);
 }
 
 function buildSttSummary(snapshot = {}) {
@@ -200,14 +204,14 @@ function buildSttSummary(snapshot = {}) {
     summary.value = 'Dictée désactivée';
     summary.detail = 'Rendez-vous dans Organisation pour réactiver la carte « Dictée vocale ».';
     summary.tone = STATUS_TONE_MUTED;
-    return summary;
+    return finalizeSummary(summary, runtime);
   }
 
   if (moduleState === 'loading') {
     summary.badge = 'Chargement…';
     summary.value = 'Initialisation de la dictée';
     summary.detail = 'Le module de dictée vocale se charge.';
-    return summary;
+    return finalizeSummary(summary, runtime);
   }
 
   if (moduleState === 'error') {
@@ -215,7 +219,7 @@ function buildSttSummary(snapshot = {}) {
     summary.value = 'Module indisponible';
     summary.detail = runtime.error || 'Impossible de charger la dictée vocale.';
     summary.tone = STATUS_TONE_ALERT;
-    return summary;
+    return finalizeSummary(summary, runtime);
   }
 
   summary.badge = 'Module prêt';
@@ -244,7 +248,7 @@ function buildSttSummary(snapshot = {}) {
       break;
   }
 
-  return summary;
+  return finalizeSummary(summary, runtime);
 }
 
 function buildBrailleSummary(snapshot = {}) {
@@ -267,14 +271,14 @@ function buildBrailleSummary(snapshot = {}) {
     summary.value = 'Transcription désactivée';
     summary.detail = 'Réactivez la carte « Braille » pour convertir le texte sélectionné.';
     summary.tone = STATUS_TONE_MUTED;
-    return summary;
+    return finalizeSummary(summary, runtime);
   }
 
   if (moduleState === 'loading') {
     summary.badge = 'Chargement…';
     summary.value = 'Initialisation du braille';
     summary.detail = 'Le module braille se charge.';
-    return summary;
+    return finalizeSummary(summary, runtime);
   }
 
   if (moduleState === 'error') {
@@ -282,7 +286,7 @@ function buildBrailleSummary(snapshot = {}) {
     summary.value = 'Module indisponible';
     summary.detail = runtime.error || 'Impossible de charger le module braille.';
     summary.tone = STATUS_TONE_ALERT;
-    return summary;
+    return finalizeSummary(summary, runtime);
   }
 
   summary.badge = 'Module prêt';
@@ -297,7 +301,7 @@ function buildBrailleSummary(snapshot = {}) {
     summary.detail = 'Aucune transcription active pour le moment.';
   }
 
-  return summary;
+  return finalizeSummary(summary, runtime);
 }
 
 function buildContrastSummary(snapshot = {}) {
@@ -320,14 +324,14 @@ function buildContrastSummary(snapshot = {}) {
     summary.value = 'Contraste désactivé';
     summary.detail = 'Activez la carte « Contraste élevé » pour appliquer le thème renforcé.';
     summary.tone = STATUS_TONE_MUTED;
-    return summary;
+    return finalizeSummary(summary, runtime);
   }
 
   if (moduleState === 'loading') {
     summary.badge = 'Chargement…';
     summary.value = 'Initialisation du thème';
     summary.detail = 'Le module de contraste se charge.';
-    return summary;
+    return finalizeSummary(summary, runtime);
   }
 
   if (moduleState === 'error') {
@@ -335,7 +339,7 @@ function buildContrastSummary(snapshot = {}) {
     summary.value = 'Contraste indisponible';
     summary.detail = runtime.error || 'Impossible de charger le module de contraste.';
     summary.tone = STATUS_TONE_ALERT;
-    return summary;
+    return finalizeSummary(summary, runtime);
   }
 
   const isActive = contrast.enabled === true;
@@ -349,7 +353,7 @@ function buildContrastSummary(snapshot = {}) {
     summary.live = 'assertive';
   }
 
-  return summary;
+  return finalizeSummary(summary, runtime);
 }
 
 function buildSpacingSummary(snapshot = {}) {
@@ -372,14 +376,14 @@ function buildSpacingSummary(snapshot = {}) {
     summary.value = 'Espacements désactivés';
     summary.detail = 'Réactivez la carte « Espacements » pour ajuster interlignage et lettres.';
     summary.tone = STATUS_TONE_MUTED;
-    return summary;
+    return finalizeSummary(summary, runtime);
   }
 
   if (moduleState === 'loading') {
     summary.badge = 'Chargement…';
     summary.value = 'Initialisation des espacements';
     summary.detail = 'Le module d’espacements se charge.';
-    return summary;
+    return finalizeSummary(summary, runtime);
   }
 
   if (moduleState === 'error') {
@@ -387,7 +391,7 @@ function buildSpacingSummary(snapshot = {}) {
     summary.value = 'Espacements indisponibles';
     summary.detail = runtime.error || 'Impossible de charger le module d’espacements.';
     summary.tone = STATUS_TONE_ALERT;
-    return summary;
+    return finalizeSummary(summary, runtime);
   }
 
   const lineHeight = Number(spacing.lineHeight ?? 1.5);
@@ -411,7 +415,7 @@ function buildSpacingSummary(snapshot = {}) {
     summary.detail = 'Utilise les valeurs par défaut, prêtes à personnaliser.';
   }
 
-  return summary;
+  return finalizeSummary(summary, runtime);
 }
 
 export function summarizeStatuses(snapshot = {}) {

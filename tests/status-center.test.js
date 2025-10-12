@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeStatuses } from '../src/status-center.js';
+import { summarizeStatuses, computeModuleMetrics, getModuleCompatibilityScore } from '../src/status-center.js';
 
 describe('summarizeStatuses', () => {
   it('retourne un état prêt par défaut pour les modules critiques', () => {
@@ -45,10 +45,13 @@ describe('summarizeStatuses', () => {
     const ttsSummary = statuses.find((status) => status.id === 'tts');
     expect(ttsSummary.value).toBe('En veille');
     expect(ttsSummary.detail).toContain('Voix active');
+    expect(ttsSummary.insights.latencyLabel).toBe('Non mesuré');
+    expect(ttsSummary.insights.riskLevel).toBe('AAA');
 
     const sttSummary = statuses.find((status) => status.id === 'stt');
     expect(sttSummary.value).toBe('En veille');
     expect(sttSummary.tone).toBe('info');
+    expect(sttSummary.insights.compatLabel).toBe('Pré-requis non déclarés');
 
     const brailleSummary = statuses.find((status) => status.id === 'braille');
     expect(brailleSummary.value).toBe('En veille');
@@ -61,6 +64,7 @@ describe('summarizeStatuses', () => {
     const spacingSummary = statuses.find((status) => status.id === 'spacing');
     expect(spacingSummary.value).toBe('Réglages standards');
     expect(spacingSummary.detail).toContain('valeurs par défaut');
+    expect(spacingSummary.insights.riskLevel).toBe('AAA');
   });
 
   it('signale les erreurs de chargement et les modules désactivés', () => {
@@ -117,6 +121,7 @@ describe('summarizeStatuses', () => {
     expect(spacingSummary.tone).toBe('alert');
     expect(spacingSummary.value).toBe('Espacements indisponibles');
     expect(spacingSummary.detail).toContain('Espacement indisponible');
+    expect(spacingSummary.insights.riskLevel).toBe('AA');
   });
 
   it('priorise les états actifs pour lecture, dictée et braille', () => {
@@ -189,5 +194,36 @@ describe('summarizeStatuses', () => {
     expect(spacingSummary.tone).toBe('active');
     expect(spacingSummary.value).toBe('Espacements ajustés');
     expect(spacingSummary.detail).toContain('Interlignage 1.9×');
+    expect(spacingSummary.insights.latencyLabel).toBe('Non mesuré');
+  });
+
+  it('met en avant les métriques de compatibilité et de risque', () => {
+    const runtimeEntry = {
+      metrics: {
+        attempts: 2,
+        successes: 1,
+        failures: 1,
+        retryCount: 1,
+        timings: {
+          load: { last: 150, average: 120, samples: 1 },
+          init: { last: null, average: null, samples: 0 },
+          combinedAverage: 120
+        },
+        compat: {
+          required: { features: ['SpeechRecognition'], browsers: [] },
+          missing: { features: ['SpeechRecognition'], browsers: [] },
+          unknown: { features: [], browsers: [] },
+          status: 'partial',
+          score: 'AA'
+        }
+      }
+    };
+
+    const metrics = computeModuleMetrics(runtimeEntry, { label: 'Reconnaissance vocale' });
+    expect(metrics.latencyLabel).toBe('120 ms');
+    expect(metrics.compatLabel).toContain('Pré-requis manquants');
+    expect(metrics.riskLevel).toBe('AA');
+    expect(metrics.announcement).toContain('indice AA');
+    expect(getModuleCompatibilityScore(runtimeEntry)).toBe('AA');
   });
 });

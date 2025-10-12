@@ -24,7 +24,7 @@ objet `manifest` passé à `registerModule`. Les objectifs :
 | `defaults.state` | `object` | Valeurs initiales fusionnées dans le store (non destructives). |
 | `lifecycle` | `object` | Hooks optionnels (`init`, `mount`, `unmount`, `onStateChange`) prêts pour une future exploitation. |
 | `config` | `object` | Schéma libre pour décrire les options exposées au panneau global. |
-| `compat` | `object` | Contrainte de compatibilité (`browsers`, `features`). |
+| `compat` | `object` | Contrainte de compatibilité (`browsers`, `features`). Les valeurs sont agrégées dans `runtime.modules.<id>.metrics.compat` pour calculer un score global (AA/AAA). |
 
 Les champs inconnus sont ignorés avec un avertissement console pour éviter les fautes de frappe.
 
@@ -47,3 +47,21 @@ Les champs inconnus sont ignorés avec un avertissement console pour éviter les
 - `window.a11ytb.registry` expose ces méthodes pour un accès runtime (ex. depuis un module externe ou une console de debug).
 
 Ces conventions préparent l’introduction d’un fichier `module.json` par module tout en sécurisant l’intégration multi-équipe.
+
+## Métriques runtime dérivées
+
+Lors du chargement, `module-runtime.js` renseigne `runtime.modules.<id>.metrics` afin de suivre l’état opérationnel de chaque module.
+
+### Indicateurs suivis
+
+- `attempts`, `successes`, `failures`, `retryCount` : compteurs de tentatives, succès, échecs et réessais.
+- `lastError`, `lastAttemptAt` : dernier message d’erreur et horodatage de la tentative.
+- `timings.load` / `timings.init` : dernières durées mesurées (ms), moyenne et nombre d’échantillons.
+- `timings.combinedAverage` : latence moyenne cumulée (chargement + initialisation).
+- `compat.required` : prérequis déclarés dans le manifest (`browsers`, `features`).
+- `compat.missing` : prérequis non satisfaits détectés côté client.
+- `compat.unknown` : prérequis à vérifier manuellement (non détectables automatiquement).
+- `compat.score` : score synthétique (AAA si tout est conforme, AA si des manques sont détectés).
+- `compat.status` et `compat.checkedAt` : statut d’évaluation et horodatage du dernier contrôle.
+
+Les fonctionnalités reconnues par défaut pour `compat.features` sont `SpeechRecognition`, `SpeechSynthesis` et `AudioContext`. Toute autre valeur est marquée comme « à vérifier » afin d’éviter les faux positifs.
