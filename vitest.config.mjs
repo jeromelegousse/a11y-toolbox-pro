@@ -3,6 +3,7 @@ import { defineConfig, configDefaults } from 'vitest/config';
 export default defineConfig({
   test: {
     exclude: [...configDefaults.exclude, 'tests/visual/**'],
-    environment: 'jsdom'
+    environment: 'jsdom',
+    setupFiles: ['tests/setup/vitest-polyfills.js']
   }
 });
