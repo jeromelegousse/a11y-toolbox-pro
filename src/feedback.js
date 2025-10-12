@@ -78,79 +78,164 @@ const THEMES = {
   }
 };
 
-function clampVolume(value) {
-  if (typeof value !== 'number' || Number.isNaN(value)) return 1;
-  return Math.min(1, Math.max(0, value));
+function normalizeKey(value) {
+  if (typeof value !== 'string') return null;
+  const key = value.trim().toLowerCase();
+  return key ? key : null;
+}
+
+function resolveThemeKey(themeName) {
+  const key = normalizeKey(themeName);
+  return key && THEMES[key] ? key : 'classic';
+}
+
+function clampVolume(value, fallback = 1) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(1, Math.max(0, numeric));
+}
+
+function buildPresets(themeName) {
+  const resolvedThemeKey = resolveThemeKey(themeName);
+  const theme = THEMES[resolvedThemeKey];
+  const fallbackTheme = THEMES.classic;
+  const events = new Set([
+    ...Object.keys(EVENT_FAMILIES),
+    ...Object.keys(theme)
+  ]);
+  const presets = {};
+  events.forEach((eventName) => {
+    const normalizedEvent = normalizeKey(eventName);
+    if (!normalizedEvent) return;
+    const family = EVENT_FAMILIES[normalizedEvent] || normalizedEvent;
+    const basePreset =
+      theme[normalizedEvent] ||
+      theme[eventName] ||
+      theme[family] ||
+      fallbackTheme[normalizedEvent] ||
+      fallbackTheme[family];
+    if (basePreset) {
+      presets[normalizedEvent] = { ...basePreset };
+    }
+  });
+  return { presets, themeKey: resolvedThemeKey };
+}
+
+function createDefaultEventTable(presets) {
+  return Object.fromEntries(
+    Object.keys(presets).map((eventName) => {
+      const enabled = DEFAULT_EVENTS[eventName];
+      return [eventName, { enabled: enabled !== undefined ? enabled : true, preset: null }];
+    })
+  );
 }
 
 export function createFeedback(options = {}) {
   const player = makeTonePlayer();
-  const presets = {
-    confirm: { frequency: 880, duration: 0.12, type: 'triangle' },
-    toggle: { frequency: 540, duration: 0.1, type: 'sine' },
-    success: { frequency: 760, duration: 0.16, type: 'triangle' },
-    info: { frequency: 520, duration: 0.14, type: 'sine' },
-    warning: { frequency: 420, duration: 0.2, type: 'sawtooth', volume: 0.16 },
-    alert: { frequency: 320, duration: 0.22, type: 'square', volume: 0.18 }
-  };
+  const initialTheme = buildPresets(options.theme);
+  let currentThemeKey = initialTheme.themeKey;
+  let presets = initialTheme.presets;
 
-  let masterVolume = 1;
-  let eventTable = {};
+  let masterVolume = clampVolume(options.volume, 1);
+  let eventTable = createDefaultEventTable(presets);
 
-  function clampVolume(value, fallback = 0.15) {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) return fallback;
-    return Math.min(1, Math.max(0, numeric));
+  function getPreset(presetName) {
+    const normalized = normalizeKey(presetName);
+    if (!normalized) return presets.confirm;
+    return (
+      presets[normalized] ||
+      presets[EVENT_FAMILIES[normalized]] ||
+      presets.confirm
+    );
   }
 
-  function normalizePresetName(name) {
-    if (typeof name !== 'string') return null;
-    const key = name.trim();
-    return key ? key : null;
+  function shouldPlayEvent(eventName) {
+    const normalized = normalizeKey(eventName) || 'confirm';
+    const entry = eventTable[normalized];
+    if (!entry) return true;
+    return entry.enabled !== false;
+  }
+
+  function resolveEventPreset(eventName) {
+    const normalized = normalizeKey(eventName) || 'confirm';
+    const entry = eventTable[normalized];
+    const presetKey = entry && entry.preset ? entry.preset : normalized;
+    return getPreset(presetKey);
   }
 
   function play(name = 'confirm') {
-    const preset = typeof name === 'object' ? name : presets[name] || presets.confirm;
-    if (player.enabled) {
-      const base = preset || presets.confirm;
-      const options = { ...base };
-      const baseVolume = base && typeof base.volume === 'number' ? base.volume : 0.15;
-      options.volume = clampVolume(baseVolume * masterVolume, baseVolume);
-      player.play(options);
-    }
+    if (!player.enabled) return;
+    const presetOptions =
+      typeof name === 'object' && name
+        ? name
+        : shouldPlayEvent(name)
+          ? resolveEventPreset(name)
+          : null;
+    if (!presetOptions) return;
+    const optionsToUse = { ...presetOptions };
+    const baseVolume =
+      typeof presetOptions.volume === 'number'
+        ? presetOptions.volume
+        : 0.15;
+    optionsToUse.volume = clampVolume(baseVolume * masterVolume, baseVolume);
+    player.play(optionsToUse);
   }
 
-  function configure(options = {}) {
-    if (!options || typeof options !== 'object') return;
+  function configure(config = {}) {
+    if (!config || typeof config !== 'object') return;
 
-    if (options.volume !== undefined) {
-      const nextVolume = Number(options.volume);
+    if (config.theme) {
+      const { presets: nextPresets, themeKey: nextThemeKey } = buildPresets(config.theme);
+      if (Object.keys(nextPresets).length > 0) {
+        currentThemeKey = nextThemeKey;
+        presets = nextPresets;
+        eventTable = {
+          ...createDefaultEventTable(presets),
+          ...eventTable
+        };
+      }
+    }
+
+    if (config.volume !== undefined) {
+      const nextVolume = Number(config.volume);
       if (Number.isFinite(nextVolume)) {
         masterVolume = clampVolume(nextVolume, masterVolume);
       }
     }
 
-    if (options.events && typeof options.events === 'object') {
-      const normalized = {};
-      Object.entries(options.events).forEach(([severity, entry]) => {
+    if (config.events && typeof config.events === 'object') {
+      const nextTable = { ...eventTable };
+      Object.entries(config.events).forEach(([severity, entry]) => {
         if (!entry || typeof entry !== 'object') return;
-        const presetName = normalizePresetName(entry.preset) || normalizePresetName(entry.sound) || null;
-        const enabled = entry.enabled !== undefined ? !!entry.enabled : true;
-        normalized[severity] = {
-          enabled,
-          preset: presetName
+        const normalizedSeverity = normalizeKey(severity);
+        if (!normalizedSeverity) return;
+        const presetName = normalizeKey(entry.preset) || normalizeKey(entry.sound);
+        const previous = nextTable[normalizedSeverity] || { enabled: true, preset: null };
+        nextTable[normalizedSeverity] = {
+          enabled: entry.enabled !== undefined ? !!entry.enabled : previous.enabled,
+          preset: presetName || previous.preset
         };
       });
-      eventTable = normalized;
+      eventTable = nextTable;
     }
   }
 
   function getConfig() {
     return {
       volume: masterVolume,
-      events: structuredClone(eventTable)
+      events: structuredClone(eventTable),
+      theme: currentThemeKey
     };
   }
 
-  return { play, configure, getConfig, presets: Object.freeze({ ...presets }) };
+  configure(options);
+
+  return {
+    play,
+    configure,
+    getConfig,
+    get presets() {
+      return Object.freeze({ ...presets });
+    }
+  };
 }
