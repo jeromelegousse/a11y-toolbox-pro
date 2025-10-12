@@ -1239,6 +1239,247 @@ body {
   min-height: 0;
 }
 
+.a11ytb-available-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.a11ytb-available-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 160px;
+}
+
+.a11ytb-available-filter-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--a11ytb-fg) 60%, transparent);
+}
+
+.a11ytb-available-filter-select {
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--a11ytb-border) 78%, transparent);
+  background: color-mix(in srgb, var(--a11ytb-surface) 92%, transparent);
+  color: var(--a11ytb-fg);
+  font-size: 13px;
+  padding: 6px 12px;
+  min-height: 36px;
+}
+
+.a11ytb-available-filter-select:focus-visible {
+  outline: var(--a11ytb-focus-ring-tight);
+  outline-offset: 2px;
+}
+
+.a11ytb-available-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.a11ytb-available-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--a11ytb-border) 78%, transparent);
+  background: var(--a11ytb-surface-elevated);
+  box-shadow: var(--a11ytb-shadow-subtle);
+}
+
+.a11ytb-available-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.a11ytb-available-card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--a11ytb-fg);
+}
+
+.a11ytb-available-card-version {
+  font-size: 12px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--a11ytb-fg) 65%, transparent);
+}
+
+.a11ytb-available-card-description {
+  margin: 0;
+  font-size: 13px;
+  color: color-mix(in srgb, var(--a11ytb-fg) 75%, transparent);
+  line-height: 1.5;
+}
+
+.a11ytb-module-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--a11ytb-fg) 12%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-fg) 82%, transparent);
+}
+
+.a11ytb-module-badge--category {
+  background: color-mix(in srgb, var(--a11ytb-accent) 18%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-accent-strong) 85%, white 15%);
+}
+
+.a11ytb-module-badge--active {
+  background: color-mix(in srgb, var(--a11ytb-success) 30%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-success) 90%, white 10%);
+}
+
+.a11ytb-module-badge--required {
+  background: color-mix(in srgb, var(--a11ytb-warning) 28%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-warning) 90%, white 10%);
+}
+
+.a11ytb-module-badge--conflict {
+  background: color-mix(in srgb, var(--a11ytb-danger) 30%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-danger) 90%, white 10%);
+}
+
+.a11ytb-module-badge--compat-full {
+  background: color-mix(in srgb, var(--a11ytb-success) 24%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-success) 85%, white 15%);
+}
+
+.a11ytb-module-badge--compat-partial {
+  background: color-mix(in srgb, var(--a11ytb-warning) 26%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-warning) 88%, white 12%);
+}
+
+.a11ytb-module-badge--compat-unknown {
+  background: color-mix(in srgb, var(--a11ytb-accent) 18%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-accent-strong) 85%, white 15%);
+}
+
+.a11ytb-module-badge--compat-none {
+  background: color-mix(in srgb, var(--a11ytb-fg) 10%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-fg) 75%, transparent);
+}
+
+.a11ytb-module-badge--dependency-ok {
+  background: color-mix(in srgb, var(--a11ytb-success) 22%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-success) 82%, white 18%);
+}
+
+.a11ytb-module-badge--dependency-missing {
+  background: color-mix(in srgb, var(--a11ytb-danger) 32%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-danger) 90%, white 10%);
+}
+
+.a11ytb-module-badge--dependency-incompatible {
+  background: color-mix(in srgb, var(--a11ytb-warning) 30%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-warning) 88%, white 12%);
+}
+
+.a11ytb-available-card-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.a11ytb-available-subtitle {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--a11ytb-fg) 60%, transparent);
+}
+
+.a11ytb-available-deps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.a11ytb-available-dep {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--a11ytb-border) 78%, transparent);
+  background: color-mix(in srgb, var(--a11ytb-surface) 94%, transparent);
+}
+
+.a11ytb-available-dep-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.a11ytb-available-dep-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: color-mix(in srgb, var(--a11ytb-fg) 85%, transparent);
+}
+
+.a11ytb-available-dep-detail {
+  margin: 0;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--a11ytb-fg) 70%, transparent);
+  line-height: 1.4;
+}
+
+.a11ytb-available-compat-note {
+  margin: 0;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--a11ytb-fg) 68%, transparent);
+  line-height: 1.4;
+}
+
+.a11ytb-available-references {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.a11ytb-available-reference-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.a11ytb-available-reference-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--a11ytb-fg) 60%, transparent);
+}
+
+.a11ytb-available-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--a11ytb-accent) 20%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-accent-strong) 88%, white 12%);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .a11ytb-admin-help {
   margin: 0;
   font-size: 12px;
