@@ -1358,6 +1358,41 @@ export function mountUI({ root, state }) {
     return tag;
   }
 
+  function getCompatSection(section) {
+    if (!section || typeof section !== 'object') {
+      return { features: [], browsers: [] };
+    }
+    const features = Array.isArray(section.features) ? section.features.filter(Boolean) : [];
+    const browsers = Array.isArray(section.browsers) ? section.browsers.filter(Boolean) : [];
+    return { features, browsers };
+  }
+
+  function deriveCompatStatus(compat) {
+    if (compat && typeof compat === 'object') {
+      const normalizedStatus = typeof compat.status === 'string' ? compat.status.trim().toLowerCase() : '';
+      if (normalizedStatus && COMPAT_STATUS_LABELS[normalizedStatus]) {
+        return normalizedStatus;
+      }
+
+      const missing = getCompatSection(compat.missing);
+      if (missing.features.length || missing.browsers.length) {
+        return 'partial';
+      }
+
+      const unknown = getCompatSection(compat.unknown);
+      if (unknown.features.length || unknown.browsers.length) {
+        return 'unknown';
+      }
+
+      const required = getCompatSection(compat.required);
+      if (required.features.length || required.browsers.length) {
+        return 'full';
+      }
+    }
+
+    return 'none';
+  }
+
   function renderAvailableModules(snapshot) {
     if (!availableGrid) return;
     const data = snapshot || state.get();
@@ -1378,7 +1413,7 @@ export function mountUI({ root, state }) {
       if (!manifest) return;
       const runtimeEntry = runtime[moduleId] || {};
       const compat = runtimeEntry.metrics?.compat || {};
-      const compatStatus = compat.status || 'none';
+      const compatStatus = deriveCompatStatus(compat);
       const profileIds = Array.from(moduleToProfiles.get(moduleId) ?? []);
       const collectionIds = Array.from(moduleCollectionsIndex.get(moduleId) ?? []);
       const matchesProfile = profileFilter === 'all' || profileIds.includes(profileFilter);
