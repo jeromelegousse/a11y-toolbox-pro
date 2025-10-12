@@ -52,6 +52,7 @@ export function setupModuleRuntime({ state, catalog }) {
 
   const initialized = new Set();
   const loading = new Map();
+  const metricsCache = new Map();
 
   function buildDependencyMetadata(moduleId) {
     const manifest = manifests.get(moduleId);
@@ -167,7 +168,17 @@ export function setupModuleRuntime({ state, catalog }) {
 
   function updateModuleRuntime(moduleId, patch) {
     const current = state.get(`runtime.modules.${moduleId}`) || {};
-    state.set(`runtime.modules.${moduleId}`, { ...current, ...patch });
+    const next = { ...current, ...patch };
+    if (!Object.prototype.hasOwnProperty.call(patch, 'metrics')) {
+      next.metrics = serializeMetrics(ensureMetrics(moduleId));
+    }
+    state.set(`runtime.modules.${moduleId}`, next);
+  }
+
+  function publishMetrics(moduleId) {
+    const internal = ensureMetrics(moduleId);
+    internal.compat = evaluateCompatibility(manifests.get(moduleId));
+    updateModuleRuntime(moduleId, { metrics: serializeMetrics(internal) });
   }
 
   function loadModule(moduleId) {
@@ -182,31 +193,61 @@ export function setupModuleRuntime({ state, catalog }) {
     if (!loader) {
       return Promise.reject(new Error(`Module loader missing for "${moduleId}".`));
     }
-    updateModuleRuntime(moduleId, { state: 'loading', error: null });
-    const promise = loader()
+    const metrics = ensureMetrics(moduleId);
+    metrics.attempts += 1;
+    metrics.lastAttemptAt = Date.now();
+    metrics.lastError = null;
+    updateModuleRuntime(moduleId, { state: 'loading', error: null, metrics: serializeMetrics(metrics) });
+    const loadStartedAt = now();
+    const promise = Promise.resolve()
+      .then(() => loader())
       .then(() => {
         const mod = getModule(moduleId);
         if (!mod) {
           throw new Error(`Module "${moduleId}" did not register itself.`);
         }
+        const loadDuration = now() - loadStartedAt;
+        metrics.loadTimings.last = loadDuration;
+        metrics.loadTimings.total += loadDuration;
+        metrics.loadTimings.samples += 1;
         if (!initialized.has(moduleId)) {
           if (typeof mod.init === 'function') {
+            const initStartedAt = now();
             try {
               mod.init({ state });
             } catch (error) {
               console.error(`a11ytb: échec de l’initialisation du module ${moduleId}.`, error);
-              updateModuleRuntime(moduleId, { state: 'error', error: error?.message || 'Échec d\'initialisation' });
+              metrics.failures += 1;
+              metrics.lastError = error?.message || "Échec d'initialisation";
+              metrics.initTimings.last = null;
+              error.__a11ytbTracked = true;
+              publishMetrics(moduleId);
+              updateModuleRuntime(moduleId, { state: 'error', error: metrics.lastError });
               throw error;
             }
+            const initDuration = now() - initStartedAt;
+            metrics.initTimings.last = initDuration;
+            metrics.initTimings.total += initDuration;
+            metrics.initTimings.samples += 1;
           }
           initialized.add(moduleId);
         }
+        metrics.successes += 1;
+        publishMetrics(moduleId);
         updateModuleRuntime(moduleId, { state: 'ready', error: null });
         return mod;
       })
       .catch((error) => {
+        const tracked = error && typeof error === 'object' && error.__a11ytbTracked;
+        const metrics = ensureMetrics(moduleId);
+        if (!tracked) {
+          metrics.failures += 1;
+          metrics.lastError = error?.message || 'Échec de chargement';
+          metrics.loadTimings.last = null;
+          publishMetrics(moduleId);
+        }
         console.error(`a11ytb: impossible de charger le module ${moduleId}.`, error);
-        updateModuleRuntime(moduleId, { state: 'error', error: error?.message || 'Échec de chargement' });
+        updateModuleRuntime(moduleId, { state: 'error', error: metrics.lastError || 'Échec de chargement' });
         throw error;
       })
       .finally(() => {

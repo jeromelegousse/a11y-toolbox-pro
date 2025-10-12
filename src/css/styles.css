@@ -337,6 +337,43 @@ body {
   color: color-mix(in srgb, var(--a11ytb-fg) 72%, transparent);
 }
 
+.a11ytb-status-meta {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 8px;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--a11ytb-fg) 65%, transparent);
+}
+
+.a11ytb-status-meta dt {
+  margin: 0;
+  font-weight: 600;
+}
+
+.a11ytb-status-meta dd {
+  margin: 0;
+}
+
+.a11ytb-status-risk {
+  margin-left: auto;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border-radius: var(--a11ytb-radius-sm);
+  border: 1px solid color-mix(in srgb, var(--a11ytb-success) 60%, transparent);
+  background: color-mix(in srgb, var(--a11ytb-success) 18%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-success) 80%, black 20%);
+}
+
+.a11ytb-status-risk[data-score="AA"] {
+  border-color: color-mix(in srgb, var(--a11ytb-warning) 65%, transparent);
+  background: color-mix(in srgb, var(--a11ytb-warning) 18%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-warning) 80%, black 20%);
+}
+
 .a11ytb-view-toggle {
   display: grid;
   gap: 10px;
