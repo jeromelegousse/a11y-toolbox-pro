@@ -17,33 +17,42 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 | --- | --- | --- | --- |
 | **UX / UI** | Parcours guidés, microcopie pédagogique, hiérarchie d'information claire (axe Insights, Stark) | Panneau unique avec options listées et vue Guides (checklists onboarding) mais peu de scénarios contextualisés | Prioriser les actions critiques, étendre l'onboarding contextuel et proposer des exemples d'usage |
 | **Ergonomie** | Navigation clavier fluide, focus trap dans les dialogues, raccourcis cohérents, feedback état chargement | Focus trap complet, vue « Raccourcis » et centre d’état temps réel (TTS/STT/Braille) mais peu d’indicateurs pour les autres modules | Harmoniser les patterns clavier, ajouter indicateurs de statut (chargement/sauvegarde), préparer la personnalisation des raccourcis |
-| **Fiabilité** | Tests automatisés (axe core), reporting d'erreurs, synchronisation cloud, compatibilité multi-navigateurs | Démo locale sans pipeline de tests, journal local uniquement | Ajouter tests unitaires + e2e, gestion offline/erreurs, fallback progressif sur features vocales |
+| **Fiabilité** | Tests automatisés (axe core), reporting d'erreurs, synchronisation cloud, compatibilité multi-navigateurs | Suite de tests (lint, unitaires Vitest, visuels Playwright) et journal exportable mais pas encore de CI distante ni de monitoring cloud | Connecter la CI, ajouter des tests offline/résilience et prévoir un reporting partagé |
 | **Design** | Design systems documentés, tokens (couleurs, espace), mode sombre cohérent | Styles ad hoc par module, contraste variable, icônes hétérogènes | Définir tokens de base, bibliothèque d'icônes accessible, mode sombre clair | 
 
 ## Écarts actuels
 
-- **Portée fonctionnelle** : la démo couvre surtout quelques actions temps réel (TTS, STT, contraste, espacement) mais n'exécute ni audit automatique ni export de rapports comme axe DevTools ou Accessibility Insights.
-- **Personnalisation** : des profils préconfigurés (Vision basse, Dyslexie, Lecture vocale rapide) sont désormais disponibles avec sauvegarde côté store, mais ils restent limités à un socle commun sans personnalisation fine (voix TTS, raccourcis personnalisables, profils dynamiques) comme proposé par Stark.
-- **Administration modulaire** : une première itération du builder réordonnable accessible est en ligne (saisie clavier avec annonces live et support souris/tactile) mais ne gère pas encore les dépendances, le lazy-loading ni les validations avancées.
-- **Collaboration** : un journal exportable (JSON/CSV) est disponible mais il manque encore le partage multi-utilisateurs et les intégrations outils présentes dans les solutions professionnelles.
-- **Gouvernance modules** : le registre est simple (`registerModule`, `registerBlock`) mais n'intègre pas de gestion de versions ou de dépendances, ce qui limite la scalabilité face aux bibliothèques modulaires plus matures.
+- **Portée fonctionnelle** : la démo embarque maintenant un module d’audit axe-core complet (lancement manuel, synthèse, exports JSON/CSV) et un centre d’état corrélé, ce qui rapproche l’outil d’axe DevTools/Accessibility Insights. Il manque toutefois l’orchestration automatique (planification, FastPass) et la corrélation avec des parcours utilisateurs.
+- **Personnalisation** : les profils préconfigurés peuvent être combinés avec des réglages fins (voix TTS, vitesse, volume, paramètres audio, dictionnaire braille) directement issus des manifestes, mais l’édition/duplication de profils et les raccourcis personnalisés restent à implémenter pour atteindre la profondeur de Stark.
+- **Administration modulaire** : le builder réordonnable intègre désormais des collections activables en un clic, la désactivation conditionnelle et le lazy-loading des modules au runtime. Il reste à gérer les collections imbriquées, les vues d’ensemble par profil et le chargement différé côté réseau (préchargement progressif, stratégie cache).
+- **Collaboration** : le journal exportable (JSON/CSV) et les métriques runtime apportent une base de partage, mais il n’y a toujours pas d’espace multi-utilisateurs, de commentaires ni de synchronisation cloud comme dans les suites professionnelles.
+- **Gouvernance modules & observabilité** : les manifestes versionnés exposent désormais dépendances, compatibilité et métriques de performance (load/init, compat features) avec signalement dans le centre d’état. Il manque encore le contrôle des semver, la revue des dépendances transverses et un tableau de bord consolidé.
 
 ## Manques par rapport à la feuille de route
 
 - **Phase 0** :
-  - Les tests automatisés restent à industrialiser (unitaires + visuels, point 6).
-  - Le focus trap complet du panneau d’options est couvert (isolation inert + restitution focus) et le centre d’état unifie désormais voix, braille, contraste et espacements ; il reste à exposer les métriques de performance et de compatibilité.
-  - L’atelier design system doit encore fournir les exports CSS/tokens prêts à l’emploi (point 7).
-- **Phase 1** : le builder drag & drop accessible est livré en version initiale mais les collections de modules et le chargement conditionnel restent à lancer.
-- **Phase 2 et suivantes** : observabilité temps réel, profils dynamiques, catalogue de modules et multi-tenant restent entièrement à concevoir.
+  - ✅ Concevoir un format `module.json`/manifest pour documenter les métadonnées (validation, fusion `defaults`).
+  - ✅ Ajouter des profils d’accessibilité préconfigurés (Vision basse, Dyslexie, Lecture vocale rapide).
+  - ✅ Centraliser la gestion des options via le panneau Options & Profils alimenté par `config.fields`.
+  - ✅ Étendre `window.a11ytb.logActivity` avec exports JSON/CSV et tags thématiques.
+  - ✅ Documenter le guide module et les manifestes (`docs/module-guide.md`, `docs/module-manifest.md`).
+  - ✅ Industrialiser les tests automatisés (lint, Vitest, Playwright) exécutables via `npm run test`.
+  - ✅ Livrer l’atelier design system (tokens CSS + kit Figma synchronisés).
+  - ✅ Ajouter un focus trap complet avec isolation (`inert`) pour le panneau d’options.
+- **Phase 1** :
+  - ✅ Collections de modules : définition (`module-collections.js`), toggles accessibles, compteur d’état et propagation aux profils.
+  - ✅ Chargement conditionnel : lazy-loading à l’activation, suivi `runtime.modules.<id>` et reprise après bascule.
+  - ✅ Dépendances & compatibilité : calcul semver, badges dans l’admin, logs d’alertes/résolutions et métriques intégrées au centre d’état.
+  - ⏳ Versionnement visible côté UI (historique, comparaison) et collections imbriquées.
+- **Phase 2 et suivantes** : observabilité temps réel multi-instance, profils dynamiques, catalogue distant et multi-tenant restent à spécifier et exécuter.
 
 ## Manques face à la concurrence
 
-- **Audit automatisé** : absence d’analyse WCAG intégrée (axe DevTools, Accessibility Insights).
-- **Guidage** : pas de parcours FastPass ou de checklists interactives.
-- **Personnalisation avancée** : profils dynamiques, raccourcis personnalisables et réglages voix étendus manquent face à Stark.
-- **Collaboration** : aucune intégration Jira/Linear/Slack ni partage multi-utilisateurs, contrairement aux suites professionnelles.
-- **Observabilité** : pas de score de conformité ni d’analytics consolidés comme sur les plateformes enterprise, mais le centre d’état s’aligne progressivement sur les tableaux de bord temps réel proposés par Accessibility Insights ou Stark.
+- **Audit automatisé continu** : l’analyse axe-core manuelle et ses exports existent, mais il manque les audits programmés, les parcours guidés FastPass et le suivi multi-pages proposé par Accessibility Insights.
+- **Guidage** : la vue Guides reste statique ; aucune checklist dynamique ni scénarisation interactive façon FastPass.
+- **Personnalisation avancée** : pas de duplication/partage de profils, ni de raccourcis personnalisables ou d’automations, contrairement à Stark.
+- **Collaboration** : toujours aucune intégration Jira/Linear/Slack ni gestion multi-utilisateurs.
+- **Observabilité** : les métriques runtime sont locales ; il manque un score de conformité consolidé, l’agrégation historique et des tableaux de bord partageables comme sur les plateformes enterprise.
 
 ## Recommandations stratégiques
 
@@ -70,13 +79,12 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
    - Définir un **mode sombre** et garantir une cohérence icône/illustration (SVG optimisés, lignes de 1.5px, labels visibles).
 
 5. **Collaboration et observabilité**
-   - Étendre `window.a11ytb.logActivity` pour exposer un journal exportable (JSON/CSV) et un système de tags (module, gravité).
-   - Prévoir des connecteurs d'export (copie presse-papiers, webhook) pour se rapprocher des intégrations axe/Insights.
+   - Consolider `window.a11ytb.logActivity` avec historique filtrable, notifications FastPass et connecteurs d’export (copie presse-papiers, webhook, Jira/Linear).
+   - Mutualiser les métriques runtime (latence, compatibilité, erreurs) dans un tableau de bord partageable.
 
 6. **Conformité et UX**
-   - Ajouter une vérification de compatibilité navigateur (p. ex. fallback lorsqu'`speechSynthesis` est indisponible est déjà gérée mais pourrait être propagée sous forme d'état global `compat.features`).
-   - Mettre en place un **score de conformité** (WCAG niveau AA vs AAA) récapitulant l'état des modules activés.
-   - Documenter les **bonnes pratiques d'usage** (notamment limites des modules, contextes recommandés) pour aligner expérience et attentes utilisateurs.
+   - Propager les contrôles de compatibilité navigateur via `runtime.modules.<id>.metrics` et exposer un score global AA/AAA.
+   - Documenter les **bonnes pratiques d'usage** (limites modules, contextes recommandés) et enrichir la microcopie des Guides.
 
 ## Vision produit modulaire (2025-2028)
 
@@ -90,32 +98,29 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
 2. ✅ Ajouter des profils d'accessibilité préconfigurés au store initial (Vision basse, Dyslexie, Lecture vocale rapide).
 3. ✅ Centraliser la gestion des options (panneau dédié Options & Profils avec champs déclarés dans les manifestes).
 4. ✅ Étendre `window.a11ytb.logActivity` pour exposer un journal exportable (JSON/CSV) et des tags (module, gravité).
-5. Documenter le guide module (voir `docs/module-guide.md`).
-6. Mettre en place des tests automatisés (lint déjà dispo) et prévoir des tests visuels/screenshot pour les nouveaux blocs.
-7. Lancer un **atelier de design system** : définir palette + composants de base, livrer un kit Figma pour préparer l'implémentation.
+5. ✅ Documenter le guide module (voir `docs/module-guide.md`).
+6. ✅ Mettre en place des tests automatisés (lint déjà dispo) et prévoir des tests visuels/screenshot pour les nouveaux blocs.
+7. ✅ Lancer un **atelier de design system** : définir palette + composants de base, livrer un kit Figma pour préparer l'implémentation.
 8. ✅ Ajouter un **focus trap** complet avec isolation (`inert`) du reste de la page pour le panneau d'options.
 
 ### Phase 1 – Admin modulaire (T3 2025)
 
 - ✅ Première itération du **builder drag & drop** livrée : liste réordonnable accessible (clavier, annonces live, souris/tactile) avec sauvegarde optimiste et rollback de base.
-- Introduire des **collections de modules** : regroupements thématiques (lecture, navigation, contraste) avec bascule globale.
-  - Définir un modèle `collection.json` (id, label, description, modules inclus, dépendances).
-  - Afficher la collection comme un bloc repliable avec un switch maître qui active/désactive tous les modules compatibles.
-  - Permettre les collections imbriquées (p. ex. "Lecture" > "Lecture immersive") avec héritage de priorités.
-- Implémenter le **chargement conditionnel** : un panneau "Modules disponibles" affichant cases à cocher + état (actif, désactivé,
-  requis par un profil) et appliquant le lazy-loading côté client.
-  - Statut temps réel (badges "Actif", "Requis", "En conflit") + filtre par collection/profil.
-  - Chargement via `import()` différé : précharger le manifest, charger le bundle uniquement à l'activation.
-  - Gestion mémoire : déchargement (`unmount`) lors d'une désactivation manuelle avec sauvegarde de l'état utilisateur.
-- Ajouter une vue "Dépendances" dans l'admin, affichant les modules requis avant activation.
-- Versionner les manifestes (`semver`) et exposer un historique des changements dans l'interface.
+- ✅ **Collections de modules** disponibles (vision, audio, interaction) avec bascule globale, comptage des modules actifs et propagation dans les profils.
+  - ⏳ Collections imbriquées et dépendances entre collections.
+- ✅ **Chargement conditionnel** opérationnel : lazy-loading des modules à l’activation, suivi `runtime.modules` (états `ready/error/loading`) et notifications en cas d’échec.
+  - ⏳ Panneau "Modules disponibles" dédié avec filtres avancés (profil, collection, compatibilité) et badges "requis/en conflit".
+  - ⏳ Déchargement sélectif (`unmount`) et stratégies de préchargement progressif.
+- ✅ Vue **Dépendances & compatibilité** : calcul semver, badges automatiques, logs d’alertes/résolutions et accessibilité ARIA.
+- ⏳ Historique de versions visible et diff des manifestes depuis l’interface.
 
 ### Prochaines itérations
 
-- **Personnalisation avancée** : ouvrir la configuration fine des profils (raccourcis personnalisés, paramètres TTS/STT, granularité par module) et permettre la duplication de profils existants.
-- **Collections & dépendances** : livrer les regroupements de modules avec gestion des dépendances et conflits.
-- **Chargement conditionnel** : généraliser le lazy-loading et la décharge automatique pour réduire le coût mémoire.
-- **Instrumentation** : enrichir le centre d'état avec des métriques de performance et de compatibilité module par module.
+- **Personnalisation avancée** : permettre la duplication/partage de profils, l’édition des raccourcis clavier et des presets audio détaillés.
+- **Collections évoluées** : gérer les collections imbriquées, les dépendances entre collections et proposer des suggestions automatiques par profil.
+- **Chargement conditionnel étendu** : vue dédiée "Modules disponibles", lazy-loading réseau granulaire et politique de cache/offline.
+- **Instrumentation** : agréger les métriques runtime dans un tableau de bord (temps de chargement, compatibilité, erreurs) avec export partagé.
+- **Audit enrichi** : séquencer des plans FastPass, permettre l’analyse multi-onglets et historiser les résultats.
 
 ### Phase 2 – Observabilité et personnalisation avancée (T4 2025 - T1 2026)
 
@@ -149,28 +154,28 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
 
 ## Étapes court terme
 
-1. Consolider la documentation module (exemples drag & drop, bonnes pratiques de lazy-loading) et la faire valider par les
-   premiers contributeurs externes.
-2. Finaliser les **collections de modules** (modèle `collection.json`, bascule globale, gestion des dépendances de base).
-3. Mettre en place des **tests contractuels** sur le manifest (validation JSON Schema, dépendances cycliques).
-4. Introduire un **switch de chargement différé** par module (coché/décoché) côté runtime pour mesurer l'impact performance.
-5. Instrumenter le **centre d’état** (latence de chargement, compatibilité navigateur) pour se rapprocher des indicateurs temps réel d’Accessibility Insights et Stark.
-6. Documenter un **processus de contribution** pour les modules (template PR, checklist accessibilité, revue design system).
+1. Livrer le **panneau Modules disponibles** avec filtres (profil, collection, compatibilité) et badges "requis/en conflit".
+2. Implémenter le **déchargement contrôlé** (`unmount`) et des stratégies de préchargement progressif pour réduire l’empreinte mémoire.
+3. Ouvrir la **duplication de profils** (création, sauvegarde, partage) et un premier lot de raccourcis personnalisables.
+4. Agréger les **métriques runtime** dans le centre d’état (graphiques, tendances, export) avec score de conformité AA/AAA consolidé.
+5. Connecter l’**audit axe-core** au journal d’activité (plans FastPass, historique des scans, notifications) et préparer les intégrations externes.
+6. Formaliser le **processus de contribution modules** (template PR, checklist accessibilité/design system, validations automatiques dans la CI).
 
 ## Étapes moyen terme
 
-- Scanner d'accessibilité (intégration axe-core ou Pa11y) pour produire des rapports directement dans l'admin.
-- API plugin distants : charger des modules depuis un CDN signé avec mise en quarantaine si la vérification échoue.
-- Gestion multilingue (i18n) afin de couvrir les marchés ciblés et localiser l'interface drag & drop.
-- Parcours guidé d'audit rapide (FastPass-like) avec checklist, indicateurs de progression et export résumé.
-- Synchronisation des préférences utilisateurs via stockage cloud sécurisé pour fiabiliser l'expérience multi-supports.
-- Lancement d'un **programme bêta** pour les modules tiers, incluant audit de sécurité et validation RGPD.
+- Automatiser les **scans d’accessibilité** (planification, comparaison de rapports, budget qualité).
+- API plugin distants : installation de modules depuis un CDN signé avec sandbox et vérification des permissions.
+- Gestion multilingue (i18n) du panneau drag & drop et du centre d’état.
+- Parcours guidé **FastPass-like** avec checklist interactive, notation par critère et export résumé.
+- Synchronisation des préférences utilisateurs via stockage cloud sécurisé (multi-appareils).
+- Lancement d'un **programme bêta** pour les modules tiers (audit sécurité, conformité RGPD, monitoring usage).
 
 ## Étapes long terme
 
-- Intégration CI/CD (npm package + documentation d'intégration) avec scénarios de tests modulaires automatisés.
-- Tableau de bord analytics (statistiques d'usage des modules) dans le respect RGPD, interfaçable avec des outils BI.
-- Publication d'un **design system public** (documentation + composants web) pour favoriser l'écosystème de modules tiers.
+- Intégration CI/CD (package npm + documentation) avec scénarios de tests modulaires automatisés et pipelines d’audit continus.
+- Tableau de bord analytics (usage des modules, performance, conformité) exportable vers des outils BI.
+- Publication d'un **design system public** (documentation + composants web) synchronisé avec le builder.
 - Mise en place d'un **système de licences** et de partenariats pour les modules premium.
+- Gouvernance multi-tenant (espaces organisationnels, workflow de validation, intégrations Jira/Linear/Slack).
 
-Mise à jour : 2025-10-16
+Mise à jour : 2025-04-05
