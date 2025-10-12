@@ -23,7 +23,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 ## Écarts actuels
 
 - **Portée fonctionnelle** : la démo embarque maintenant un module d’audit axe-core complet (lancement manuel, synthèse, exports JSON/CSV) et un centre d’état corrélé, ce qui rapproche l’outil d’axe DevTools/Accessibility Insights. Il manque toutefois l’orchestration automatique (planification, FastPass) et la corrélation avec des parcours utilisateurs.
-- **Personnalisation** : les profils préconfigurés peuvent être combinés avec des réglages fins (voix TTS, vitesse, volume, paramètres audio, dictionnaire braille) directement issus des manifestes, mais l’édition/duplication de profils et les raccourcis personnalisés restent à implémenter pour atteindre la profondeur de Stark.
+- **Personnalisation** : les profils préconfigurés peuvent être combinés avec des réglages fins (voix TTS, vitesse, volume, paramètres audio, dictionnaire braille) directement issus des manifestes. La duplication, le partage/import de profils et le premier lot de raccourcis configurables sont disponibles ; il reste à enrichir l’édition collaborative et la gestion avancée des raccourcis pour atteindre la profondeur de Stark.
 - **Administration modulaire** : le builder réordonnable intègre désormais des collections activables en un clic, la désactivation conditionnelle et le lazy-loading des modules au runtime. Il reste à gérer les collections imbriquées, les vues d’ensemble par profil et le chargement différé côté réseau (préchargement progressif, stratégie cache).
 - **Collaboration** : le journal exportable (JSON/CSV) et les métriques runtime apportent une base de partage, mais il n’y a toujours pas d’espace multi-utilisateurs, de commentaires ni de synchronisation cloud comme dans les suites professionnelles.
 - **Gouvernance modules & observabilité** : les manifestes versionnés exposent désormais dépendances, compatibilité et métriques de performance (load/init, compat features) avec signalement dans le centre d’état. Il manque encore le contrôle des semver, la revue des dépendances transverses et un tableau de bord consolidé.
@@ -52,7 +52,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 - **Guidage** : la vue Guides reste statique ; aucune checklist dynamique ni scénarisation interactive façon FastPass.
 - **Personnalisation avancée** : pas de duplication/partage de profils, ni de raccourcis personnalisables ou d’automations, contrairement à Stark.
 - **Collaboration** : toujours aucune intégration Jira/Linear/Slack ni gestion multi-utilisateurs.
-- **Observabilité** : les métriques runtime sont locales ; il manque un score de conformité consolidé, l’agrégation historique et des tableaux de bord partageables comme sur les plateformes enterprise.
+- **Observabilité** : les métriques runtime sont locales, désormais agrégées dans un indice de conformité AA/AAA consolidé. Il manque encore l’agrégation historique et des tableaux de bord partageables comme sur les plateformes enterprise.
 
 ## Recommandations stratégiques
 
@@ -154,11 +154,11 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
 
 ## Étapes court terme
 
-1. Livrer le **panneau Modules disponibles** avec filtres (profil, collection, compatibilité) et badges "requis/en conflit".
+1. ✅ Livrer le **panneau Modules disponibles** avec filtres (profil, collection, compatibilité) et badges "requis/en conflit".
 2. ✅ Implémenter le **déchargement contrôlé** (`unmount`) et des stratégies de préchargement progressif pour réduire l’empreinte mémoire (livré : nettoyage module, préchargements `idle`/visibilité/pointeur).
-3. Ouvrir la **duplication de profils** (création, sauvegarde, partage) et un premier lot de raccourcis personnalisables.
-4. Agréger les **métriques runtime** dans le centre d’état (graphiques, tendances, export) avec score de conformité AA/AAA consolidé.
-5. Connecter l’**audit axe-core** au journal d’activité (plans FastPass, historique des scans, notifications) et préparer les intégrations externes.
+3. ✅ Ouvrir la **duplication de profils** (création, sauvegarde, partage) et un premier lot de raccourcis personnalisables.
+4. ✅ Agréger les **métriques runtime** dans le centre d’état (graphiques, tendances, export) avec score de conformité AA/AAA consolidé.
+5. ✅ Connecter l’**audit axe-core** au journal d’activité (plans FastPass, historique des scans, notifications) et préparer les intégrations externes.
 6. Formaliser le **processus de contribution modules** (template PR, checklist accessibilité/design system, validations automatiques dans la CI).
 
 ## Étapes moyen terme

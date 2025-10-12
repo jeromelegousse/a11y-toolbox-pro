@@ -52,7 +52,13 @@ async function runAudit({ state }) {
       module: manifest.id,
       tone: summary.tone,
       severity: summary.severity,
-      tags: ['audit', `impact:${summary.outcome}`]
+      tags: ['audit', `impact:${summary.outcome}`],
+      payload: {
+        type: 'audit-report',
+        runAt: normalized.timestamp,
+        totals: summary.totals || {},
+        outcome: summary.outcome
+      }
     });
     return normalized;
   } catch (error) {
@@ -66,7 +72,12 @@ async function runAudit({ state }) {
       module: manifest.id,
       tone: 'alert',
       severity: 'alert',
-      tags: ['audit', 'error']
+      tags: ['audit', 'error'],
+      payload: {
+        type: 'audit-report',
+        outcome: 'error',
+        error: error?.message || 'Échec de l’audit'
+      }
     });
     throw error;
   }

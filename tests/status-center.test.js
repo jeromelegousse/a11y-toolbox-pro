@@ -36,7 +36,14 @@ describe('summarizeStatuses', () => {
     };
 
     const statuses = summarizeStatuses(snapshot);
-    expect(statuses).toHaveLength(6);
+    expect(statuses).toHaveLength(7);
+
+    const globalSummary = statuses.find((status) => status.id === 'global-score');
+    expect(globalSummary).toBeDefined();
+    expect(globalSummary.value).toBe('Indice AA');
+    expect(globalSummary.detail).toContain('6/6 modules prêts');
+    expect(globalSummary.insights.compatLabel).toBe('Aucun incident');
+    expect(globalSummary.tone).toBe('active');
 
     const auditSummary = statuses.find((status) => status.id === 'audit');
     expect(auditSummary.value).toBe('En attente');
@@ -98,6 +105,12 @@ describe('summarizeStatuses', () => {
     };
 
     const statuses = summarizeStatuses(snapshot);
+
+    const globalSummary = statuses.find((status) => status.id === 'global-score');
+    expect(globalSummary.value).toBe('Indice AA');
+    expect(globalSummary.detail).toContain('2/4 modules prêts');
+    expect(globalSummary.detail).toContain('2 en erreur');
+    expect(globalSummary.insights.compatLabel).toBe('2 incidents');
 
     const auditSummary = statuses.find((status) => status.id === 'audit');
     expect(auditSummary.tone).toBe('warning');
@@ -168,6 +181,12 @@ describe('summarizeStatuses', () => {
     };
 
     const statuses = summarizeStatuses(snapshot);
+
+    const globalSummary = statuses.find((status) => status.id === 'global-score');
+    expect(globalSummary.value).toBe('Indice A');
+    expect(globalSummary.detail).toContain('6/6 modules prêts');
+    expect(globalSummary.insights.compatLabel).toBe('Aucun incident');
+    expect(globalSummary.tone).toBe('warning');
 
     const auditSummary = statuses.find((status) => status.id === 'audit');
     expect(auditSummary.tone).toBe('alert');
