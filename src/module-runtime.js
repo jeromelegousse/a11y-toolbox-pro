@@ -1,138 +1,41 @@
 import { getModule, listBlocks } from './registry.js';
 
-const FEATURE_CHECKS = {
-  SpeechRecognition: () => {
-    const scope = typeof window !== 'undefined' ? window : globalThis;
-    if (!scope) return false;
-    return 'SpeechRecognition' in scope || 'webkitSpeechRecognition' in scope;
-  },
-  SpeechSynthesis: () => {
-    const scope = typeof window !== 'undefined' ? window : globalThis;
-    if (!scope) return false;
-    return 'speechSynthesis' in scope;
-  },
-  AudioContext: () => {
-    const scope = typeof window !== 'undefined' ? window : globalThis;
-    if (!scope) return false;
-    return 'AudioContext' in scope || 'webkitAudioContext' in scope;
-  }
+const DEPENDENCY_STATUS_LABELS = {
+  ok: 'OK',
+  missing: 'Manquant',
+  incompatible: 'Version incompatible'
 };
 
-function now() {
-  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
-    return performance.now();
-  }
-  return Date.now();
-}
+const DEPENDENCY_STATUS_TONE = {
+  missing: 'alert',
+  incompatible: 'warning'
+};
 
-function evaluateFeature(name) {
-  if (!name || typeof name !== 'string') return { status: 'unknown', name };
-  const check = FEATURE_CHECKS[name];
-  if (typeof check === 'function') {
-    return { status: check() ? 'available' : 'missing', name };
+function parseSemver(version) {
+  if (typeof version !== 'string') {
+    return { major: 0, minor: 0, patch: 0, pre: null };
   }
-  const scope = typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : {});
-  if (scope && name in scope) {
-    return { status: 'available', name };
-  }
-  return { status: 'unknown', name };
-}
-
-function evaluateCompatibility(manifest) {
-  const compat = manifest?.compat;
-  const requiredBrowsers = Array.isArray(compat?.browsers) ? compat.browsers.slice() : [];
-  const requiredFeatures = Array.isArray(compat?.features) ? compat.features.slice() : [];
-  const featureEvaluations = requiredFeatures.map((feature) => evaluateFeature(feature));
-  const missingFeatures = featureEvaluations
-    .filter((entry) => entry.status === 'missing')
-    .map((entry) => entry.name);
-  const unknownFeatures = featureEvaluations
-    .filter((entry) => entry.status === 'unknown')
-    .map((entry) => entry.name);
-  const status = missingFeatures.length ? 'partial' : 'ok';
-  const score = missingFeatures.length ? 'AA' : 'AAA';
+  const normalized = version.trim();
+  const [main = '0.0.0', pre = null] = normalized.split('-', 2);
+  const [major = '0', minor = '0', patch = '0'] = main.split('.', 3);
   return {
-    required: {
-      browsers: requiredBrowsers,
-      features: requiredFeatures
-    },
-    missing: {
-      browsers: [],
-      features: missingFeatures
-    },
-    unknown: {
-      browsers: requiredBrowsers.length ? requiredBrowsers.slice() : [],
-      features: unknownFeatures
-    },
-    status,
-    score,
-    checkedAt: Date.now()
+    major: Number.parseInt(major, 10) || 0,
+    minor: Number.parseInt(minor, 10) || 0,
+    patch: Number.parseInt(patch, 10) || 0,
+    pre: pre ?? null
   };
 }
 
-function createInitialMetrics(manifest) {
-  return {
-    attempts: 0,
-    successes: 0,
-    failures: 0,
-    lastError: null,
-    lastAttemptAt: null,
-    loadTimings: { total: 0, samples: 0, last: null },
-    initTimings: { total: 0, samples: 0, last: null },
-    compat: evaluateCompatibility(manifest)
-  };
-}
-
-function serializeMetrics(internal) {
-  if (!internal) return undefined;
-  const loadAverage = internal.loadTimings.samples
-    ? internal.loadTimings.total / internal.loadTimings.samples
-    : null;
-  const initAverage = internal.initTimings.samples
-    ? internal.initTimings.total / internal.initTimings.samples
-    : null;
-  let combinedAverage = null;
-  if (loadAverage !== null || initAverage !== null) {
-    combinedAverage = (loadAverage ?? 0) + (initAverage ?? 0);
-  }
-  return {
-    attempts: internal.attempts,
-    successes: internal.successes,
-    failures: internal.failures,
-    retryCount: Math.max(0, internal.attempts - internal.successes),
-    lastError: internal.lastError,
-    lastAttemptAt: internal.lastAttemptAt,
-    timings: {
-      load: {
-        last: internal.loadTimings.last,
-        average: loadAverage,
-        samples: internal.loadTimings.samples
-      },
-      init: {
-        last: internal.initTimings.last,
-        average: initAverage,
-        samples: internal.initTimings.samples
-      },
-      combinedAverage
-    },
-    compat: {
-      required: {
-        browsers: internal.compat?.required?.browsers ? [...internal.compat.required.browsers] : [],
-        features: internal.compat?.required?.features ? [...internal.compat.required.features] : []
-      },
-      missing: {
-        browsers: internal.compat?.missing?.browsers ? [...internal.compat.missing.browsers] : [],
-        features: internal.compat?.missing?.features ? [...internal.compat.missing.features] : []
-      },
-      unknown: {
-        browsers: internal.compat?.unknown?.browsers ? [...internal.compat.unknown.browsers] : [],
-        features: internal.compat?.unknown?.features ? [...internal.compat.unknown.features] : []
-      },
-      status: internal.compat?.status ?? 'ok',
-      score: internal.compat?.score ?? 'AAA',
-      checkedAt: internal.compat?.checkedAt ?? null
-    }
-  };
+function compareSemver(a, b) {
+  const left = parseSemver(a);
+  const right = parseSemver(b);
+  if (left.major !== right.major) return left.major > right.major ? 1 : -1;
+  if (left.minor !== right.minor) return left.minor > right.minor ? 1 : -1;
+  if (left.patch !== right.patch) return left.patch > right.patch ? 1 : -1;
+  if (left.pre === right.pre) return 0;
+  if (!left.pre) return 1;
+  if (!right.pre) return -1;
+  return left.pre.localeCompare(right.pre);
 }
 
 export function setupModuleRuntime({ state, catalog }) {
@@ -151,14 +54,119 @@ export function setupModuleRuntime({ state, catalog }) {
   const loading = new Map();
   const metricsCache = new Map();
 
-  function ensureMetrics(moduleId) {
-    if (!metricsCache.has(moduleId)) {
-      metricsCache.set(moduleId, createInitialMetrics(manifests.get(moduleId)));
-    }
-    return metricsCache.get(moduleId);
+  function buildDependencyMetadata(moduleId) {
+    const manifest = manifests.get(moduleId);
+    if (!manifest) return [];
+    const moduleName = manifest.name || moduleId;
+    const dependencies = Array.isArray(manifest.dependencies) ? manifest.dependencies : [];
+    if (!dependencies.length) return [];
+
+    return dependencies.map((dep) => {
+      const depId = dep.id;
+      const requiredVersion = typeof dep.version === 'string' && dep.version.trim() ? dep.version.trim() : null;
+      const targetManifest = manifests.get(depId);
+      const dependencyName = targetManifest?.name || depId;
+      const currentVersion = targetManifest?.version || null;
+      let status = 'missing';
+      if (targetManifest) {
+        status = requiredVersion && currentVersion
+          ? (compareSemver(currentVersion, requiredVersion) >= 0 ? 'ok' : 'incompatible')
+          : 'ok';
+      }
+
+      let message = '';
+      if (status === 'missing') {
+        message = 'Module requis introuvable.';
+      } else if (status === 'incompatible') {
+        const detected = currentVersion || 'inconnue';
+        message = `Version détectée ${detected} (minimum ${requiredVersion}).`;
+      } else if (requiredVersion && currentVersion) {
+        message = `Version détectée ${currentVersion} (minimum ${requiredVersion}).`;
+      } else {
+        message = 'Module disponible.';
+      }
+
+      let aria = '';
+      if (status === 'missing') {
+        aria = `Dépendance ${dependencyName} manquante pour ${moduleName}.`;
+      } else if (status === 'incompatible') {
+        const detected = currentVersion || 'inconnue';
+        aria = `Dépendance ${dependencyName} incompatible pour ${moduleName} : version ${detected}, minimum ${requiredVersion}.`;
+      } else {
+        aria = `Dépendance ${dependencyName} disponible pour ${moduleName}.`;
+      }
+
+      return {
+        id: depId,
+        label: dependencyName,
+        status,
+        statusLabel: DEPENDENCY_STATUS_LABELS[status] || status,
+        requiredVersion,
+        currentVersion,
+        message,
+        aria
+      };
+    });
   }
 
-  function updateModuleRuntime(moduleId, patch = {}) {
+  function logVersionChange(moduleId, previousVersion, nextVersion, moduleName) {
+    if (!previousVersion || previousVersion === nextVersion) return;
+    window.a11ytb?.logActivity?.(
+      `Version du module ${moduleName} mise à jour : ${previousVersion} → ${nextVersion}`,
+      {
+        tone: 'info',
+        module: moduleId,
+        tags: ['modules', 'versions']
+      }
+    );
+  }
+
+  function logDependencyChanges(moduleId, moduleName, previous = [], next = []) {
+    const prevMap = new Map(previous.map((entry) => [entry.id, entry]));
+    next.forEach((entry) => {
+      const prev = prevMap.get(entry.id);
+      const prevStatus = prev?.status ?? null;
+      if (entry.status === prevStatus) return;
+      if (entry.status === 'ok') {
+        if (prevStatus && prevStatus !== 'ok') {
+          window.a11ytb?.logActivity?.(
+            `Conflit résolu pour ${moduleName} : ${entry.label}`,
+            {
+              tone: 'confirm',
+              module: moduleId,
+              tags: ['modules', 'dependencies', `dependency:${entry.id}`]
+            }
+          );
+        }
+        return;
+      }
+      const tone = DEPENDENCY_STATUS_TONE[entry.status] || 'alert';
+      window.a11ytb?.logActivity?.(entry.aria, {
+        tone,
+        module: moduleId,
+        tags: ['modules', 'dependencies', `dependency:${entry.id}`]
+      });
+    });
+  }
+
+  function applyModuleMetadata(moduleId) {
+    const manifest = manifests.get(moduleId);
+    if (!manifest) return;
+    const moduleName = manifest.name || moduleId;
+    const dependencies = buildDependencyMetadata(moduleId);
+    const manifestVersion = manifest.version || '0.0.0';
+    const previous = state.get(`runtime.modules.${moduleId}`) || {};
+    updateModuleRuntime(moduleId, {
+      manifestVersion,
+      manifestName: moduleName,
+      dependencies
+    });
+    logVersionChange(moduleId, previous.manifestVersion, manifestVersion, moduleName);
+    const prevDependencies = Array.isArray(previous.dependencies) ? previous.dependencies : [];
+    logDependencyChanges(moduleId, moduleName, prevDependencies, dependencies);
+  }
+
+  function updateModuleRuntime(moduleId, patch) {
     const current = state.get(`runtime.modules.${moduleId}`) || {};
     const next = { ...current, ...patch };
     if (!Object.prototype.hasOwnProperty.call(patch, 'metrics')) {
@@ -257,7 +265,7 @@ export function setupModuleRuntime({ state, catalog }) {
   moduleToBlocks.forEach((blockIds, moduleId) => {
     const enabled = isModuleEnabled(blockIds, lastDisabled);
     updateModuleRuntime(moduleId, { blockIds, enabled });
-    publishMetrics(moduleId);
+    applyModuleMetadata(moduleId);
     if (enabled) {
       loadModule(moduleId).catch(() => {});
     }
@@ -269,7 +277,7 @@ export function setupModuleRuntime({ state, catalog }) {
 
   modulesWithoutBlocks.forEach((moduleId) => {
     updateModuleRuntime(moduleId, { blockIds: [], enabled: true });
-    publishMetrics(moduleId);
+    applyModuleMetadata(moduleId);
     loadModule(moduleId).catch(() => {});
   });
 

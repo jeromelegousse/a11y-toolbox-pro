@@ -3,6 +3,7 @@ import { applyInertToSiblings } from './utils/inert.js';
 import { summarizeStatuses } from './status-center.js';
 import { buildGuidedChecklists, toggleManualChecklistStep } from './guided-checklists.js';
 import { normalizeAudioEvents } from './audio-config.js';
+import { updateDependencyDisplay } from './utils/dependency-display.js';
 
 const DEFAULT_BLOCK_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h7v7H4V5zm9 0h7v7h-7V5zM4 12h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>';
 
@@ -891,6 +892,7 @@ export function mountUI({ root, state }) {
 
   const moduleElements = new Map();
   const adminItems = new Map();
+  const dependencyViews = new Map();
   const adminToolbarCounts = { active: null, hidden: null, pinned: null };
   const organizeFilterToggles = new Map();
 
@@ -1668,6 +1670,7 @@ export function mountUI({ root, state }) {
     const li = document.createElement('li');
     li.className = 'a11ytb-admin-item';
     li.dataset.blockId = block.id;
+    li.dataset.moduleId = block.moduleId || block.id;
     li.dataset.title = block.title || block.id;
     if (block.category) {
       li.dataset.category = block.category;
@@ -1803,6 +1806,49 @@ export function mountUI({ root, state }) {
 
     priorityWrapper.append(priorityLabel, prioritySelect, priorityHint);
     meta.append(priorityWrapper);
+
+    const dependenciesSection = document.createElement('div');
+    dependenciesSection.className = 'a11ytb-admin-dependencies';
+
+    const dependenciesTitle = document.createElement('h4');
+    dependenciesTitle.className = 'a11ytb-admin-dependencies-title';
+    dependenciesTitle.textContent = 'Dépendances';
+    dependenciesSection.append(dependenciesTitle);
+
+    const dependenciesSummary = document.createElement('p');
+    dependenciesSummary.className = 'a11ytb-admin-dependencies-summary';
+    dependenciesSection.append(dependenciesSummary);
+
+    const dependenciesList = document.createElement('ul');
+    dependenciesList.className = 'a11ytb-admin-dependencies-list';
+    dependenciesSection.append(dependenciesList);
+
+    const dependenciesLive = document.createElement('div');
+    dependenciesLive.className = 'a11ytb-sr-only';
+    dependenciesLive.setAttribute('role', 'status');
+    dependenciesLive.setAttribute('aria-live', 'polite');
+    dependenciesSection.append(dependenciesLive);
+
+    meta.append(dependenciesSection);
+
+    const moduleId = li.dataset.moduleId;
+    if (moduleId) {
+      const view = {
+        wrapper: dependenciesSection,
+        list: dependenciesList,
+        summary: dependenciesSummary,
+        live: dependenciesLive,
+        moduleName: block.title || moduleId
+      };
+      if (dependencyViews.has(moduleId)) {
+        dependencyViews.get(moduleId).push(view);
+      } else {
+        dependencyViews.set(moduleId, [view]);
+      }
+      const runtimeInfo = state.get(`runtime.modules.${moduleId}`) || {};
+      const dependencies = Array.isArray(runtimeInfo.dependencies) ? runtimeInfo.dependencies : [];
+      updateDependencyDisplay(view, dependencies, { moduleName: runtimeInfo.manifestName || block.title || moduleId });
+    }
 
     prioritySelect.addEventListener('change', () => {
       const raw = prioritySelect.value;
@@ -2028,6 +2074,19 @@ export function mountUI({ root, state }) {
       }
     });
     updateAdminPositions();
+  }
+
+  function syncDependencySections(snapshot = state.get()) {
+    const runtimeModules = snapshot?.runtime?.modules || {};
+    dependencyViews.forEach((views, moduleId) => {
+      if (!Array.isArray(views) || !views.length) return;
+      const runtimeInfo = runtimeModules?.[moduleId] || state.get(`runtime.modules.${moduleId}`) || {};
+      const dependencies = Array.isArray(runtimeInfo.dependencies) ? runtimeInfo.dependencies : [];
+      views.forEach((view) => {
+        const moduleName = runtimeInfo.manifestName || view.moduleName || moduleId;
+        updateDependencyDisplay(view, dependencies, { moduleName });
+      });
+    });
   }
 
   function applyPresetProfile(profileId, { viaUser = false } = {}) {
@@ -2868,6 +2927,7 @@ export function mountUI({ root, state }) {
   state.on((snapshot) => {
     syncFilters();
     syncAdminList();
+    syncDependencySections(snapshot);
     applyModuleLayout();
     updateActivityLog();
     syncView();
@@ -2878,6 +2938,7 @@ export function mountUI({ root, state }) {
   const initialSnapshot = state.get();
   syncFilters();
   syncAdminList();
+  syncDependencySections(initialSnapshot);
   applyModuleLayout();
   updateActivityLog();
   syncView();
