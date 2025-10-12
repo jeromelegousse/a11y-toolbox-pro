@@ -4,6 +4,16 @@ import { summarizeStatuses } from '../src/status-center.js';
 describe('summarizeStatuses', () => {
   it('retourne un état prêt par défaut pour les modules critiques', () => {
     const snapshot = {
+      audit: {
+        status: 'idle',
+        lastReport: null,
+        summary: {
+          headline: 'Audit en attente',
+          detail: '',
+          tone: 'info',
+          totals: { critical: 0, serious: 0, moderate: 0, minor: 0, unknown: 0, total: 0 }
+        }
+      },
       tts: {
         status: 'idle',
         voice: 'fr-default',
@@ -15,6 +25,7 @@ describe('summarizeStatuses', () => {
       spacing: { lineHeight: 1.5, letterSpacing: 0 },
       runtime: {
         modules: {
+          audit: { enabled: true, state: 'ready' },
           tts: { enabled: true, state: 'ready' },
           stt: { enabled: true, state: 'ready' },
           braille: { enabled: true, state: 'ready' },
@@ -25,7 +36,11 @@ describe('summarizeStatuses', () => {
     };
 
     const statuses = summarizeStatuses(snapshot);
-    expect(statuses).toHaveLength(5);
+    expect(statuses).toHaveLength(6);
+
+    const auditSummary = statuses.find((status) => status.id === 'audit');
+    expect(auditSummary.value).toBe('En attente');
+    expect(auditSummary.detail).toContain('Lancez une analyse');
 
     const ttsSummary = statuses.find((status) => status.id === 'tts');
     expect(ttsSummary.value).toBe('En veille');
@@ -50,6 +65,17 @@ describe('summarizeStatuses', () => {
 
   it('signale les erreurs de chargement et les modules désactivés', () => {
     const snapshot = {
+      audit: {
+        status: 'error',
+        error: 'axe-core indisponible',
+        lastReport: null,
+        summary: {
+          headline: 'Audit en attente',
+          detail: '',
+          tone: 'info',
+          totals: { critical: 0, serious: 0, moderate: 0, minor: 0, unknown: 0, total: 0 }
+        }
+      },
       tts: { status: 'error' },
       stt: { status: 'idle' },
       braille: { output: '' },
@@ -57,6 +83,7 @@ describe('summarizeStatuses', () => {
       spacing: { lineHeight: 1.5, letterSpacing: 0 },
       runtime: {
         modules: {
+          audit: { enabled: true, state: 'ready' },
           tts: { enabled: true, state: 'error', error: 'Échec de chargement' },
           stt: { enabled: false, state: 'idle' },
           braille: { enabled: true, state: 'ready' },
@@ -67,6 +94,11 @@ describe('summarizeStatuses', () => {
     };
 
     const statuses = summarizeStatuses(snapshot);
+
+    const auditSummary = statuses.find((status) => status.id === 'audit');
+    expect(auditSummary.tone).toBe('warning');
+    expect(auditSummary.value).toBe('Analyse interrompue');
+    expect(auditSummary.detail).toContain('axe-core');
 
     const ttsSummary = statuses.find((status) => status.id === 'tts');
     expect(ttsSummary.tone).toBe('alert');
@@ -89,6 +121,30 @@ describe('summarizeStatuses', () => {
 
   it('priorise les états actifs pour lecture, dictée et braille', () => {
     const snapshot = {
+      audit: {
+        status: 'critical',
+        lastRun: 1700000000000,
+        lastReport: {
+          violations: [
+            {
+              id: 'color-contrast',
+              impact: 'critical',
+              description: 'Contraste insuffisant',
+              help: 'Augmentez le contraste',
+              helpUrl: 'https://example.test',
+              nodes: [{ target: ['.btn'], failureSummary: 'ratio insuffisant' }]
+            }
+          ]
+        },
+        summary: {
+          outcome: 'critical',
+          headline: '1 erreur critique',
+          detail: '1 critique',
+          tone: 'alert',
+          totals: { critical: 1, serious: 0, moderate: 0, minor: 0, unknown: 0, total: 1 },
+          totalNodes: 1
+        }
+      },
       tts: { status: 'speaking', progress: 0.42 },
       stt: { status: 'listening' },
       braille: { output: '⠞⠑⠎⠞' },
@@ -96,6 +152,7 @@ describe('summarizeStatuses', () => {
       spacing: { lineHeight: 1.9, letterSpacing: 0.1 },
       runtime: {
         modules: {
+          audit: { enabled: true, state: 'ready' },
           tts: { enabled: true, state: 'ready' },
           stt: { enabled: true, state: 'ready' },
           braille: { enabled: true, state: 'ready' },
@@ -106,6 +163,11 @@ describe('summarizeStatuses', () => {
     };
 
     const statuses = summarizeStatuses(snapshot);
+
+    const auditSummary = statuses.find((status) => status.id === 'audit');
+    expect(auditSummary.tone).toBe('alert');
+    expect(auditSummary.value).toBe('1 erreur critique');
+    expect(auditSummary.detail).toContain('Export disponible');
 
     const ttsSummary = statuses.find((status) => status.id === 'tts');
     expect(ttsSummary.tone).toBe('active');

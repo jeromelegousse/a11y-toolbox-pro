@@ -7,6 +7,7 @@ import { mergeManifestDefaults } from './module-manifest.js';
 import { moduleCatalog } from './module-catalog.js';
 import { setupModuleRuntime } from './module-runtime.js';
 import { setupAudioFeedback } from './audio-feedback.js';
+import { buildAuditStatusText, renderAuditStats, renderAuditViolations } from './modules/audit-view.js';
 
 const profilePresets = {
   'vision-basse': {
@@ -111,12 +112,68 @@ const initial = normalizedManifests.reduce(
 );
 
 const moduleIcons = {
+  audit: '<svg viewBox="0 0 24 24" focusable="false"><path d="M3 5a2 2 0 012-2h10a2 2 0 012 2v3h3v13h-8v-3h-2v3H3zm2 2v11h4v-3h6v3h4V10h-3V7H5zm9 1V5H5v3z"/></svg>',
   tts: '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 9v6h3l4 4V5L7 9H4zm13 3a3 3 0 00-3-3v6a3 3 0 003-3zm-3-6.9v2.07a5 5 0 010 9.66V18a7 7 0 000-13.9z"/></svg>',
   stt: '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3zm5-3a1 1 0 012 0 7 7 0 01-6 6.92V21h3v1H8v-1h3v-3.08A7 7 0 015 11a1 1 0 012 0 5 5 0 0010 0z"/></svg>',
   braille: '<svg viewBox="0 0 24 24" focusable="false"><path d="M6 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4zm12-14a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4z"/></svg>',
   contrast: '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 2a10 10 0 100 20V2z"/></svg>',
   spacing: '<svg viewBox="0 0 24 24" focusable="false"><path d="M7 4h10v2H7V4zm-2 5h14v2H5V9zm3 5h8v2H8v-2zm-3 5h14v2H5v-2z"/></svg>'
 };
+
+function downloadTextFile(filename, text, mime = 'text/plain') {
+  try {
+    const blob = new Blob([text], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.warn('a11ytb: impossible de déclencher le téléchargement', error);
+  }
+}
+
+function escapeCsvValue(value) {
+  const text = String(value ?? '');
+  if (text.includes('"') || text.includes(',') || text.includes('\n')) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function buildAuditCsv(report = {}) {
+  const violations = Array.isArray(report?.violations) ? report.violations : [];
+  const header = ['impact', 'id', 'description', 'target', 'helpUrl'];
+  const rows = [];
+  violations.forEach((violation) => {
+    const base = {
+      impact: violation.impact || 'unknown',
+      id: violation.id || '',
+      description: violation.description || violation.help || '',
+      helpUrl: violation.helpUrl || ''
+    };
+    const nodes = Array.isArray(violation.nodes) && violation.nodes.length
+      ? violation.nodes
+      : [{ target: [''], failureSummary: '' }];
+    nodes.forEach((node) => {
+      const target = Array.isArray(node.target) ? node.target.join(' | ') : '';
+      rows.push([
+        base.impact,
+        base.id,
+        base.description,
+        target,
+        base.helpUrl
+      ]);
+    });
+  });
+  if (!rows.length) {
+    return header.join(',');
+  }
+  return [header.join(','), ...rows.map((row) => row.map(escapeCsvValue).join(','))].join('\n');
+}
 
 function ttsStatusMessage(status) {
   switch (status) {
@@ -152,6 +209,7 @@ const ensureDefaults = [
   ['ui.guides', initial.ui.guides],
   ['audio', initial.audio],
   ['profiles', initial.profiles],
+  ['audit', initial.audit],
   ['runtime.modules', initial.runtime.modules],
   ['tts.progress', initial.tts.progress]
 ];
@@ -175,6 +233,108 @@ function markProfileCustom() {
     state.set('ui.activeProfile', 'custom');
   }
 }
+
+registerBlock({
+  id: 'audit-controls',
+  moduleId: 'audit',
+  title: 'Audit accessibilité',
+  icon: moduleIcons.audit,
+  category: 'diagnostic',
+  keywords: ['audit', 'axe-core', 'diagnostic'],
+  render: (state) => {
+    const s = state.get();
+    const audit = s.audit ?? {};
+    const { label, detail } = buildAuditStatusText(audit);
+    const running = audit.status === 'running';
+    const hasReport = !!audit.lastReport;
+    return `
+      <div class="a11ytb-row">
+        <button class="a11ytb-button" data-action="audit-run"${running ? ' disabled aria-busy="true"' : ''}>${running ? 'Analyse en cours…' : 'Analyser la page'}</button>
+        <button class="a11ytb-button a11ytb-button--ghost" data-action="audit-export-json"${hasReport ? '' : ' disabled'}>Exporter JSON</button>
+        <button class="a11ytb-button a11ytb-button--ghost" data-action="audit-export-csv"${hasReport ? '' : ' disabled'}>Exporter CSV</button>
+      </div>
+      <p class="a11ytb-note" role="status" aria-live="polite" data-ref="audit-status">${label}</p>
+      <p class="a11ytb-note" data-ref="audit-detail">${detail}</p>
+      <div data-ref="audit-stats">${renderAuditStats(audit.summary)}</div>
+      <div data-ref="audit-violations">${renderAuditViolations(audit.lastReport)}</div>
+    `;
+  },
+  wire: ({ root, state }) => {
+    const runBtn = root.querySelector('[data-action="audit-run"]');
+    const exportJsonBtn = root.querySelector('[data-action="audit-export-json"]');
+    const exportCsvBtn = root.querySelector('[data-action="audit-export-csv"]');
+    const statusNode = root.querySelector('[data-ref="audit-status"]');
+    const detailNode = root.querySelector('[data-ref="audit-detail"]');
+    const statsNode = root.querySelector('[data-ref="audit-stats"]');
+    const violationsNode = root.querySelector('[data-ref="audit-violations"]');
+
+    if (runBtn) {
+      runBtn.addEventListener('click', async () => {
+        try {
+          await window.a11ytb?.runtime?.loadModule?.('audit');
+        } catch (error) {
+          console.warn('a11ytb: impossible de précharger le module audit', error);
+        }
+        try {
+          await window.a11ytb?.audit?.analyze?.();
+        } catch (error) {
+          console.error('a11ytb: échec de l’audit manuel', error);
+        }
+      });
+    }
+
+    function exportReport(format) {
+      const report = state.get('audit.lastReport');
+      if (!report) return;
+      const lastRun = state.get('audit.lastRun') || Date.now();
+      const timestamp = new Date(lastRun).toISOString().replace(/[:.]/g, '-');
+      if (format === 'json') {
+        downloadTextFile(`audit-axe-core-${timestamp}.json`, JSON.stringify(report, null, 2), 'application/json');
+        window.a11ytb?.logActivity?.('Rapport axe-core exporté (JSON)', {
+          module: 'audit',
+          tone: 'info',
+          tags: ['audit', 'export', 'json']
+        });
+      } else if (format === 'csv') {
+        downloadTextFile(`audit-axe-core-${timestamp}.csv`, buildAuditCsv(report), 'text/csv');
+        window.a11ytb?.logActivity?.('Rapport axe-core exporté (CSV)', {
+          module: 'audit',
+          tone: 'info',
+          tags: ['audit', 'export', 'csv']
+        });
+      }
+    }
+
+    exportJsonBtn?.addEventListener('click', () => exportReport('json'));
+    exportCsvBtn?.addEventListener('click', () => exportReport('csv'));
+
+    function update(snapshot) {
+      const audit = snapshot.audit ?? {};
+      const { label, detail } = buildAuditStatusText(audit);
+      if (statusNode) statusNode.textContent = label;
+      if (detailNode) detailNode.textContent = detail;
+      if (statsNode) statsNode.innerHTML = renderAuditStats(audit.summary);
+      if (violationsNode) violationsNode.innerHTML = renderAuditViolations(audit.lastReport);
+      const running = audit.status === 'running';
+      if (runBtn) {
+        runBtn.disabled = running;
+        if (running) {
+          runBtn.textContent = 'Analyse en cours…';
+          runBtn.setAttribute('aria-busy', 'true');
+        } else {
+          runBtn.textContent = 'Analyser la page';
+          runBtn.removeAttribute('aria-busy');
+        }
+      }
+      const hasReport = !!audit.lastReport;
+      if (exportJsonBtn) exportJsonBtn.disabled = !hasReport;
+      if (exportCsvBtn) exportCsvBtn.disabled = !hasReport;
+    }
+
+    update(state.get());
+    state.on(update);
+  }
+});
 
 registerBlock({
   id: 'tts-controls',

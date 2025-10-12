@@ -1,3 +1,5 @@
+import { formatTimestamp, summarizeReport } from './modules/audit-report.js';
+
 const STATUS_TONE_DEFAULT = 'info';
 const STATUS_TONE_ACTIVE = 'active';
 const STATUS_TONE_ALERT = 'alert';
@@ -10,6 +12,99 @@ function isEmpty(value) {
 
 function getRuntimeInfo(snapshot, moduleId) {
   return snapshot?.runtime?.modules?.[moduleId] ?? {};
+}
+
+function toneToStatusTone(tone) {
+  switch ((tone || '').toLowerCase()) {
+    case 'alert':
+      return STATUS_TONE_ALERT;
+    case 'warning':
+      return STATUS_TONE_WARNING;
+    case 'confirm':
+      return STATUS_TONE_ACTIVE;
+    default:
+      return STATUS_TONE_DEFAULT;
+  }
+}
+
+function buildAuditSummary(snapshot = {}) {
+  const audit = snapshot.audit ?? {};
+  const runtime = getRuntimeInfo(snapshot, 'audit');
+  const enabled = runtime.enabled ?? true;
+  const moduleState = runtime.state ?? 'idle';
+  const summary = {
+    id: 'audit',
+    label: 'Audit accessibilité',
+    badge: '',
+    value: '',
+    detail: '',
+    tone: STATUS_TONE_DEFAULT,
+    live: 'polite'
+  };
+
+  if (!enabled) {
+    summary.badge = 'Module désactivé';
+    summary.value = 'Audit désactivé';
+    summary.detail = 'Réactivez la carte « Audit accessibilité » pour lancer une analyse.';
+    summary.tone = STATUS_TONE_MUTED;
+    return summary;
+  }
+
+  if (moduleState === 'loading') {
+    summary.badge = 'Chargement…';
+    summary.value = 'Initialisation de l’audit';
+    summary.detail = 'Le module d’audit charge axe-core.';
+    summary.tone = STATUS_TONE_DEFAULT;
+    return summary;
+  }
+
+  if (moduleState === 'error') {
+    summary.badge = 'Erreur de chargement';
+    summary.value = 'Module indisponible';
+    summary.detail = runtime.error || 'Impossible de charger le module d’audit.';
+    summary.tone = STATUS_TONE_ALERT;
+    return summary;
+  }
+
+  if (audit.status === 'running') {
+    summary.badge = 'Analyse en cours';
+    summary.value = 'Inspection de la page';
+    summary.detail = 'axe-core parcourt le DOM pour détecter les violations.';
+    summary.tone = STATUS_TONE_ACTIVE;
+    summary.live = 'assertive';
+    return summary;
+  }
+
+  if (audit.status === 'error') {
+    summary.badge = 'Échec de l’audit';
+    summary.value = 'Analyse interrompue';
+    summary.detail = audit.error || 'Une erreur est survenue pendant l’analyse axe-core.';
+    summary.tone = STATUS_TONE_WARNING;
+    return summary;
+  }
+
+  if (!audit.lastReport) {
+    summary.badge = 'Audit prêt';
+    summary.value = 'En attente';
+    summary.detail = 'Lancez une analyse depuis la carte Audit pour obtenir un rapport détaillé.';
+    summary.tone = STATUS_TONE_DEFAULT;
+    return summary;
+  }
+
+  const reportSummary = audit.summary && audit.summary.totals
+    ? audit.summary
+    : summarizeReport(audit.lastReport);
+  const timestamp = formatTimestamp(audit.lastRun);
+  summary.badge = 'Dernier audit';
+  summary.value = reportSummary.headline || 'Audit réalisé';
+  const detailParts = [];
+  if (timestamp) detailParts.push(`Le ${timestamp}`);
+  if (reportSummary.detail) detailParts.push(reportSummary.detail);
+  detailParts.push('Export disponible dans le journal d’activité.');
+  summary.detail = detailParts.join(' · ');
+  summary.tone = toneToStatusTone(reportSummary.tone);
+
+  return summary;
 }
 
 function buildTtsSummary(snapshot = {}) {
@@ -321,6 +416,7 @@ function buildSpacingSummary(snapshot = {}) {
 
 export function summarizeStatuses(snapshot = {}) {
   return [
+    buildAuditSummary(snapshot),
     buildTtsSummary(snapshot),
     buildSttSummary(snapshot),
     buildBrailleSummary(snapshot),
