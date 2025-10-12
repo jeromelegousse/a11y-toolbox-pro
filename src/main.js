@@ -6,6 +6,7 @@ import { manifest as audioManifest } from './modules/audio.manifest.js';
 import { mergeManifestDefaults } from './module-manifest.js';
 import { moduleCatalog } from './module-catalog.js';
 import { setupModuleRuntime } from './module-runtime.js';
+import { moduleCollections } from './module-collections.js';
 import { setupAudioFeedback } from './audio-feedback.js';
 
 const profilePresets = {
@@ -97,6 +98,9 @@ const baseInitial = {
     lastProfile: null,
     guides: {
       completedSteps: {}
+    },
+    collections: {
+      disabled: []
     }
   },
   profiles: profilePresets,
@@ -150,6 +154,7 @@ const ensureDefaults = [
   ['ui.view', initial.ui.view],
   ['ui.lastProfile', initial.ui.lastProfile],
   ['ui.guides', initial.ui.guides],
+  ['ui.collections', initial.ui.collections],
   ['audio', initial.audio],
   ['profiles', initial.profiles],
   ['runtime.modules', initial.runtime.modules],
@@ -450,7 +455,7 @@ registerBlock({
   }
 });
 
-setupModuleRuntime({ state, catalog: moduleCatalog });
+setupModuleRuntime({ state, catalog: moduleCatalog, collections: moduleCollections });
 
 const root = document.getElementById('a11ytb-root');
 mountUI({ root, state });
