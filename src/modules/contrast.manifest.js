@@ -5,6 +5,9 @@ export const manifest = {
   description: 'Applique un thème sombre à fort contraste pour améliorer la lisibilité.',
   category: 'vision',
   keywords: ['contrast', 'vision'],
+  runtime: {
+    preload: 'visible'
+  },
   defaults: {
     state: {
       contrast: { enabled: false }

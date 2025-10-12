@@ -135,6 +135,7 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
   const manifests = new Map(catalog.map((entry) => [entry.id, entry.manifest]));
   const moduleToBlocks = new Map();
   const moduleToCollections = new Map();
+  const blockToModule = new Map();
 
   collections.forEach((collection) => {
     if (!collection || typeof collection !== 'object') return;
@@ -154,6 +155,7 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
       moduleToBlocks.set(block.moduleId, []);
     }
     moduleToBlocks.get(block.moduleId).push(block.id);
+    blockToModule.set(block.id, block.moduleId);
   });
 
   function getCollectionsForModule(moduleId) {
@@ -176,6 +178,200 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
   const initialized = new Set();
   const loading = new Map();
   const metricsCache = new Map();
+  const moduleLifecycle = new Map();
+  const preloadedModules = new Set();
+  const scheduledPreloads = new Map();
+
+  function getLifecycleEntry(moduleId) {
+    if (!moduleLifecycle.has(moduleId)) {
+      moduleLifecycle.set(moduleId, { mounted: false, teardowns: [] });
+    }
+    return moduleLifecycle.get(moduleId);
+  }
+
+  function runTeardowns(entry, moduleId) {
+    const handlers = Array.isArray(entry.teardowns) ? entry.teardowns : [];
+    entry.teardowns = [];
+    handlers.forEach((teardown) => {
+      if (typeof teardown !== 'function') return;
+      try {
+        teardown();
+      } catch (error) {
+        console.error(`a11ytb: erreur lors du nettoyage du module ${moduleId}.`, error);
+      }
+    });
+  }
+
+  function mountModule(moduleId) {
+    const mod = getModule(moduleId);
+    if (!mod) return;
+    const entry = getLifecycleEntry(moduleId);
+    if (entry.mounted) return;
+    const teardowns = [];
+    const context = { state };
+    if (typeof mod.mount === 'function') {
+      try {
+        const result = mod.mount(context);
+        if (typeof result === 'function') {
+          teardowns.push(result);
+        }
+      } catch (error) {
+        console.error(`a11ytb: échec du montage du module ${moduleId}.`, error);
+      }
+    }
+    if (mod.lifecycle?.mount && typeof mod.lifecycle.mount === 'function') {
+      try {
+        const result = mod.lifecycle.mount(context);
+        if (typeof result === 'function') {
+          teardowns.push(result);
+        }
+      } catch (error) {
+        console.error(`a11ytb: échec du montage complémentaire pour ${moduleId}.`, error);
+      }
+    }
+    entry.teardowns = teardowns;
+    entry.mounted = true;
+    moduleLifecycle.set(moduleId, entry);
+  }
+
+  function unmountModule(moduleId) {
+    const mod = getModule(moduleId);
+    if (!mod) return;
+    const entry = getLifecycleEntry(moduleId);
+    if (!entry.mounted) return;
+    runTeardowns(entry, moduleId);
+    const context = { state };
+    if (typeof mod.unmount === 'function') {
+      try {
+        mod.unmount(context);
+      } catch (error) {
+        console.error(`a11ytb: échec du déchargement du module ${moduleId}.`, error);
+      }
+    }
+    if (mod.lifecycle?.unmount && typeof mod.lifecycle.unmount === 'function') {
+      try {
+        mod.lifecycle.unmount(context);
+      } catch (error) {
+        console.error(`a11ytb: échec du déchargement complémentaire pour ${moduleId}.`, error);
+      }
+    }
+    entry.mounted = false;
+    entry.teardowns = [];
+    moduleLifecycle.set(moduleId, entry);
+  }
+
+  function cancelScheduledPreload(moduleId) {
+    const entry = scheduledPreloads.get(moduleId);
+    if (!entry) return;
+    if (entry.strategy === 'idle') {
+      if (typeof entry.cancel === 'function') {
+        try { entry.cancel(); } catch (error) {
+          console.error(`a11ytb: échec de l’annulation du préchargement idle pour ${moduleId}.`, error);
+        }
+      }
+    } else if (entry.strategy === 'visible') {
+      entry.observer?.disconnect?.();
+    } else if (entry.strategy === 'pointer') {
+      entry.records?.forEach(({ pointerHandler, focusHandler }, element) => {
+        try {
+          element.removeEventListener('pointerenter', pointerHandler);
+          element.removeEventListener('focusin', focusHandler);
+        } catch (error) {
+          console.error(`a11ytb: impossible de retirer un écouteur de préchargement pour ${moduleId}.`, error);
+        }
+      });
+    }
+    scheduledPreloads.delete(moduleId);
+  }
+
+  function triggerPreload(moduleId) {
+    if (initialized.has(moduleId) || loading.has(moduleId) || preloadedModules.has(moduleId)) {
+      cancelScheduledPreload(moduleId);
+      return;
+    }
+    cancelScheduledPreload(moduleId);
+    preloadedModules.add(moduleId);
+    loadModule(moduleId).catch(() => {});
+  }
+
+  function scheduleIdlePreload(moduleId) {
+    if (initialized.has(moduleId) || loading.has(moduleId) || preloadedModules.has(moduleId) || scheduledPreloads.has(moduleId)) return;
+    const supportsIdle = typeof requestIdleCallback === 'function';
+    if (supportsIdle) {
+      const handle = requestIdleCallback(() => triggerPreload(moduleId), { timeout: 2000 });
+      const cancel = () => {
+        if (typeof cancelIdleCallback === 'function') {
+          cancelIdleCallback(handle);
+        }
+      };
+      scheduledPreloads.set(moduleId, { strategy: 'idle', cancel });
+    } else {
+      const timeout = setTimeout(() => triggerPreload(moduleId), 600);
+      const cancel = () => clearTimeout(timeout);
+      scheduledPreloads.set(moduleId, { strategy: 'idle', cancel });
+    }
+  }
+
+  function scheduleVisibilityPreload(moduleId, element) {
+    if (!element || initialized.has(moduleId) || loading.has(moduleId) || preloadedModules.has(moduleId)) return;
+    if (!('IntersectionObserver' in window)) {
+      scheduleIdlePreload(moduleId);
+      return;
+    }
+    const existing = scheduledPreloads.get(moduleId);
+    if (existing?.strategy === 'visible') {
+      if (existing.observed.has(element)) return;
+      existing.observed.add(element);
+      existing.observer.observe(element);
+      return;
+    }
+    const observed = new Set([element]);
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        triggerPreload(moduleId);
+      }
+    }, { root: document.querySelector('#a11ytb-root') || null, threshold: 0.2 });
+    scheduledPreloads.set(moduleId, { strategy: 'visible', observer, observed });
+    observer.observe(element);
+  }
+
+  function schedulePointerPreload(moduleId, element) {
+    if (!element || initialized.has(moduleId) || loading.has(moduleId) || preloadedModules.has(moduleId)) return;
+    let entry = scheduledPreloads.get(moduleId);
+    if (!entry || entry.strategy !== 'pointer') {
+      entry = { strategy: 'pointer', records: new Map() };
+      scheduledPreloads.set(moduleId, entry);
+    }
+    if (entry.records.has(element)) return;
+    const handler = () => triggerPreload(moduleId);
+    const pointerHandler = () => handler();
+    const focusHandler = () => handler();
+    element.addEventListener('pointerenter', pointerHandler, { once: true });
+    element.addEventListener('focusin', focusHandler, { once: true });
+    entry.records.set(element, { pointerHandler, focusHandler });
+  }
+
+  function planPreload(moduleId) {
+    const manifest = manifests.get(moduleId);
+    const strategy = manifest?.runtime?.preload;
+    if (!strategy) return;
+    if (initialized.has(moduleId) || loading.has(moduleId) || preloadedModules.has(moduleId)) return;
+    const hasBlocks = (moduleToBlocks.get(moduleId) || []).length > 0;
+    if (strategy === 'idle') {
+      scheduleIdlePreload(moduleId);
+    } else if (!hasBlocks) {
+      scheduleIdlePreload(moduleId);
+    }
+  }
+
+  function ensureModuleMounted(moduleId) {
+    cancelScheduledPreload(moduleId);
+    return loadModule(moduleId)
+      .then(() => {
+        mountModule(moduleId);
+      })
+      .catch(() => {});
+  }
 
   function ensureMetrics(moduleId) {
     if (metricsCache.has(moduleId)) {
@@ -417,7 +613,9 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
     applyModuleMetadata(moduleId);
     updateModuleRuntime(moduleId, { blockIds, collections: getCollectionsForModule(moduleId), enabled });
     if (enabled) {
-      loadModule(moduleId).catch(() => {});
+      ensureModuleMounted(moduleId);
+    } else {
+      planPreload(moduleId);
     }
   });
 
@@ -430,7 +628,9 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
     applyModuleMetadata(moduleId);
     updateModuleRuntime(moduleId, { blockIds: [], collections: getCollectionsForModule(moduleId), enabled });
     if (enabled) {
-      loadModule(moduleId).catch(() => {});
+      ensureModuleMounted(moduleId);
+    } else {
+      planPreload(moduleId);
     }
   });
 
@@ -445,7 +645,9 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
         updateModuleRuntime(moduleId, { enabled: isEnabled });
       }
       if (isEnabled && !wasEnabled) {
-        loadModule(moduleId).catch(() => {});
+        ensureModuleMounted(moduleId);
+      } else if (!isEnabled && wasEnabled) {
+        unmountModule(moduleId);
       }
     });
     modulesWithoutBlocks.forEach((moduleId) => {
@@ -454,8 +656,10 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
       if (wasEnabled !== isEnabled) {
         updateModuleRuntime(moduleId, { enabled: isEnabled });
       }
-      if (isEnabled && !loading.has(moduleId) && !initialized.has(moduleId)) {
-        loadModule(moduleId).catch(() => {});
+      if (isEnabled && !wasEnabled) {
+        ensureModuleMounted(moduleId);
+      } else if (!isEnabled && wasEnabled) {
+        unmountModule(moduleId);
       }
     });
     lastDisabled = nextDisabled;
@@ -465,6 +669,20 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
   if (!window.a11ytb) window.a11ytb = {};
   if (!window.a11ytb.runtime) window.a11ytb.runtime = {};
   window.a11ytb.runtime.loadModule = loadModule;
+  window.a11ytb.runtime.registerBlockElement = (blockId, element) => {
+    if (!blockId || !element) return;
+    const moduleId = blockToModule.get(blockId);
+    if (!moduleId) return;
+    const manifest = manifests.get(moduleId);
+    const strategy = manifest?.runtime?.preload;
+    if (!strategy) return;
+    if (initialized.has(moduleId) || loading.has(moduleId) || preloadedModules.has(moduleId)) return;
+    if (strategy === 'visible') {
+      scheduleVisibilityPreload(moduleId, element);
+    } else if (strategy === 'pointer') {
+      schedulePointerPreload(moduleId, element);
+    }
+  };
   window.a11ytb.runtime.moduleStatus = (id) => ({
     loaded: initialized.has(id),
     blockIds: moduleToBlocks.get(id) ?? [],

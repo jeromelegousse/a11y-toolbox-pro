@@ -84,6 +84,11 @@ const auditModule = {
     };
     if (!window.a11ytb) window.a11ytb = {};
     window.a11ytb.audit = api;
+  },
+  unmount() {
+    if (window.a11ytb) {
+      delete window.a11ytb.audit;
+    }
   }
 };
 

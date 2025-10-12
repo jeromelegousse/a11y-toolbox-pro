@@ -5,6 +5,9 @@ export const manifest = {
   description: 'Analyse la page courante avec axe-core et synthétise les violations détectées.',
   category: 'diagnostic',
   keywords: ['audit', 'accessibilite', 'axe-core'],
+  runtime: {
+    preload: 'pointer'
+  },
   permissions: ['dom-inspection', 'activity-log'],
   defaults: {
     state: {

@@ -110,7 +110,7 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
   - ⏳ Collections imbriquées et dépendances entre collections.
 - ✅ **Chargement conditionnel** opérationnel : lazy-loading des modules à l’activation, suivi `runtime.modules` (états `ready/error/loading`) et notifications en cas d’échec.
   - ⏳ Panneau "Modules disponibles" dédié avec filtres avancés (profil, collection, compatibilité) et badges "requis/en conflit".
-  - ⏳ Déchargement sélectif (`unmount`) et stratégies de préchargement progressif.
+  - ✅ Déchargement sélectif (`unmount`) et stratégies de préchargement progressif (préchargement `idle`, visibilité des blocs, interaction pointeur).
 - ✅ Vue **Dépendances & compatibilité** : calcul semver, badges automatiques, logs d’alertes/résolutions et accessibilité ARIA.
 - ⏳ Historique de versions visible et diff des manifestes depuis l’interface.
 
@@ -155,7 +155,7 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
 ## Étapes court terme
 
 1. Livrer le **panneau Modules disponibles** avec filtres (profil, collection, compatibilité) et badges "requis/en conflit".
-2. Implémenter le **déchargement contrôlé** (`unmount`) et des stratégies de préchargement progressif pour réduire l’empreinte mémoire.
+2. ✅ Implémenter le **déchargement contrôlé** (`unmount`) et des stratégies de préchargement progressif pour réduire l’empreinte mémoire (livré : nettoyage module, préchargements `idle`/visibilité/pointeur).
 3. Ouvrir la **duplication de profils** (création, sauvegarde, partage) et un premier lot de raccourcis personnalisables.
 4. Agréger les **métriques runtime** dans le centre d’état (graphiques, tendances, export) avec score de conformité AA/AAA consolidé.
 5. Connecter l’**audit axe-core** au journal d’activité (plans FastPass, historique des scans, notifications) et préparer les intégrations externes.
