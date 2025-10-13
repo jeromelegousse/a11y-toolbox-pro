@@ -1,12 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { shouldSkipVisualTests } from './skip-flag.js';
 
-const shouldSkipVisualTests =
-  process.env.PLAYWRIGHT_SKIP_VISUAL_TESTS === '1' ||
-  process.env.PLAYWRIGHT_SKIP_VISUAL_TESTS === 'true';
+const skipVisualTests = shouldSkipVisualTests();
 
 test.describe('Organisation — dépendances', () => {
   test.skip(
-    shouldSkipVisualTests,
+    skipVisualTests,
     'Playwright browser dependencies are not available in this environment.'
   );
 
@@ -49,8 +48,14 @@ test.describe('Organisation — dépendances', () => {
 
     const dependencySection = page.locator('.a11ytb-admin-dependencies').first();
     await expect(dependencySection).toBeVisible();
-    await expect(dependencySection.locator('.a11ytb-admin-dependency-badge', { hasText: 'Manquant' })).toBeVisible();
-    await expect(dependencySection.locator('.a11ytb-admin-dependency-badge', { hasText: 'OK' })).toBeVisible();
-    await expect(dependencySection.locator('.a11ytb-admin-dependency-message').first()).toContainText('introuvable');
+    await expect(
+      dependencySection.locator('.a11ytb-admin-dependency-badge', { hasText: 'Manquant' })
+    ).toBeVisible();
+    await expect(
+      dependencySection.locator('.a11ytb-admin-dependency-badge', { hasText: 'OK' })
+    ).toBeVisible();
+    await expect(
+      dependencySection.locator('.a11ytb-admin-dependency-message').first()
+    ).toContainText('introuvable');
   });
 });
