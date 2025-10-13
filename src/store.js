@@ -90,12 +90,21 @@ function safeClone(value) {
 
 export function createStore(key, initial) {
   const subs = new Set();
-  let state = load() ?? safeClone(initial);
+  const loaded = load();
+  let state = safeClone(initial);
+  if (loaded && typeof loaded === 'object') {
+    state = { ...state, ...loaded };
+  }
 
   function load() {
     try {
       const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : null;
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        delete parsed.runtime;
+      }
+      return parsed;
     } catch (error) {
       console.warn('a11ytb: impossible de charger l’état depuis le stockage local.', error);
       return null;
@@ -103,7 +112,11 @@ export function createStore(key, initial) {
   }
   function persist() {
     try {
-      localStorage.setItem(key, JSON.stringify(state));
+      const snapshot = safeClone(state);
+      if (snapshot && typeof snapshot === 'object') {
+        snapshot.runtime = safeClone(initial?.runtime) ?? {};
+      }
+      localStorage.setItem(key, JSON.stringify(snapshot));
     } catch (error) {
       console.warn('a11ytb: impossible d’enregistrer l’état.', error);
     }
@@ -118,13 +131,16 @@ export function createStore(key, initial) {
       if (!path) return;
       const keys = path.split('.');
       let ref = state;
+      const shouldPersist = keys[0] !== 'runtime';
       for (let i = 0; i < keys.length - 1; i++) {
         const k = keys[i];
         if (typeof ref[k] !== 'object' || ref[k] === null) ref[k] = {};
         ref = ref[k];
       }
       ref[keys.at(-1)] = value;
-      persist();
+      if (shouldPersist) {
+        persist();
+      }
       subs.forEach(fn => fn(safeClone(state)));
     },
     tx(patch) {

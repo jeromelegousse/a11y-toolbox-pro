@@ -2148,6 +2148,18 @@ export function mountUI({ root, state, config = {} }) {
   const organizeFilterToggles = new Map();
   const collectionButtons = new Map();
 
+  function refreshDependencyViews(snapshot) {
+    const runtimeModules = snapshot?.runtime?.modules || state.get('runtime.modules') || {};
+    dependencyViews.forEach((views, moduleId) => {
+      const runtimeInfo = runtimeModules[moduleId] || {};
+      const dependencies = Array.isArray(runtimeInfo.dependencies) ? runtimeInfo.dependencies : [];
+      const moduleName = runtimeInfo.manifestName || views?.[0]?.moduleName;
+      views.forEach((view) => {
+        updateDependencyDisplay(view, dependencies, { moduleName });
+      });
+    });
+  }
+
   function focusModuleCard(moduleId) {
     if (!moduleId) return;
     const blockEntry = blocks.find((block) => block.moduleId === moduleId);
@@ -3702,6 +3714,7 @@ export function mountUI({ root, state, config = {} }) {
 
   function syncAdminList() {
     const prefs = getPreferences();
+    const runtimeModules = state.get('runtime.modules') || {};
     const disabledSet = new Set(prefs.disabled);
     const hiddenSet = new Set(prefs.hidden);
     const pinnedSet = new Set(prefs.pinned);
@@ -3714,10 +3727,19 @@ export function mountUI({ root, state, config = {} }) {
         validPriorities[id] = priority;
       }
     });
+    function hasDependencyIssue(blockId) {
+      const moduleId = blockInfo.get(blockId)?.moduleId || blockId;
+      const runtimeEntry = runtimeModules[moduleId] || {};
+      const dependencies = Array.isArray(runtimeEntry.dependencies) ? runtimeEntry.dependencies : [];
+      return dependencies.some((entry) => entry?.status && entry.status !== 'ok');
+    }
+
     const hasCustomOrder = prefs.moduleOrder.length > 0;
     const orderSource = hasCustomOrder
       ? prefs.moduleOrder
       : [...blockIds].sort((a, b) => {
+          const depDiff = Number(hasDependencyIssue(b)) - Number(hasDependencyIssue(a));
+          if (depDiff !== 0) return depDiff;
           const diff = getPriorityWeight(validPriorities[a]) - getPriorityWeight(validPriorities[b]);
           if (diff !== 0) return diff;
           return (blockIndex.get(a) ?? 0) - (blockIndex.get(b) ?? 0);
@@ -4217,9 +4239,13 @@ export function mountUI({ root, state, config = {} }) {
     viewElements.forEach((element, id) => {
       const isActive = id === currentView;
       if (isActive) {
+        element.hidden = false;
+        element.style.visibility = 'visible';
         element.removeAttribute('hidden');
         element.setAttribute('aria-hidden', 'false');
       } else {
+        element.hidden = true;
+        element.style.visibility = 'hidden';
         element.setAttribute('hidden', '');
         element.setAttribute('aria-hidden', 'true');
       }
@@ -4908,6 +4934,7 @@ export function mountUI({ root, state, config = {} }) {
     syncCollectionPanel();
     applyModuleLayout();
     updateActivityLog();
+    refreshDependencyViews(snapshot);
     syncView();
     syncFullscreenMode(snapshot);
     renderProfiles(snapshot);
@@ -4923,6 +4950,7 @@ export function mountUI({ root, state, config = {} }) {
   syncCollectionPanel();
   applyModuleLayout();
   updateActivityLog();
+  refreshDependencyViews(initialSnapshot);
   syncView();
   syncFullscreenMode(initialSnapshot);
   renderProfiles(initialSnapshot);
