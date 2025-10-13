@@ -570,18 +570,19 @@ body {
   display: grid;
   gap: 16px;
   height: 100%;
+  min-height: 0;
 }
 
 .a11ytb-view--modules {
-  grid-template-rows: 1fr;
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .a11ytb-view--options {
-  grid-template-rows: 1fr;
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .a11ytb-view--shortcuts {
-  grid-template-rows: 1fr;
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .a11ytb-options-scroll {
