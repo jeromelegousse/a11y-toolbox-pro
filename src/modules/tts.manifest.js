@@ -5,6 +5,13 @@ export const manifest = {
   description: 'Lit le contenu sélectionné ou la page complète via l’API SpeechSynthesis.',
   category: 'lecture',
   keywords: ['tts', 'lecture', 'audio', 'speech'],
+  homepage: 'https://a11y-toolbox.test/modules/tts',
+  bugs: 'https://a11y-toolbox.test/support',
+  license: 'MIT',
+  authors: [
+    { name: 'Équipe Accessibilité', email: 'accessibilite@a11ytoolbox.test' },
+    { name: 'Nora Belaïd', email: 'n.belaid@a11ytoolbox.test' }
+  ],
   guides: [
     {
       id: 'tts-onboarding',

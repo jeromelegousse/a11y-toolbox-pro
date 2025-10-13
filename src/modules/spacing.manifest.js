@@ -5,6 +5,18 @@ export const manifest = {
   description: 'Injecte des variables CSS pour ajuster l’interlignage et l’espacement des lettres.',
   category: 'vision',
   keywords: ['espacement', 'typographie'],
+  homepage: 'https://a11y-toolbox.test/modules/spacing',
+  bugs: 'https://a11y-toolbox.test/support',
+  license: 'MIT',
+  authors: [
+    { name: 'Équipe Accessibilité', email: 'accessibilite@a11ytoolbox.test' },
+    { name: 'Laura Pineau', email: 'l.pineau@a11ytoolbox.test' }
+  ],
+  permissions: ['style-injection', 'activity-log'],
+  compat: {
+    browsers: ['chrome >= 88', 'edge >= 88', 'firefox >= 90', 'safari >= 15'],
+    features: ['CSSVariables']
+  },
   guides: [
     {
       id: 'vision-personalization',
