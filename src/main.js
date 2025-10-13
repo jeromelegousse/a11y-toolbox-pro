@@ -93,6 +93,7 @@ const baseInitial = {
     dock: 'right',
     category: 'all',
     search: '',
+    fullscreen: false,
     pinned: [],
     hidden: [],
     disabled: [],
@@ -139,6 +140,10 @@ const allowedViews = new Set(['modules', 'options', 'organize', 'guides', 'short
 
 if (defaultConfig?.dock && allowedDocks.has(defaultConfig.dock)) {
   initial.ui.dock = defaultConfig.dock;
+}
+
+if (typeof defaultConfig?.fullscreen === 'boolean') {
+  initial.ui.fullscreen = defaultConfig.fullscreen;
 }
 
 if (defaultConfig?.view && allowedViews.has(defaultConfig.view)) {
@@ -230,6 +235,7 @@ window.a11ytb.feedback = feedback;
 const ensureDefaults = [
   ['ui.category', initial.ui.category],
   ['ui.search', initial.ui.search],
+  ['ui.fullscreen', initial.ui.fullscreen],
   ['ui.pinned', initial.ui.pinned],
   ['ui.hidden', initial.ui.hidden],
   ['ui.disabled', initial.ui.disabled],
