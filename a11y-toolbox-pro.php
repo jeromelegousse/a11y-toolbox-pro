@@ -208,26 +208,6 @@ function a11ytb_register_settings(): void
         ]
     );
 
-    register_setting(
-        'a11ytb_settings',
-        'a11ytb_gemini_api_key',
-        [
-            'type' => 'string',
-            'default' => '',
-            'sanitize_callback' => 'a11ytb_sanitize_secret',
-        ]
-    );
-
-    register_setting(
-        'a11ytb_settings',
-        'a11ytb_gemini_quota',
-        [
-            'type' => 'integer',
-            'default' => 15,
-            'sanitize_callback' => 'a11ytb_sanitize_quota',
-        ]
-    );
-
     add_settings_section(
         'a11ytb_section_general',
         __('Activation & diffusion', 'a11ytb'),
@@ -285,23 +265,6 @@ function a11ytb_register_settings(): void
         ['label_for' => 'a11ytb_auto_open_panel']
     );
 
-    add_settings_field(
-        'a11ytb_gemini_api_key',
-        __('Clé API Gemini', 'a11ytb'),
-        'a11ytb_render_gemini_key_field',
-        'a11ytb_settings_page',
-        'a11ytb_section_integrations',
-        ['label_for' => 'a11ytb_gemini_api_key']
-    );
-
-    add_settings_field(
-        'a11ytb_gemini_quota',
-        __('Quota gratuit suivi', 'a11ytb'),
-        'a11ytb_render_gemini_quota_field',
-        'a11ytb_settings_page',
-        'a11ytb_section_integrations',
-        ['label_for' => 'a11ytb_gemini_quota']
-    );
 }
 add_action('admin_init', 'a11ytb_register_settings');
 
@@ -576,27 +539,9 @@ function a11ytb_enqueue_admin_assets(string $hook): void
         true
     );
 
-    if (function_exists('wp_script_add_data')) {
-        wp_script_add_data('a11ytb/admin-app', 'type', 'module');
-    }
+    wp_script_add_data('a11ytb/admin-app', 'type', 'module');
 }
 add_action('admin_enqueue_scripts', 'a11ytb_enqueue_admin_assets');
-
-/**
- * Sanitize Gemini related settings before persistence.
- *
- * @param mixed $value Valeur à nettoyer.
- *
- * @return string
- */
-function a11ytb_sanitize_gemini_setting($value): string
-{
-    if (!is_string($value)) {
-        $value = (string) $value;
-    }
-
-    return sanitize_text_field(trim($value));
-}
 
 /**
  * Enregistre les options nécessaires au tableau de bord Gemini.
@@ -608,7 +553,7 @@ function a11ytb_register_admin_settings(): void
         'a11ytb_gemini_api_key',
         [
             'type' => 'string',
-            'sanitize_callback' => 'a11ytb_sanitize_gemini_setting',
+            'sanitize_callback' => 'a11ytb_sanitize_secret',
             'default' => '',
         ]
     );
@@ -617,13 +562,41 @@ function a11ytb_register_admin_settings(): void
         'a11ytb_options',
         'a11ytb_gemini_quota',
         [
-            'type' => 'string',
-            'sanitize_callback' => 'a11ytb_sanitize_gemini_setting',
-            'default' => '',
+            'type' => 'integer',
+            'sanitize_callback' => 'a11ytb_sanitize_quota',
+            'default' => 15,
         ]
     );
 }
 add_action('admin_init', 'a11ytb_register_admin_settings');
+
+/**
+ * Affiche les champs cachés requis par l’API Settings en évitant les ID dupliqués.
+ *
+ * @param string $option_group Groupe d’options ciblé.
+ * @param string $nonce_suffix Suffixe optionnel pour différencier l’ID du nonce.
+ */
+function a11ytb_render_settings_hidden_fields(string $option_group, string $nonce_suffix = ''): void
+{
+    $nonce_field = '_wpnonce';
+    $nonce_id = $nonce_field;
+
+    if ($nonce_suffix !== '') {
+        $nonce_id .= '_' . sanitize_key($nonce_suffix);
+    }
+
+    $nonce_markup = wp_nonce_field($option_group . '-options', $nonce_field, true, false);
+
+    if ($nonce_id !== $nonce_field) {
+        $escaped_id = esc_attr($nonce_id);
+        $nonce_markup = preg_replace('/id="_wpnonce"/', 'id="' . $escaped_id . '"', $nonce_markup, 1);
+    }
+
+    echo $nonce_markup; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+    echo wp_referer_field(false, false); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+    printf('<input type="hidden" name="option_page" value="%s" />', esc_attr($option_group));
+    echo '<input type="hidden" name="action" value="update" />';
+}
 
 /**
  * Affiche la page d'administration principale du plugin.
@@ -633,7 +606,7 @@ function a11ytb_render_admin_page(): void
     $is_enabled = a11ytb_is_enabled();
     $preview_url = plugins_url('index.html', __FILE__);
     $gemini_api_key = get_option('a11ytb_gemini_api_key', '');
-    $gemini_quota = get_option('a11ytb_gemini_quota', '');
+    $gemini_quota = (int) get_option('a11ytb_gemini_quota', 15);
     ?>
     <div class="wrap a11ytb-admin-page">
         <h1><?php esc_html_e('A11y Toolbox Pro', 'a11ytb'); ?></h1>
@@ -646,7 +619,7 @@ function a11ytb_render_admin_page(): void
 
         <form method="post" action="options.php" class="a11ytb-settings-form">
             <?php
-            settings_fields('a11ytb_settings');
+            a11ytb_render_settings_hidden_fields('a11ytb_settings', 'general');
             do_settings_sections('a11ytb_settings_page');
             submit_button(__('Enregistrer les réglages', 'a11ytb'));
             ?>
@@ -660,10 +633,11 @@ function a11ytb_render_admin_page(): void
             </div>
         <?php endif; ?>
 
+        <?php settings_errors('a11ytb_options'); ?>
+
         <form method="post" action="options.php" class="a11ytb-admin-settings">
             <?php
-            settings_fields('a11ytb_options');
-            do_settings_sections('a11y-toolbox-pro');
+            a11ytb_render_settings_hidden_fields('a11ytb_options', 'gemini');
             ?>
 
             <div class="a11ytb-admin-field">
