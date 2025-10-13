@@ -4,17 +4,60 @@ import { normalizeAxeReport, summarizeReport } from './audit-report.js';
 
 export { manifest };
 
+const AXE_CORE_VERSION = '4.11.0';
+const CDN_AXE_CORE_SRC = `https://cdn.jsdelivr.net/npm/axe-core@${AXE_CORE_VERSION}/axe.min.js`;
+
 let axeLoader = null;
+let axeCdnLoader = null;
+
+function resolveAxe(module) {
+  const axe = module?.default ?? module?.axe ?? module;
+  if (!axe || typeof axe.run !== 'function') {
+    throw new Error('axe-core indisponible');
+  }
+  return axe;
+}
+
+function loadAxeFromCdn() {
+  if (window.axe && typeof window.axe.run === 'function') {
+    return Promise.resolve(window.axe);
+  }
+  if (!axeCdnLoader) {
+    axeCdnLoader = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = CDN_AXE_CORE_SRC;
+      script.async = true;
+      script.onload = () => {
+        if (window.axe && typeof window.axe.run === 'function') {
+          resolve(window.axe);
+        } else {
+          reject(new Error('axe-core indisponible'));
+        }
+      };
+      script.onerror = () => {
+        reject(new Error('axe-core indisponible'));
+      };
+      document.head.appendChild(script);
+    }).catch((error) => {
+      axeCdnLoader = null;
+      throw error;
+    });
+  }
+  return axeCdnLoader;
+}
 
 function loadAxeCore() {
   if (!axeLoader) {
-    axeLoader = import('axe-core').then((module) => {
-      const axe = module?.default ?? module?.axe ?? module;
-      if (!axe || typeof axe.run !== 'function') {
-        throw new Error('axe-core indisponible');
-      }
-      return axe;
-    });
+    axeLoader = import('axe-core')
+      .then(resolveAxe)
+      .catch((error) => {
+        console.warn('a11ytb: import axe-core échoué, tentative via CDN.', error);
+        return loadAxeFromCdn();
+      })
+      .catch((error) => {
+        axeLoader = null;
+        throw error;
+      });
   }
   return axeLoader;
 }
