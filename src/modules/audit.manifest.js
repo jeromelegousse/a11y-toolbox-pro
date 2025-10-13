@@ -14,7 +14,7 @@ export const manifest = {
   ],
   compat: {
     browsers: ['chrome >= 102', 'edge >= 102', 'firefox >= 104'],
-    features: ['axe-core']
+    features: ['axe']
   },
   guides: [
     {

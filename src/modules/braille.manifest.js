@@ -15,7 +15,7 @@ export const manifest = {
   permissions: ['dom-read', 'activity-log'],
   compat: {
     browsers: ['chrome >= 92', 'edge >= 92', 'firefox >= 91', 'safari >= 15'],
-    features: ['SelectionAPI']
+    features: ['document.getSelection']
   },
   guides: [
     {

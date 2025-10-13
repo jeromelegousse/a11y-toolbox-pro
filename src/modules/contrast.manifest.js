@@ -15,7 +15,7 @@ export const manifest = {
   permissions: ['style-injection', 'activity-log'],
   compat: {
     browsers: ['chrome >= 88', 'edge >= 88', 'firefox >= 89', 'safari >= 14.1'],
-    features: ['CSSVariables']
+    features: ['CSS.supports']
   },
   guides: [
     {
