@@ -128,4 +128,59 @@ describe('module manifest contract', () => {
       throw new Error(`Cycle de dépendances détecté: ${cycle.join(' -> ')}`);
     }
   });
+
+  it('gère le versionnage des manifestes et historise les changements', async () => {
+    const {
+      registerModuleManifest,
+      getModuleManifest,
+      getModuleManifestHistory
+    } = await import('../src/registry.js');
+
+    const manifestId = 'test-semver-manifest';
+    const baseManifest = {
+      id: manifestId,
+      name: 'Module test semver',
+      version: '1.0.0',
+      description: 'Manifest de test pour la gouvernance.',
+      category: 'vision',
+      keywords: ['test', 'semver'],
+      permissions: ['speechSynthesis'],
+      defaults: {
+        state: {
+          [manifestId]: { enabled: true }
+        }
+      },
+      config: {
+        fields: [
+          {
+            type: 'toggle',
+            path: `${manifestId}.enabled`,
+            label: 'Activer le module de test'
+          }
+        ]
+      }
+    };
+
+    const initial = registerModuleManifest(baseManifest, manifestId);
+    expect(initial.version).toBe('1.0.0');
+
+    const downgrade = { ...baseManifest, version: '0.5.0' };
+    const afterDowngrade = registerModuleManifest(downgrade, manifestId);
+    expect(afterDowngrade.version).toBe('1.0.0');
+
+    const upgrade = { ...baseManifest, version: '1.1.0', description: 'Manifest mis à jour.' };
+    const upgraded = registerModuleManifest(upgrade, manifestId);
+    expect(upgraded.version).toBe('1.1.0');
+    expect(getModuleManifest(manifestId).description).toBe('Manifest mis à jour.');
+
+    const history = getModuleManifestHistory(manifestId);
+    expect(history).toHaveLength(3);
+    expect(history[0].status).toBe('accepted');
+    expect(history[0].reason).toBe('initial');
+    expect(history[1].status).toBe('rejected');
+    expect(history[1].reason).toBe('downgrade');
+    expect(history[2].status).toBe('accepted');
+    expect(history[2].reason).toBe('upgrade');
+    expect(history[2].version).toBe('1.1.0');
+  });
 });

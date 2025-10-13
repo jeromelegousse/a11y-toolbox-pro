@@ -28,6 +28,8 @@ objet `manifest` passé à `registerModule`. Les objectifs :
 
 Les champs inconnus sont ignorés avec un avertissement console pour éviter les fautes de frappe.
 
+> Les versions déclarées dans `manifest.version` et `dependencies[].version` doivent respecter la spécification semver (`1.2.3`). Les tentatives de rétrogradation sont bloquées lors de l’enregistrement pour garantir une progression continue des manifestes.
+
 > Astuce : `config.fields` accepte aujourd’hui les types `range`, `toggle` et `select`. Chaque champ doit définir `path` (clé du
 > store) et `label`. Les fonctions `format`, `onChange` et `getOptions` sont supportées pour personnaliser le rendu.
 
@@ -38,12 +40,15 @@ Les champs inconnus sont ignorés avec un avertissement console pour éviter les
 3. Le manifest est gelé (`Object.freeze`) et exposé via `listModuleManifests()` / `getModuleManifest()`.
 4. `mergeManifestDefaults` fusionne les `defaults.state` dans l’état initial (`src/main.js`), ce qui dispense d’éditer `main.js`
    lors de l’ajout d’un module.
+5. `registerModuleManifest` applique un garde-fou semver : un manifest à version identique remplace l’existant uniquement si le contenu diffère, tandis qu’une version inférieure est historisée puis ignorée.
 
 ## API associées
 
 - `listModuleManifests()` : retourne la liste des manifestes normalisés (utile pour générer une palette d’options ou un export).
 - `getModuleManifest(id)` : récupère un manifest précis.
 - `mergeManifestDefaults(state, manifest)` : utilitaire pour injecter des valeurs d’état si absentes.
+- `getModuleManifestHistory(id)` : renvoie l’historique des versions enregistrées (upgrade, refresh, downgrade rejetée).
+- `listModuleManifestHistory()` : synthèse de tous les historiques disponibles pour préparer un futur tableau de bord.
 - `window.a11ytb.registry` expose ces méthodes pour un accès runtime (ex. depuis un module externe ou une console de debug).
 
 Ces conventions préparent l’introduction d’un fichier `module.json` par module tout en sécurisant l’intégration multi-équipe.
@@ -76,7 +81,8 @@ gouvernance. Chaque critère est pondéré pour refléter les attentes concurren
 ```
 
 L’interface **Modules disponibles** met en avant ce score via un badge et des recommandations ciblées, ce qui rapproche le
-catalogue maison des grilles de maturité proposées par Stark ou EqualWeb.
+catalogue maison des grilles de maturité proposées par Stark ou EqualWeb. Le centre d’administration agrège également ces
+indicateurs dans une carte « Maturité manifestes » pour comparer la couverture moyenne face aux workflows FastPass et Stark.
 
 ## Métriques runtime dérivées
 

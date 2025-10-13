@@ -127,6 +127,115 @@ function buildGlobalScoreSummary(snapshot = {}) {
   };
 }
 
+function buildMetadataSummary(snapshot = {}) {
+  const runtimeEntries = snapshot?.runtime?.modules ?? {};
+  const moduleIds = Object.keys(runtimeEntries);
+  const totalModules = moduleIds.length;
+  let tracked = 0;
+  let coverageSum = 0;
+  let worstLevel = 'AAA';
+  const distribution = new Map();
+  const missingCounter = new Map();
+
+  moduleIds.forEach((moduleId) => {
+    const runtime = runtimeEntries[moduleId];
+    const quality = runtime?.metadataQuality;
+    if (!quality) return;
+    tracked += 1;
+    if (Number.isFinite(quality.coverage)) {
+      coverageSum += quality.coverage;
+    } else if (Number.isFinite(quality.coveragePercent)) {
+      coverageSum += quality.coveragePercent / 100;
+    }
+    const level = typeof quality.level === 'string' ? quality.level.toUpperCase() : 'C';
+    distribution.set(level, (distribution.get(level) ?? 0) + 1);
+    worstLevel = pickWorstScore(worstLevel, level);
+    if (Array.isArray(quality.missing)) {
+      quality.missing.forEach((label) => {
+        if (!label) return;
+        const normalizedLabel = String(label);
+        missingCounter.set(normalizedLabel, (missingCounter.get(normalizedLabel) ?? 0) + 1);
+      });
+    }
+  });
+
+  if (tracked === 0) {
+    const baseline = totalModules > 0
+      ? `Ajoutez des manifestes complets pour ${totalModules} module${totalModules > 1 ? 's' : ''} afin de rivaliser avec Accessibility Insights.`
+      : 'Ajoutez des manifestes complets pour suivre la qualité face aux outils professionnels.';
+    return {
+      id: 'metadata-score',
+      label: 'Maturité manifestes',
+      badge: 'Suivi requis',
+      value: 'Manifestes attendus',
+      detail: baseline,
+      tone: STATUS_TONE_WARNING,
+      live: 'polite',
+      metaLabels: {
+        latency: 'Manifestes évalués',
+        compat: 'Priorités'
+      },
+      insights: {
+        riskLevel: 'B',
+        coverageAverage: 0,
+        evaluatedModules: 0,
+        totalModules,
+        latencyLabel: `0/${totalModules}`,
+        compatLabel: 'Complétez les manifestes pour atteindre la parité Stark',
+        missingHighlights: []
+      }
+    };
+  }
+
+  const averageCoverage = Math.round((coverageSum / Math.max(tracked, 1)) * 100);
+  const LEVEL_ORDER = ['AAA', 'AA', 'A', 'B', 'C'];
+  const distributionParts = LEVEL_ORDER
+    .map((level) => {
+      const count = distribution.get(level) ?? 0;
+      return count > 0 ? `${count} ${level}` : null;
+    })
+    .filter(Boolean);
+  const distributionLabel = distributionParts.length
+    ? `Répartition : ${distributionParts.join(' · ')}`
+    : 'Répartition : données partielles';
+
+  const missingHighlights = Array.from(missingCounter.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([label, count]) => `${label} (${count})`);
+
+  const missingDetail = missingHighlights.length
+    ? `Manques clés : ${missingHighlights.join(' ; ')}.`
+    : 'Parité atteinte avec les grilles Stark.';
+
+  const compatLabel = missingHighlights.length
+    ? missingHighlights.join(' · ')
+    : 'Aligné sur Stark';
+
+  return {
+    id: 'metadata-score',
+    label: 'Maturité manifestes',
+    badge: `Qualité ${worstLevel}`,
+    value: `Couverture moyenne ${averageCoverage} %`,
+    detail: `${distributionLabel}. ${missingDetail}`,
+    tone: toneFromScore(worstLevel),
+    live: 'polite',
+    metaLabels: {
+      latency: 'Manifestes évalués',
+      compat: 'Écart vs FastPass/Stark'
+    },
+    insights: {
+      riskLevel: worstLevel,
+      coverageAverage: averageCoverage,
+      evaluatedModules: tracked,
+      totalModules,
+      latencyLabel: `${tracked}/${totalModules}`,
+      compatLabel,
+      missingHighlights
+    }
+  };
+}
+
 function isEmpty(value) {
   return value === null || value === undefined || value === '';
 }
@@ -626,6 +735,7 @@ function buildSpacingSummary(snapshot = {}) {
 export function summarizeStatuses(snapshot = {}) {
   return [
     buildGlobalScoreSummary(snapshot),
+    buildMetadataSummary(snapshot),
     buildAuditSummary(snapshot),
     buildTtsSummary(snapshot),
     buildSttSummary(snapshot),
