@@ -80,6 +80,10 @@ describe('module manifest contract', () => {
       const normalized = validateModuleManifest(manifest, id);
       normalizedById.set(normalized.id, normalized);
       expect(Object.isFrozen(normalized)).toBe(true);
+      expect(normalized.metadataQuality).toBeDefined();
+      expect(typeof normalized.metadataQuality.level).toBe('string');
+      expect(typeof normalized.metadataQuality.coverage).toBe('number');
+      expect(Array.isArray(normalized.metadataQuality.checks)).toBe(true);
       registerModuleManifest(manifest, id);
     });
 

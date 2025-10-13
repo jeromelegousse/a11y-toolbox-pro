@@ -48,6 +48,36 @@ Les champs inconnus sont ignorés avec un avertissement console pour éviter les
 
 Ces conventions préparent l’introduction d’un fichier `module.json` par module tout en sécurisant l’intégration multi-équipe.
 
+## Indice de qualité des métadonnées
+
+Depuis l’itération courante, `validateModuleManifest` calcule automatiquement un objet `metadataQuality`. Cet indice vérifie onze
+critères inspirés des consoles professionnelles (axe DevTools, Accessibility Insights, Stark) : description détaillée, catégories
+et mots-clés filtrables, options exposées dans le panneau global, prérequis de compatibilité, guides FastPass et éléments de
+gouvernance. Chaque critère est pondéré pour refléter les attentes concurrentes (guidage et compatibilité pèsent davantage).
+
+```jsonc
+{
+  "level": "AA",           // AAA > AA > A > B > C
+  "levelLabel": "Avancé",  // libellé lisible pour l’interface
+  "coverage": 0.74,         // ratio de critères satisfaits
+  "coveragePercent": 74,
+  "summary": "Couverture métadonnées : 74 % (niveau AA).",
+  "detail": "À compléter : Guides FastPass et Licence déclarée.",
+  "missing": ["Guides FastPass", "Licence déclarée"],
+  "recommendations": [
+    "Déclarez des guides pour rivaliser avec les parcours FastPass d’Accessibility Insights.",
+    "Ajoutez la licence du module pour sécuriser la gouvernance."
+  ],
+  "checks": [
+    { "id": "guides", "passed": false, "dimension": "guidage", "weight": 1.5 },
+    { "id": "compat", "passed": true,  "dimension": "fiabilité", "weight": 1.25 }
+  ]
+}
+```
+
+L’interface **Modules disponibles** met en avant ce score via un badge et des recommandations ciblées, ce qui rapproche le
+catalogue maison des grilles de maturité proposées par Stark ou EqualWeb.
+
 ## Métriques runtime dérivées
 
 Lors du chargement, `module-runtime.js` renseigne `runtime.modules.<id>.metrics` afin de suivre l’état opérationnel de chaque module.

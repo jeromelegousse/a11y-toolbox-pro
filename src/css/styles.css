@@ -1753,11 +1753,82 @@ body {
   color: color-mix(in srgb, var(--a11ytb-warning) 88%, white 12%);
 }
 
+.a11ytb-module-badge--quality-aaa {
+  background: color-mix(in srgb, var(--a11ytb-success) 26%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-success) 92%, white 8%);
+}
+
+.a11ytb-module-badge--quality-aa {
+  background: color-mix(in srgb, var(--a11ytb-accent) 24%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-accent-strong) 88%, white 12%);
+}
+
+.a11ytb-module-badge--quality-a {
+  background: color-mix(in srgb, var(--a11ytb-warning) 26%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-warning) 82%, white 18%);
+}
+
+.a11ytb-module-badge--quality-b {
+  background: color-mix(in srgb, var(--a11ytb-warning) 34%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-warning) 92%, white 8%);
+}
+
+.a11ytb-module-badge--quality-c {
+  background: color-mix(in srgb, var(--a11ytb-danger) 36%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-danger) 94%, white 6%);
+}
+
 .a11ytb-available-card-meta {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.a11ytb-available-quality-summary,
+.a11ytb-available-quality-detail {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.a11ytb-available-quality-summary {
+  color: color-mix(in srgb, var(--a11ytb-fg) 68%, transparent);
+}
+
+.a11ytb-available-quality-summary[data-level='AAA'],
+.a11ytb-available-quality-summary[data-level='AA'] {
+  color: color-mix(in srgb, var(--a11ytb-success) 70%, var(--a11ytb-fg) 30%);
+}
+
+.a11ytb-available-quality-summary[data-level='A'] {
+  color: color-mix(in srgb, var(--a11ytb-accent) 70%, var(--a11ytb-fg) 30%);
+}
+
+.a11ytb-available-quality-summary[data-level='B'],
+.a11ytb-available-quality-summary[data-level='C'] {
+  color: color-mix(in srgb, var(--a11ytb-warning) 80%, var(--a11ytb-fg) 30%);
+}
+
+.a11ytb-available-quality-detail {
+  color: color-mix(in srgb, var(--a11ytb-warning) 78%, var(--a11ytb-fg) 22%);
+  font-weight: 600;
+}
+
+.a11ytb-available-quality-detail[data-level='C'] {
+  color: color-mix(in srgb, var(--a11ytb-danger) 82%, var(--a11ytb-fg) 18%);
+}
+
+.a11ytb-available-quality-recos {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--a11ytb-fg) 70%, transparent);
+}
+
+.a11ytb-available-quality-recos li {
+  margin: 2px 0;
 }
 
 .a11ytb-available-subtitle {

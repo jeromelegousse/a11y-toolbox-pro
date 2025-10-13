@@ -490,6 +490,27 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
     });
   }
 
+  function logMetadataQualityChange(moduleId, moduleName, previousQuality, nextQuality) {
+    if (!nextQuality) return;
+    const previousLevel = previousQuality?.level ?? null;
+    const nextLevel = nextQuality.level;
+    if (!nextLevel || previousLevel === nextLevel) return;
+    const tone = nextLevel === 'AAA' ? 'confirm' : (nextLevel === 'AA' ? 'info' : 'warning');
+    const coverageLabel = Number.isFinite(nextQuality.coveragePercent)
+      ? `${nextQuality.coveragePercent} %`
+      : null;
+    const summary = nextQuality.summary || (coverageLabel
+      ? `Mise à jour métadonnées ${nextLevel} (${coverageLabel})`
+      : `Mise à jour métadonnées ${nextLevel}`);
+    const detail = nextQuality.detail ? ` ${nextQuality.detail}` : '';
+    const message = `${moduleName} · ${summary}${detail}`;
+    window.a11ytb?.logActivity?.(message, {
+      tone,
+      module: moduleId,
+      tags: ['modules', 'metadata', `metadata:${nextLevel}`]
+    });
+  }
+
   function applyModuleMetadata(moduleId) {
     const manifest = manifests.get(moduleId);
     if (!manifest) return;
@@ -500,11 +521,15 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
     updateModuleRuntime(moduleId, {
       manifestVersion,
       manifestName: moduleName,
-      dependencies
+      dependencies,
+      metadataQuality: manifest.metadataQuality
     });
     logVersionChange(moduleId, previous.manifestVersion, manifestVersion, moduleName);
     const prevDependencies = Array.isArray(previous.dependencies) ? previous.dependencies : [];
     logDependencyChanges(moduleId, moduleName, prevDependencies, dependencies);
+    if (manifest.metadataQuality) {
+      logMetadataQualityChange(moduleId, moduleName, previous.metadataQuality, manifest.metadataQuality);
+    }
   }
 
   function updateModuleRuntime(moduleId, patch) {

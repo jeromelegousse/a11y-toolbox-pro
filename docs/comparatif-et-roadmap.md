@@ -26,7 +26,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 - **Personnalisation** : les profils préconfigurés peuvent être combinés avec des réglages fins (voix TTS, vitesse, volume, paramètres audio, dictionnaire braille) directement issus des manifestes. La duplication, le partage/import de profils et le premier lot de raccourcis configurables sont disponibles ; il reste à enrichir l’édition collaborative et la gestion avancée des raccourcis pour atteindre la profondeur de Stark.
 - **Administration modulaire** : le builder réordonnable intègre désormais des collections activables en un clic, la désactivation conditionnelle et le lazy-loading des modules au runtime. Il reste à gérer les collections imbriquées, les vues d’ensemble par profil et le chargement différé côté réseau (préchargement progressif, stratégie cache).
 - **Collaboration** : le journal exportable (JSON/CSV) et les métriques runtime apportent une base de partage, mais il n’y a toujours pas d’espace multi-utilisateurs, de commentaires ni de synchronisation cloud comme dans les suites professionnelles.
-- **Gouvernance modules & observabilité** : les manifestes versionnés exposent désormais dépendances, compatibilité et métriques de performance (load/init, compat features) avec signalement dans le centre d’état. Il manque encore le contrôle des semver, la revue des dépendances transverses et un tableau de bord consolidé.
+- **Gouvernance modules & observabilité** : les manifestes versionnés exposent désormais dépendances, compatibilité, métriques de performance (load/init, compat features) **et un indice `metadataQuality` pondéré** aligné sur les consoles Stark/Accessibility Insights. Il manque encore le contrôle des semver, la revue des dépendances transverses et un tableau de bord consolidé.
 
 ## Manques par rapport à la feuille de route
 
@@ -160,6 +160,7 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
 4. ✅ Agréger les **métriques runtime** dans le centre d’état (graphiques, tendances, export) avec score de conformité AA/AAA consolidé.
 5. ✅ Connecter l’**audit axe-core** au journal d’activité (plans FastPass, historique des scans, notifications) et préparer les intégrations externes.
 6. Formaliser le **processus de contribution modules** (template PR, checklist accessibilité/design system, validations automatiques dans la CI).
+7. ✅ Calculer et exposer un **score de qualité des manifestes** (badge + recommandations dans la vue Modules disponibles) pour rapprocher la gouvernance des suites enterprise.
 
 ## Étapes moyen terme
 

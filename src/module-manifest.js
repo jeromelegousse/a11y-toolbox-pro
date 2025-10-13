@@ -23,6 +23,185 @@ const KNOWN_FIELDS = new Set([
 
 const KNOWN_PRELOAD_STRATEGIES = new Set(['idle', 'visible', 'pointer']);
 
+const QUALITY_LEVEL_LABELS = Object.freeze({
+  AAA: 'Excellent',
+  AA: 'Avancé',
+  A: 'Solide',
+  B: 'À renforcer',
+  C: 'Critique'
+});
+
+const QUALITY_CHECKS = Object.freeze([
+  {
+    id: 'name',
+    label: 'Nom lisible',
+    dimension: 'documentation',
+    weight: 0.75,
+    hint: 'Définissez `manifest.name` pour identifier clairement le module dans le catalogue.',
+    evaluate: (manifest) => typeof manifest.name === 'string' && manifest.name.trim().length > 0
+  },
+  {
+    id: 'description',
+    label: 'Description détaillée',
+    dimension: 'documentation',
+    weight: 1,
+    hint: 'Ajoutez une description utilisateur (au moins deux phrases) pour aligner le module sur les solutions professionnelles.',
+    evaluate: (manifest) => {
+      if (typeof manifest.description !== 'string') return false;
+      return manifest.description.trim().length >= 40;
+    }
+  },
+  {
+    id: 'category',
+    label: 'Catégorie renseignée',
+    dimension: 'catalogue',
+    weight: 0.5,
+    hint: 'Renseignez `category` pour faciliter le tri par thématique.',
+    evaluate: (manifest) => typeof manifest.category === 'string' && manifest.category.trim().length > 0
+  },
+  {
+    id: 'keywords',
+    label: 'Mots-clés filtrables',
+    dimension: 'catalogue',
+    weight: 0.5,
+    hint: 'Ajoutez au moins deux `keywords` pour rejoindre l’expérience de filtrage proposée par Stark.',
+    evaluate: (manifest) => Array.isArray(manifest.keywords) && manifest.keywords.length >= 2
+  },
+  {
+    id: 'config',
+    label: 'Options centralisées',
+    dimension: 'expérience',
+    weight: 1,
+    hint: 'Exposez les réglages clés via `config.fields` afin de rester cohérent avec la console Options & Profils.',
+    evaluate: (manifest) => Array.isArray(manifest.config?.fields) && manifest.config.fields.length > 0
+  },
+  {
+    id: 'defaults',
+    label: 'Valeurs par défaut',
+    dimension: 'expérience',
+    weight: 0.5,
+    hint: 'Déclarez `defaults.state` pour garantir une initialisation sûre (équivalent aux presets des barres EqualWeb).',
+    evaluate: (manifest) => {
+      const state = manifest.defaults?.state;
+      return !!state && Object.keys(state).length > 0;
+    }
+  },
+  {
+    id: 'compat',
+    label: 'Compatibilité documentée',
+    dimension: 'fiabilité',
+    weight: 1.25,
+    hint: 'Ajoutez `compat.features` ou `compat.browsers` pour aligner les garanties avec axe DevTools et Accessibility Insights.',
+    evaluate: (manifest) => {
+      const compat = manifest.compat;
+      if (!compat || typeof compat !== 'object') return false;
+      const hasFeatures = Array.isArray(compat.features) && compat.features.length > 0;
+      const hasBrowsers = Array.isArray(compat.browsers) && compat.browsers.length > 0;
+      return hasFeatures || hasBrowsers;
+    }
+  },
+  {
+    id: 'permissions',
+    label: 'Permissions explicites',
+    dimension: 'fiabilité',
+    weight: 0.75,
+    hint: 'Listez les APIs critiques dans `permissions` pour sécuriser les audits et anticiper les échecs.',
+    evaluate: (manifest) => Array.isArray(manifest.permissions) && manifest.permissions.length > 0
+  },
+  {
+    id: 'guides',
+    label: 'Guides FastPass',
+    dimension: 'guidage',
+    weight: 1.5,
+    hint: 'Déclarez des `guides` avec étapes pour rivaliser avec les parcours FastPass d’Accessibility Insights.',
+    evaluate: (manifest) => Array.isArray(manifest.guides) && manifest.guides.length > 0
+  },
+  {
+    id: 'authors',
+    label: 'Contact référent',
+    dimension: 'gouvernance',
+    weight: 0.5,
+    hint: 'Ajoutez au moins un `author` pour tracer la responsabilité du module.',
+    evaluate: (manifest) => Array.isArray(manifest.authors) && manifest.authors.length > 0
+  },
+  {
+    id: 'license',
+    label: 'Licence déclarée',
+    dimension: 'gouvernance',
+    weight: 0.25,
+    hint: 'Déclarez la `license` pour harmoniser la gouvernance avec les plateformes concurrentes.',
+    evaluate: (manifest) => typeof manifest.license === 'string' && manifest.license.trim().length > 0
+  }
+]);
+
+function formatList(items = []) {
+  if (!items.length) return '';
+  if (typeof Intl !== 'undefined' && typeof Intl.ListFormat === 'function') {
+    try {
+      return new Intl.ListFormat('fr', { style: 'long', type: 'conjunction' }).format(items);
+    } catch (error) {
+      /* ignore and fallback */
+    }
+  }
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} et ${items[1]}`;
+  const head = items.slice(0, -1).join(', ');
+  return `${head} et ${items[items.length - 1]}`;
+}
+
+export function assessManifestQuality(manifest = {}) {
+  const evaluations = QUALITY_CHECKS.map((check) => {
+    const passed = !!check.evaluate(manifest);
+    return Object.freeze({
+      id: check.id,
+      label: check.label,
+      dimension: check.dimension,
+      passed,
+      weight: check.weight,
+      hint: check.hint
+    });
+  });
+
+  const totalWeight = evaluations.reduce((acc, entry) => acc + entry.weight, 0);
+  const earnedWeight = evaluations.reduce((acc, entry) => acc + (entry.passed ? entry.weight : 0), 0);
+  const coverage = totalWeight > 0 ? Math.max(0, Math.min(1, earnedWeight / totalWeight)) : 1;
+  const coveragePercent = Math.round(coverage * 100);
+
+  let level = 'C';
+  if (coverage >= 0.85) {
+    level = 'AAA';
+  } else if (coverage >= 0.7) {
+    level = 'AA';
+  } else if (coverage >= 0.5) {
+    level = 'A';
+  } else if (coverage >= 0.3) {
+    level = 'B';
+  }
+
+  const missing = evaluations.filter((entry) => !entry.passed).map((entry) => entry.label);
+  const recommendations = evaluations
+    .filter((entry) => !entry.passed && entry.hint)
+    .map((entry) => entry.hint);
+
+  const limitedRecommendations = recommendations.slice(0, 4);
+  const headline = `Couverture métadonnées : ${coveragePercent} % (niveau ${level}).`;
+  const detail = missing.length
+    ? `À compléter : ${formatList(missing)}.`
+    : 'Tous les indicateurs sont au vert.';
+
+  return Object.freeze({
+    level,
+    levelLabel: QUALITY_LEVEL_LABELS[level] || level,
+    coverage,
+    coveragePercent,
+    summary: headline,
+    detail,
+    missing: Object.freeze(missing),
+    recommendations: Object.freeze(limitedRecommendations),
+    checks: Object.freeze(evaluations)
+  });
+}
+
 function ensureArray(value, mapFn = (x) => x) {
   if (value === undefined) return undefined;
   const arr = Array.isArray(value) ? value : [value];
@@ -389,6 +568,8 @@ export function validateModuleManifest(manifest, moduleId) {
   if (guides) {
     normalized.guides = guides;
   }
+
+  normalized.metadataQuality = assessManifestQuality(normalized);
 
   return Object.freeze(normalized);
 }
