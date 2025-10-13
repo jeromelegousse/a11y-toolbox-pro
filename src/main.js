@@ -418,7 +418,7 @@ registerBlock({
           <dd data-ref="volume">${Math.round((s.tts.volume ?? 1) * 100)} %</dd>
         </div>
       </dl>
-      <button class="a11ytb-button a11ytb-button--ghost" data-action="open-options">Ajuster dans Options &amp; Profils</button>
+      <button class="a11ytb-button a11ytb-button--ghost" data-action="open-options" aria-label="Ajuster dans le panneau de personnalisation">Ajuster dans Options &amp; Profils</button>
     `;
   },
   wire: ({ root, state }) => {
@@ -621,7 +621,7 @@ registerBlock({
           <dd data-ref="letterSpacing">${Math.round((s.spacing.letterSpacing ?? 0) * 100)} %</dd>
         </div>
       </dl>
-      <button class="a11ytb-button a11ytb-button--ghost" data-action="open-options">Ouvrir Options &amp; Profils</button>
+      <button class="a11ytb-button a11ytb-button--ghost" data-action="open-options" aria-label="Ouvrir le panneau de personnalisation">Ouvrir Options &amp; Profils</button>
     `;
   },
   wire: ({ root, state }) => {
