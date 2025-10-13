@@ -370,6 +370,27 @@ describe('summarizeStatuses', () => {
     expect(historySummary.tone).toBe('warning');
   });
 
+  it('affiche un badge d’incident lorsque la lecture vocale échoue', () => {
+    const snapshot = {
+      now: BASE_NOW,
+      audit: { status: 'idle', lastReport: null },
+      tts: { status: 'error' },
+      runtime: {
+        modules: {
+          tts: { enabled: true, state: 'ready', metrics: { compat: { browsers: ['chrome >= 100'] } } }
+        }
+      },
+      manifests: { total: 0, history: [] }
+    };
+
+    const statuses = summarizeStatuses(snapshot);
+    const ttsSummary = statuses.find((status) => status.id === 'tts');
+
+    expect(ttsSummary.badge).toBe('Lecture en échec');
+    expect(ttsSummary.value).toBe('Erreur de lecture');
+    expect(ttsSummary.tone).toBe('warning');
+  });
+
   it('met en avant les métriques de compatibilité et de risque', () => {
     const runtimeEntry = {
       metrics: {
