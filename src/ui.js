@@ -2558,6 +2558,29 @@ export function mountUI({ root, state }) {
       meta.className = 'a11ytb-available-card-meta';
       meta.append(createBadge(formatCategoryLabel(entry.manifest.category), 'category', { title: 'Catégorie du module' }));
 
+      const quality = entry.manifest.metadataQuality;
+      if (quality) {
+        const qualityLevel = typeof quality.level === 'string' ? quality.level.toLowerCase() : 'c';
+        const coverageLabel = Number.isFinite(quality.coveragePercent)
+          ? `${quality.coveragePercent} %`
+          : null;
+        const badgeLabel = quality.levelLabel
+          ? `Métadonnées ${quality.levelLabel}`
+          : `Métadonnées ${quality.level || ''}`.trim();
+        const badgeTitleParts = [quality.summary, quality.detail];
+        const badge = createBadge(badgeLabel, `quality-${qualityLevel}`, {
+          title: badgeTitleParts.filter(Boolean).join(' '),
+          ariaLabel: coverageLabel
+            ? `${badgeLabel}. Couverture ${coverageLabel}. ${quality.detail || ''}`.trim()
+            : `${badgeLabel}. ${quality.detail || ''}`.trim()
+        });
+        badge.dataset.level = quality.level || '';
+        if (coverageLabel) {
+          badge.dataset.coverage = coverageLabel;
+        }
+        meta.append(badge);
+      }
+
       const compatLabel = COMPAT_STATUS_LABELS[entry.compatStatus] || COMPAT_STATUS_LABELS.none;
       const compatBadge = createBadge(`Compatibilité : ${compatLabel}`, `compat-${entry.compatStatus}`, {
         title: COMPAT_STATUS_DESCRIPTIONS[entry.compatStatus] || COMPAT_STATUS_DESCRIPTIONS.none
@@ -2641,6 +2664,34 @@ export function mountUI({ root, state }) {
         compatNote.className = 'a11ytb-available-compat-note';
         compatNote.textContent = compatMessages.join(' · ');
         card.append(compatNote);
+      }
+
+      if (quality) {
+        if (quality.summary) {
+          const qualitySummary = document.createElement('p');
+          qualitySummary.className = 'a11ytb-available-quality-summary';
+          qualitySummary.dataset.level = quality.level || '';
+          qualitySummary.textContent = quality.summary;
+          card.append(qualitySummary);
+        }
+        if (quality.detail && Array.isArray(quality.missing) && quality.missing.length) {
+          const qualityDetail = document.createElement('p');
+          qualityDetail.className = 'a11ytb-available-quality-detail';
+          qualityDetail.dataset.level = quality.level || '';
+          qualityDetail.textContent = quality.detail;
+          card.append(qualityDetail);
+        }
+        if (Array.isArray(quality.recommendations) && quality.recommendations.length) {
+          const recos = document.createElement('ul');
+          recos.className = 'a11ytb-available-quality-recos';
+          quality.recommendations.forEach((recommendation, index) => {
+            const item = document.createElement('li');
+            item.textContent = recommendation;
+            item.dataset.index = String(index);
+            recos.append(item);
+          });
+          card.append(recos);
+        }
       }
 
       if (entry.profileIds.length || entry.collectionIds.length) {
