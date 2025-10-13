@@ -71,6 +71,18 @@ function a11ytb_enqueue_frontend_assets(): void
 
     wp_enqueue_style('a11ytb/styles');
     wp_enqueue_script('a11ytb/app');
+
+    if (current_user_can('manage_options')) {
+        $config = [
+            'geminiApiKey' => get_option('a11ytb_gemini_api_key', ''),
+            'geminiQuota' => get_option('a11ytb_gemini_quota', ''),
+        ];
+
+        if ($config['geminiApiKey'] !== '' || $config['geminiQuota'] !== '') {
+            $inline_config = 'window.a11ytbGeminiConfig = ' . wp_json_encode($config) . ';';
+            wp_add_inline_script('a11ytb/app', $inline_config, 'after');
+        }
+    }
 }
 add_action('wp_enqueue_scripts', 'a11ytb_enqueue_frontend_assets');
 
@@ -148,12 +160,57 @@ function a11ytb_enqueue_admin_assets(string $hook): void
 add_action('admin_enqueue_scripts', 'a11ytb_enqueue_admin_assets');
 
 /**
+ * Sanitize Gemini related settings before persistence.
+ *
+ * @param mixed $value Valeur à nettoyer.
+ *
+ * @return string
+ */
+function a11ytb_sanitize_gemini_setting($value): string
+{
+    if (!is_string($value)) {
+        $value = (string) $value;
+    }
+
+    return sanitize_text_field(trim($value));
+}
+
+/**
+ * Enregistre les options nécessaires au tableau de bord Gemini.
+ */
+function a11ytb_register_admin_settings(): void
+{
+    register_setting(
+        'a11ytb_options',
+        'a11ytb_gemini_api_key',
+        [
+            'type' => 'string',
+            'sanitize_callback' => 'a11ytb_sanitize_gemini_setting',
+            'default' => '',
+        ]
+    );
+
+    register_setting(
+        'a11ytb_options',
+        'a11ytb_gemini_quota',
+        [
+            'type' => 'string',
+            'sanitize_callback' => 'a11ytb_sanitize_gemini_setting',
+            'default' => '',
+        ]
+    );
+}
+add_action('admin_init', 'a11ytb_register_admin_settings');
+
+/**
  * Affiche la page d'administration principale du plugin.
  */
 function a11ytb_render_admin_page(): void
 {
     $is_enabled = a11ytb_is_enabled();
     $preview_url = plugins_url('index.html', __FILE__);
+    $gemini_api_key = get_option('a11ytb_gemini_api_key', '');
+    $gemini_quota = get_option('a11ytb_gemini_quota', '');
     ?>
     <div class="wrap a11ytb-admin-page">
         <h1><?php esc_html_e('A11y Toolbox Pro', 'a11ytb'); ?></h1>
@@ -169,6 +226,46 @@ function a11ytb_render_admin_page(): void
                 </p>
             </div>
         <?php endif; ?>
+
+        <form method="post" action="options.php" class="a11ytb-admin-settings">
+            <?php
+            settings_fields('a11ytb_options');
+            do_settings_sections('a11y-toolbox-pro');
+            ?>
+
+            <div class="a11ytb-admin-field">
+                <label for="a11ytb_gemini_api_key" class="a11ytb-admin-label">
+                    <?php esc_html_e('Clé API Gemini', 'a11ytb'); ?>
+                </label>
+                <input
+                    type="password"
+                    id="a11ytb_gemini_api_key"
+                    name="a11ytb_gemini_api_key"
+                    value="<?php echo esc_attr($gemini_api_key); ?>"
+                    class="regular-text"
+                    autocomplete="off"
+                />
+            </div>
+
+            <div class="a11ytb-admin-field">
+                <label for="a11ytb_gemini_quota" class="a11ytb-admin-label">
+                    <?php esc_html_e('Consommation du quota gratuit', 'a11ytb'); ?>
+                </label>
+                <input
+                    type="number"
+                    id="a11ytb_gemini_quota"
+                    name="a11ytb_gemini_quota"
+                    value="<?php echo esc_attr($gemini_quota); ?>"
+                    class="small-text"
+                    min="0"
+                />
+                <p class="description">
+                    <?php esc_html_e('15 requêtes/minute offertes sur Gemini 1.5 Flash.', 'a11ytb'); ?>
+                </p>
+            </div>
+
+            <?php submit_button(__('Enregistrer', 'a11ytb')); ?>
+        </form>
 
         <div class="a11ytb-admin-columns">
             <div class="a11ytb-admin-column">
