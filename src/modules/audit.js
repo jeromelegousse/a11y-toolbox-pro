@@ -46,9 +46,10 @@ function loadAxeFromCdn() {
   return axeCdnLoader;
 }
 
-function loadAxeCore() {
+function loadAxeCore({ importModule } = {}) {
   if (!axeLoader) {
-    axeLoader = import('axe-core')
+    const load = importModule || (() => import('axe-core'));
+    axeLoader = load()
       .then(resolveAxe)
       .catch((error) => {
         console.warn('a11ytb: import axe-core échoué, tentative via CDN.', error);
@@ -60,6 +61,11 @@ function loadAxeCore() {
       });
   }
   return axeLoader;
+}
+
+function resetAxeLoaders() {
+  axeLoader = null;
+  axeCdnLoader = null;
 }
 
 function ensureAuditState(state) {
@@ -147,3 +153,11 @@ const auditModule = {
 };
 
 registerModule(auditModule);
+
+export const __testing = {
+  CDN_AXE_CORE_SRC,
+  resolveAxe,
+  loadAxeFromCdn,
+  loadAxeCore,
+  resetAxeLoaders
+};
