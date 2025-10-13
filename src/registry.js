@@ -44,6 +44,20 @@ function createHistoryEntry(manifest, { status, reason }) {
   return Object.freeze(entry);
 }
 
+function notifyManifestGovernanceUpdate() {
+  const scope = typeof globalThis !== 'undefined'
+    ? globalThis
+    : (typeof window !== 'undefined' ? window : undefined);
+  const refresh = scope?.a11ytb?.runtime?.refreshManifestGovernance;
+  if (typeof refresh === 'function') {
+    try {
+      refresh();
+    } catch (error) {
+      console.warn('a11ytb: impossible de synchroniser l’historique des manifestes.', error);
+    }
+  }
+}
+
 export function registerModuleManifest(manifest, moduleId) {
   const normalized = validateModuleManifest(manifest ?? { id: moduleId }, moduleId);
   const existing = _moduleManifests.get(normalized.id);
@@ -51,6 +65,7 @@ export function registerModuleManifest(manifest, moduleId) {
     _moduleManifests.set(normalized.id, normalized);
     const bucket = ensureHistoryBucket(normalized.id);
     bucket.push(createHistoryEntry(normalized, { status: 'accepted', reason: 'initial' }));
+    notifyManifestGovernanceUpdate();
     return normalized;
   }
 
@@ -62,6 +77,7 @@ export function registerModuleManifest(manifest, moduleId) {
       `a11ytb: manifest "${normalized.id}" ignoré car version ${normalized.version} < ${existing.version}.`
     );
     bucket.push(createHistoryEntry(normalized, { status: 'rejected', reason: 'downgrade' }));
+    notifyManifestGovernanceUpdate();
     return existing;
   }
 
@@ -74,6 +90,7 @@ export function registerModuleManifest(manifest, moduleId) {
       );
       _moduleManifests.set(normalized.id, normalized);
       bucket.push(createHistoryEntry(normalized, { status: 'accepted', reason: 'refresh' }));
+      notifyManifestGovernanceUpdate();
       return normalized;
     }
     return existing;
@@ -81,6 +98,7 @@ export function registerModuleManifest(manifest, moduleId) {
 
   _moduleManifests.set(normalized.id, normalized);
   bucket.push(createHistoryEntry(normalized, { status: 'accepted', reason: 'upgrade' }));
+  notifyManifestGovernanceUpdate();
   return normalized;
 }
 const PLACEHOLDER_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 3a2 2 0 11-2 2 2 2 0 012-2zm0 4a1 1 0 011 1v8a1 1 0 01-2 0V10a1 1 0 011-1z"/></svg>';
