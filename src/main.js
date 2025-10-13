@@ -1,4 +1,4 @@
-import { createStore } from './store.js';
+import { createStore, safeClone } from './store.js';
 import { mountUI } from './ui.js';
 import { registerBlock, registerModuleManifest } from './registry.js';
 import { createFeedback } from './feedback.js';
@@ -252,10 +252,7 @@ const ensureDefaults = [
 
 ensureDefaults.forEach(([path, fallback]) => {
   if (state.get(path) === undefined) {
-    const clone = Array.isArray(fallback)
-      ? [...fallback]
-      : (typeof fallback === 'object' && fallback !== null ? structuredClone(fallback) : fallback);
-    state.set(path, clone);
+    state.set(path, safeClone(fallback));
   }
 });
 setupAudioFeedback({ state, feedback });

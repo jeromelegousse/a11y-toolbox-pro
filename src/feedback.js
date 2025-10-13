@@ -1,3 +1,5 @@
+import { safeClone } from './store.js';
+
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 
 function makeTonePlayer() {
@@ -223,7 +225,7 @@ export function createFeedback(options = {}) {
   function getConfig() {
     return {
       volume: masterVolume,
-      events: structuredClone(eventTable),
+      events: safeClone(eventTable),
       theme: currentThemeKey
     };
   }

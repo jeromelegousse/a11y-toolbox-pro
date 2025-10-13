@@ -1,7 +1,7 @@
 const globalScope = typeof globalThis !== 'undefined' ? globalThis : window;
 const hasStructuredClone = Boolean(globalScope && typeof globalScope.structuredClone === 'function');
 
-function safeClone(value) {
+export function safeClone(value) {
   if (hasStructuredClone) {
     return globalScope.structuredClone(value);
   }
