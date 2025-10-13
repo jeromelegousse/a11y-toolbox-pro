@@ -23,6 +23,10 @@
   --a11ytb-overlay: color-mix(in srgb, var(--a11ytb-color-bg) 72%, transparent);
   --a11ytb-border: var(--a11ytb-color-border);
   --a11ytb-safe-margin: calc(var(--a11ytb-space-unit) * 1.5);
+  --a11ytb-safe-area-top: max(env(safe-area-inset-top), 0px);
+  --a11ytb-safe-area-right: max(env(safe-area-inset-right), 0px);
+  --a11ytb-safe-area-bottom: max(env(safe-area-inset-bottom), 0px);
+  --a11ytb-safe-area-left: max(env(safe-area-inset-left), 0px);
   --a11ytb-size: 56px;
   --a11ytb-panel-w: min(92vw, 380px);
   --a11ytb-panel-h: min(84vh, 560px);
@@ -85,8 +89,8 @@ body {
 
 .a11ytb-fab {
   position: fixed;
-  right: calc(var(--a11ytb-safe-margin) + env(safe-area-inset-right));
-  bottom: calc(var(--a11ytb-safe-margin) + env(safe-area-inset-bottom));
+  right: calc(var(--a11ytb-safe-margin) + var(--a11ytb-safe-area-right));
+  bottom: calc(var(--a11ytb-safe-margin) + var(--a11ytb-safe-area-bottom));
   width: var(--a11ytb-size);
   height: var(--a11ytb-size);
   border-radius: 999px;
@@ -219,8 +223,8 @@ body {
 
 .a11ytb-panel {
   position: fixed;
-  right: calc(var(--a11ytb-safe-margin) + env(safe-area-inset-right));
-  bottom: calc(calc(var(--a11ytb-safe-margin) + env(safe-area-inset-bottom)) + var(--a11ytb-size) + 12px);
+  right: calc(var(--a11ytb-safe-margin) + var(--a11ytb-safe-area-right));
+  bottom: calc(calc(var(--a11ytb-safe-margin) + var(--a11ytb-safe-area-bottom)) + var(--a11ytb-size) + 12px);
   width: var(--a11ytb-panel-w);
   height: var(--a11ytb-panel-h);
   background: var(--a11ytb-surface-elevated);
@@ -3347,18 +3351,18 @@ body {
 }
 
 [data-dock="right"] .a11ytb-panel {
-  right: calc(var(--a11ytb-safe-margin) + env(safe-area-inset-right));
+  right: calc(var(--a11ytb-safe-margin) + var(--a11ytb-safe-area-right));
   left: auto;
 }
 
 [data-dock="left"] .a11ytb-panel {
-  left: calc(var(--a11ytb-safe-margin) + env(safe-area-inset-left));
+  left: calc(var(--a11ytb-safe-margin) + var(--a11ytb-safe-area-left));
   right: auto;
 }
 
 [data-dock="bottom"] .a11ytb-panel {
-  bottom: calc(var(--a11ytb-safe-margin) + env(safe-area-inset-bottom));
-  right: calc(var(--a11ytb-safe-margin) + env(safe-area-inset-right));
+  bottom: calc(var(--a11ytb-safe-margin) + var(--a11ytb-safe-area-bottom));
+  right: calc(var(--a11ytb-safe-margin) + var(--a11ytb-safe-area-right));
   width: min(95vw, 900px);
   height: min(40vh, 420px);
 }
