@@ -5,6 +5,13 @@ export const manifest = {
   description: 'Transcrit la voix de l’utilisateur en texte grâce à l’API Web Speech.',
   category: 'interaction',
   keywords: ['stt', 'dictée', 'micro'],
+  homepage: 'https://a11y-toolbox.test/modules/stt',
+  bugs: 'https://a11y-toolbox.test/support',
+  license: 'MIT',
+  authors: [
+    { name: 'Équipe Accessibilité', email: 'accessibilite@a11ytoolbox.test' },
+    { name: 'Julien Meyer', email: 'j.meyer@a11ytoolbox.test' }
+  ],
   guides: [
     {
       id: 'stt-onboarding',
@@ -79,8 +86,50 @@ export const manifest = {
   },
   defaults: {
     state: {
-      stt: { status: 'idle', transcript: '' }
+      stt: {
+        status: 'idle',
+        transcript: '',
+        language: 'auto',
+        autoPunctuation: true
+      }
     }
+  },
+  config: {
+    group: 'Reconnaissance vocale',
+    description: 'Affinez les paramètres de dictée pour coller aux besoins des utilisateurs.',
+    fields: [
+      {
+        type: 'select',
+        path: 'stt.language',
+        label: 'Langue privilégiée',
+        description: 'Force une langue spécifique si le document ne renseigne pas `lang`.',
+        options: [
+          { value: 'auto', label: 'Détection automatique' },
+          { value: 'fr-FR', label: 'Français (France)' },
+          { value: 'fr-CA', label: 'Français (Canada)' },
+          { value: 'en-US', label: 'English (US)' }
+        ],
+        onChange: (value) => {
+          const labels = {
+            auto: 'Détection automatique',
+            'fr-FR': 'Français (France)',
+            'fr-CA': 'Français (Canada)',
+            'en-US': 'Anglais (États-Unis)'
+          };
+          const label = labels[value] || value;
+          window.a11ytb?.logActivity?.(`Langue STT sélectionnée : ${label}`);
+        }
+      },
+      {
+        type: 'toggle',
+        path: 'stt.autoPunctuation',
+        label: 'Ponctuation automatique',
+        description: 'Ajoute automatiquement des points et des virgules dans les transcriptions.',
+        onChange: (value) => {
+          window.a11ytb?.logActivity?.(`Ponctuation automatique ${value ? 'activée' : 'désactivée'}`);
+        }
+      }
+    ]
   }
 };
 

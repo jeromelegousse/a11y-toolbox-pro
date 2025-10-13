@@ -5,6 +5,18 @@ export const manifest = {
   description: 'Convertit un texte latin simplifié en caractères braille Unicode.',
   category: 'conversion',
   keywords: ['braille', 'transcription'],
+  homepage: 'https://a11y-toolbox.test/modules/braille',
+  bugs: 'https://a11y-toolbox.test/support',
+  license: 'MIT',
+  authors: [
+    { name: 'Équipe Accessibilité', email: 'accessibilite@a11ytoolbox.test' },
+    { name: 'Imène Fares', email: 'i.fares@a11ytoolbox.test' }
+  ],
+  permissions: ['dom-read', 'activity-log'],
+  compat: {
+    browsers: ['chrome >= 92', 'edge >= 92', 'firefox >= 91', 'safari >= 15'],
+    features: ['document.getSelection']
+  },
   guides: [
     {
       id: 'braille-setup',
@@ -53,8 +65,56 @@ export const manifest = {
   },
   defaults: {
     state: {
-      braille: { output: '' }
+      braille: {
+        output: '',
+        grade: 'integral',
+        exportFormat: 'text',
+        keepSpacing: true
+      }
     }
+  },
+  config: {
+    group: 'Transcription braille',
+    description: 'Définissez le niveau et le format utilisés pour la conversion des contenus.',
+    fields: [
+      {
+        type: 'select',
+        path: 'braille.grade',
+        label: 'Niveau de transcription',
+        options: [
+          { value: 'integral', label: 'Intégral (grade 1)' },
+          { value: 'contracted', label: 'Abrégé (grade 2)' }
+        ],
+        onChange: (value) => {
+          const labels = { integral: 'Intégral (grade 1)', contracted: 'Abrégé (grade 2)' };
+          const label = labels[value] || value;
+          window.a11ytb?.logActivity?.(`Mode braille sélectionné : ${label}`);
+        }
+      },
+      {
+        type: 'toggle',
+        path: 'braille.keepSpacing',
+        label: 'Conserver les espaces',
+        description: 'Préserve les séparateurs d’origine lors de la conversion.',
+        onChange: (value) => {
+          window.a11ytb?.logActivity?.(`Espaces d’origine ${value ? 'conservés' : 'compressés'}`);
+        }
+      },
+      {
+        type: 'select',
+        path: 'braille.exportFormat',
+        label: 'Format d’export',
+        options: [
+          { value: 'text', label: 'Texte brut' },
+          { value: 'unicode', label: 'Unicode (points braille)' }
+        ],
+        onChange: (value) => {
+          const labels = { text: 'Texte brut', unicode: 'Unicode (points braille)' };
+          const label = labels[value] || value;
+          window.a11ytb?.logActivity?.(`Format braille : ${label}`);
+        }
+      }
+    ]
   }
 };
 
