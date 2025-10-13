@@ -8,6 +8,59 @@
   max-width: 72ch;
 }
 
+.a11ytb-settings-form {
+  margin-top: 20px;
+  padding: 20px 24px;
+  border-radius: var(--a11ytb-radius-lg, 12px);
+  border: 1px solid color-mix(in srgb, var(--a11ytb-color-border) 55%, transparent);
+  background: #fff;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 8%);
+}
+
+.a11ytb-settings-form h2 {
+  margin-top: 24px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.a11ytb-settings-form h2:first-of-type {
+  margin-top: 0;
+}
+
+.a11ytb-settings-form .description {
+  margin-top: 4px;
+  margin-bottom: 0;
+  color: color-mix(in srgb, #0f172a 60%, transparent);
+}
+
+.a11ytb-settings-form .form-table {
+  margin-top: 12px;
+}
+
+.a11ytb-settings-form .form-table th {
+  width: 240px;
+  padding: 16px 24px 16px 0;
+  vertical-align: top;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.a11ytb-settings-form .form-table td {
+  padding: 16px 0;
+}
+
+.a11ytb-settings-form input[type="text"],
+.a11ytb-settings-form input[type="password"],
+.a11ytb-settings-form input[type="number"],
+.a11ytb-settings-form select {
+  max-width: 320px;
+}
+
+.a11ytb-settings-form .description + .description {
+  margin-top: 8px;
+}
+
 .a11ytb-admin-columns {
   display: flex;
   flex-wrap: wrap;

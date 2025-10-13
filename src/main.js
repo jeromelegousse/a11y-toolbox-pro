@@ -132,6 +132,19 @@ const initial = normalizedManifests.reduce(
   baseInitial
 );
 
+const pluginConfig = window.a11ytbPluginConfig || {};
+const defaultConfig = pluginConfig?.defaults || {};
+const allowedDocks = new Set(['left', 'right', 'bottom']);
+const allowedViews = new Set(['modules', 'options', 'organize', 'guides', 'shortcuts']);
+
+if (defaultConfig?.dock && allowedDocks.has(defaultConfig.dock)) {
+  initial.ui.dock = defaultConfig.dock;
+}
+
+if (defaultConfig?.view && allowedViews.has(defaultConfig.view)) {
+  initial.ui.view = defaultConfig.view;
+}
+
 const moduleIcons = {
   audit: '<svg viewBox="0 0 24 24" focusable="false"><path d="M3 5a2 2 0 012-2h10a2 2 0 012 2v3h3v13h-8v-3h-2v3H3zm2 2v11h4v-3h6v3h4V10h-3V7H5zm9 1V5H5v3z"/></svg>',
   tts: '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 9v6h3l4 4V5L7 9H4zm13 3a3 3 0 00-3-3v6a3 3 0 003-3zm-3-6.9v2.07a5 5 0 010 9.66V18a7 7 0 000-13.9z"/></svg>',
@@ -636,4 +649,4 @@ registerBlock({
 setupModuleRuntime({ state, catalog: moduleCatalog, collections: moduleCollections });
 
 const root = document.getElementById('a11ytb-root');
-mountUI({ root, state });
+mountUI({ root, state, config: pluginConfig });
