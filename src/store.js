@@ -1,6 +1,27 @@
+const globalScope = typeof globalThis !== 'undefined' ? globalThis : window;
+const hasStructuredClone = Boolean(globalScope && typeof globalScope.structuredClone === 'function');
+
+function safeClone(value) {
+  if (hasStructuredClone) {
+    return globalScope.structuredClone(value);
+  }
+  if (value === undefined || value === null) {
+    return value;
+  }
+  if (typeof value !== 'object') {
+    return value;
+  }
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (error) {
+    console.warn('a11ytb: clonage approximatif utilisé (structuredClone indisponible).', error);
+    return Array.isArray(value) ? value.slice() : { ...value };
+  }
+}
+
 export function createStore(key, initial) {
   const subs = new Set();
-  let state = load() ?? initial;
+  let state = load() ?? safeClone(initial);
 
   function load() {
     try {
@@ -21,7 +42,7 @@ export function createStore(key, initial) {
 
   const api = {
     get(path) {
-      if (!path) return structuredClone(state);
+      if (!path) return safeClone(state);
       return path.split('.').reduce((acc, k) => acc?.[k], state);
     },
     set(path, value) {
@@ -35,15 +56,15 @@ export function createStore(key, initial) {
       }
       ref[keys.at(-1)] = value;
       persist();
-      subs.forEach(fn => fn(structuredClone(state)));
+      subs.forEach(fn => fn(safeClone(state)));
     },
     tx(patch) {
       state = { ...state, ...patch };
       persist();
-      subs.forEach(fn => fn(structuredClone(state)));
+      subs.forEach(fn => fn(safeClone(state)));
     },
     on(fn) { subs.add(fn); return () => subs.delete(fn); },
-    reset() { state = structuredClone(initial); persist(); subs.forEach(fn => fn(structuredClone(state))); },
+    reset() { state = safeClone(initial); persist(); subs.forEach(fn => fn(safeClone(state))); },
     serialize() { return JSON.stringify(state, null, 2); }
   };
   if (!window.a11ytb) window.a11ytb = {};
