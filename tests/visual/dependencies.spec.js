@@ -1,14 +1,8 @@
 import { test, expect } from '@playwright/test';
-
-const shouldSkipVisualTests =
-  process.env.PLAYWRIGHT_SKIP_VISUAL_TESTS === '1' ||
-  process.env.PLAYWRIGHT_SKIP_VISUAL_TESTS === 'true';
+import { shouldSkipVisualTests, visualSkipReason } from './skip-visual-tests.js';
 
 test.describe('Organisation — dépendances', () => {
-  test.skip(
-    shouldSkipVisualTests,
-    'Playwright browser dependencies are not available in this environment.'
-  );
+  test.skip(shouldSkipVisualTests, visualSkipReason);
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/');

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { shouldSkipVisualTests, visualSkipReason } from './skip-visual-tests.js';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -28,6 +29,7 @@ const focusableSelectors = [
 ];
 
 test.describe('Panneau Options & Profils', () => {
+  test.skip(shouldSkipVisualTests, visualSkipReason);
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.locator('.a11ytb-fab').click();
