@@ -43,8 +43,14 @@ test.describe('Organisation — dépendances', () => {
 
     const dependencySection = page.locator('.a11ytb-admin-dependencies').first();
     await expect(dependencySection).toBeVisible();
-    await expect(dependencySection.locator('.a11ytb-admin-dependency-badge', { hasText: 'Manquant' })).toBeVisible();
-    await expect(dependencySection.locator('.a11ytb-admin-dependency-badge', { hasText: 'OK' })).toBeVisible();
-    await expect(dependencySection.locator('.a11ytb-admin-dependency-message').first()).toContainText('introuvable');
+    await expect(
+      dependencySection.locator('.a11ytb-admin-dependency-badge', { hasText: 'Manquant' })
+    ).toBeVisible();
+    await expect(
+      dependencySection.locator('.a11ytb-admin-dependency-badge', { hasText: 'OK' })
+    ).toBeVisible();
+    await expect(
+      dependencySection.locator('.a11ytb-admin-dependency-message').first()
+    ).toContainText('introuvable');
   });
 });
