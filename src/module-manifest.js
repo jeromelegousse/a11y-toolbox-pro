@@ -1,4 +1,5 @@
 import { isValidSemver, parseSemver } from './utils/semver.js';
+import { safeClone } from './utils/safe-clone.js';
 
 const KNOWN_FIELDS = new Set([
   'id',
@@ -551,7 +552,7 @@ export function validateModuleManifest(manifest, moduleId) {
   if (manifest.defaults && typeof manifest.defaults === 'object') {
     const defaults = {};
     if (manifest.defaults.state && typeof manifest.defaults.state === 'object') {
-      defaults.state = structuredClone(manifest.defaults.state);
+      defaults.state = safeClone(manifest.defaults.state);
     }
     if (Object.keys(defaults).length) {
       normalized.defaults = defaults;
@@ -593,7 +594,7 @@ export function mergeManifestDefaults(state, manifest) {
   const next = { ...state };
   Object.entries(manifest.defaults.state).forEach(([namespace, value]) => {
     if (next[namespace] === undefined) {
-      next[namespace] = structuredClone(value);
+      next[namespace] = safeClone(value);
     }
   });
   return next;

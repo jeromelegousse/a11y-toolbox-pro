@@ -1,14 +1,8 @@
 import { registerModule } from '../registry.js';
 import { manifest } from './audio-feedback.manifest.js';
+import { safeClone } from '../utils/safe-clone.js';
 
 export { manifest };
-
-const clone = (value) => {
-  if (typeof structuredClone === 'function') {
-    return structuredClone(value);
-  }
-  return JSON.parse(JSON.stringify(value));
-};
 
 const FALLBACK_AUDIO = {
   masterVolume: 0.9,
@@ -22,8 +16,8 @@ const FALLBACK_AUDIO = {
 };
 
 const DEFAULT_AUDIO = manifest.defaults?.state?.audio
-  ? clone(manifest.defaults.state.audio)
-  : clone(FALLBACK_AUDIO);
+  ? safeClone(manifest.defaults.state.audio)
+  : safeClone(FALLBACK_AUDIO);
 
 function normalizeConfig(snapshot = {}) {
   const audioState = snapshot.audio ?? snapshot;
@@ -68,10 +62,10 @@ const audioFeedback = {
       return;
     }
 
-    const ensureDefaults = clone(DEFAULT_AUDIO);
+    const ensureDefaults = safeClone(DEFAULT_AUDIO);
     const current = state.get('audio');
     if (!current) {
-      state.set('audio', clone(ensureDefaults));
+      state.set('audio', safeClone(ensureDefaults));
     } else {
       const merged = { ...ensureDefaults, ...current };
       merged.events = { ...ensureDefaults.events, ...(current.events || {}) };

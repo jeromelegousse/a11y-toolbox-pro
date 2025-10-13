@@ -9,6 +9,7 @@ import { setupModuleRuntime } from './module-runtime.js';
 import { moduleCollections } from './module-collections.js';
 import { setupAudioFeedback } from './audio-feedback.js';
 import { buildAuditStatusText, renderAuditStats, renderAuditViolations } from './modules/audit-view.js';
+import { safeClone } from './utils/safe-clone.js';
 
 const profilePresets = {
   'vision-basse': {
@@ -252,9 +253,7 @@ const ensureDefaults = [
 
 ensureDefaults.forEach(([path, fallback]) => {
   if (state.get(path) === undefined) {
-    const clone = Array.isArray(fallback)
-      ? [...fallback]
-      : (typeof fallback === 'object' && fallback !== null ? structuredClone(fallback) : fallback);
+    const clone = (typeof fallback === 'object' && fallback !== null) ? safeClone(fallback) : fallback;
     state.set(path, clone);
   }
 });
