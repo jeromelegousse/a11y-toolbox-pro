@@ -4214,16 +4214,37 @@ export function mountUI({ root, state, config = {} }) {
         btn.removeAttribute('aria-current');
       }
     });
+    const activeElement = document.activeElement;
+    const nextViewElement = viewElements.get(currentView);
+    let shouldRefocus = false;
+
     viewElements.forEach((element, id) => {
       const isActive = id === currentView;
       if (isActive) {
         element.removeAttribute('hidden');
         element.setAttribute('aria-hidden', 'false');
       } else {
+        if (!shouldRefocus && element?.contains?.(activeElement)) {
+          shouldRefocus = true;
+        }
         element.setAttribute('hidden', '');
         element.setAttribute('aria-hidden', 'true');
       }
     });
+
+    if (shouldRefocus && nextViewElement) {
+      requestAnimationFrame(() => {
+        const focusables = collectFocusable(nextViewElement);
+        const target = focusables[0] || nextViewElement || panel;
+        if (typeof target?.focus === 'function') {
+          try {
+            target.focus({ preventScroll: true });
+          } catch (error) {
+            target.focus();
+          }
+        }
+      });
+    }
     if (currentView === 'options') {
       if (activeViewId !== 'options') {
         setupOptionsFocusTrap();

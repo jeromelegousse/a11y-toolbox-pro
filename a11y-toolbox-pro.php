@@ -25,9 +25,16 @@ function a11ytb_register_assets(): void
     $plugin_url = plugin_dir_url(__FILE__);
 
     wp_register_style(
+        'a11ytb/design-tokens',
+        $plugin_url . 'src/css/design-tokens.css',
+        [],
+        A11YTB_PLUGIN_VERSION
+    );
+
+    wp_register_style(
         'a11ytb/styles',
         $plugin_url . 'src/css/styles.css',
-        [],
+        ['a11ytb/design-tokens'],
         A11YTB_PLUGIN_VERSION
     );
 
