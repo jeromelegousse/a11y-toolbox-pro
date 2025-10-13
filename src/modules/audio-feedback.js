@@ -1,4 +1,5 @@
 import { registerModule } from '../registry.js';
+import { safeClone } from '../store.js';
 import { manifest } from './audio-feedback.manifest.js';
 import { safeClone } from '../utils/safe-clone.js';
 

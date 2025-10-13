@@ -1,5 +1,5 @@
 import { isValidSemver, parseSemver } from './utils/semver.js';
-import { safeClone } from './utils/safe-clone.js';
+import { safeClone } from './store.js';
 
 const KNOWN_FIELDS = new Set([
   'id',

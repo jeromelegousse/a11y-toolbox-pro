@@ -1,4 +1,5 @@
 import { registerModule } from '../registry.js';
+import { safeClone } from '../store.js';
 import { manifest } from './audit.manifest.js';
 import { normalizeAxeReport, summarizeReport } from './audit-report.js';
 import { safeClone } from '../utils/safe-clone.js';
@@ -23,7 +24,8 @@ function loadAxeCore() {
 function ensureAuditState(state) {
   const current = state.get('audit');
   if (!current || typeof current !== 'object') {
-    state.set('audit', safeClone(manifest.defaults.state.audit));
+    const defaults = manifest.defaults?.state?.audit;
+    state.set('audit', defaults ? safeClone(defaults) : {});
   }
 }
 
