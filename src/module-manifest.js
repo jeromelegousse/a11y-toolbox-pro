@@ -17,7 +17,8 @@ const KNOWN_FIELDS = new Set([
   'lifecycle',
   'config',
   'compat',
-  'runtime'
+  'runtime',
+  'guides'
 ]);
 
 const KNOWN_PRELOAD_STRATEGIES = new Set(['idle', 'visible', 'pointer']);
@@ -28,6 +29,57 @@ function ensureArray(value, mapFn = (x) => x) {
   return arr
     .map(mapFn)
     .filter((entry) => entry !== undefined && entry !== null);
+}
+
+function normalizeGuides(guides, manifestId) {
+  if (guides === undefined || guides === null) return undefined;
+  const entries = Array.isArray(guides) ? guides : [guides];
+  const normalized = [];
+  entries.forEach((guide, index) => {
+    if (!guide || typeof guide !== 'object') {
+      console.warn(`a11ytb: guide ignoré pour "${manifestId}" (index ${index}).`);
+      return;
+    }
+    const rawId = typeof guide.id === 'string' && guide.id.trim() ? guide.id.trim() : null;
+    if (!rawId) {
+      console.warn(`a11ytb: guide sans identifiant pour "${manifestId}" (index ${index}).`);
+      return;
+    }
+    const steps = Array.isArray(guide.steps) ? guide.steps.filter(Boolean) : [];
+    if (!steps.length) {
+      console.warn(`a11ytb: guide "${rawId}" sans étapes pour "${manifestId}".`);
+      return;
+    }
+    const record = { ...guide };
+    record.id = rawId;
+    if (typeof record.title === 'string') {
+      record.title = record.title.trim();
+    }
+    if (!record.title) {
+      record.title = rawId;
+    }
+    record.steps = Object.freeze(steps.slice());
+    if (record.prerequisites !== undefined) {
+      const prereqs = Array.isArray(record.prerequisites)
+        ? record.prerequisites.filter(Boolean)
+        : [record.prerequisites].filter(Boolean);
+      record.prerequisites = Object.freeze(prereqs);
+    }
+    if (record.tags !== undefined) {
+      const tags = ensureArray(record.tags, (tag) => {
+        if (typeof tag !== 'string') return undefined;
+        const trimmed = tag.trim();
+        return trimmed ? trimmed : undefined;
+      });
+      if (tags?.length) {
+        record.tags = Object.freeze(Array.from(new Set(tags)));
+      } else {
+        delete record.tags;
+      }
+    }
+    normalized.push(Object.freeze(record));
+  });
+  return normalized.length ? Object.freeze(normalized) : undefined;
 }
 
 function normalizeDependencies(input) {
@@ -331,6 +383,11 @@ export function validateModuleManifest(manifest, moduleId) {
   const runtime = normalizeRuntime(manifest.runtime, id);
   if (runtime) {
     normalized.runtime = runtime;
+  }
+
+  const guides = normalizeGuides(manifest.guides, id);
+  if (guides) {
+    normalized.guides = guides;
   }
 
   return Object.freeze(normalized);
