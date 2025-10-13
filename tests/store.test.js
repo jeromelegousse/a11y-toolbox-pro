@@ -1,5 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createStore } from '../src/store.js';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 class MemoryStorage {
   constructor() {
@@ -26,11 +25,27 @@ class MemoryStorage {
 describe('createStore', () => {
   const KEY = 'a11ytb:test';
   const makeInitialState = () => ({ foo: 'bar', nested: { value: 1 } });
+  const originalStructuredClone = globalThis.structuredClone;
+  let createStore;
 
-  beforeEach(() => {
-    const storage = new MemoryStorage();
-    globalThis.localStorage = storage;
+  async function importStore(options = {}) {
+    vi.resetModules();
+    if (options.disableStructuredClone) {
+      delete globalThis.structuredClone;
+    } else {
+      globalThis.structuredClone = originalStructuredClone;
+    }
+    ({ createStore } = await import('../src/store.js'));
+  }
+
+  beforeEach(async () => {
+    await importStore();
+    globalThis.localStorage = new MemoryStorage();
     globalThis.window = { a11ytb: {} };
+  });
+
+  afterEach(() => {
+    globalThis.structuredClone = originalStructuredClone;
   });
 
   it('expose l’API du store sur window.a11ytb.state', () => {
@@ -128,5 +143,48 @@ describe('createStore', () => {
       foo: 'serialized',
       nested: { value: 1 }
     }, null, 2));
+  });
+
+  it('préserve les structures complexes quand structuredClone est indisponible', async () => {
+    await importStore({ disableStructuredClone: true });
+    globalThis.localStorage = new MemoryStorage();
+    globalThis.window = { a11ytb: {} };
+
+    const initial = {
+      foo: 'bar',
+      nested: { value: 1 },
+      createdAt: new Date('2024-01-01T00:00:00.000Z'),
+      pattern: /test/gi,
+      tags: new Set(['a', { deep: true }]),
+      entries: new Map([
+        ['first', { ready: true }]
+      ]),
+      bytes: new Uint8Array([1, 2, 3])
+    };
+
+    const store = createStore(KEY, initial);
+    const snapshot = store.get();
+
+    expect(snapshot).not.toBe(initial);
+    expect(snapshot.createdAt).toBeInstanceOf(Date);
+    expect(snapshot.createdAt.getTime()).toBe(initial.createdAt.getTime());
+    expect(snapshot.pattern).toBeInstanceOf(RegExp);
+    expect(snapshot.pattern.source).toBe('test');
+    expect(snapshot.pattern.flags).toBe('gi');
+    expect(snapshot.tags).toBeInstanceOf(Set);
+    expect(snapshot.tags).not.toBe(initial.tags);
+    const [, nestedEntry] = [...snapshot.tags];
+    expect(nestedEntry).toEqual({ deep: true });
+    expect(snapshot.entries).toBeInstanceOf(Map);
+    expect(snapshot.entries).not.toBe(initial.entries);
+    expect(snapshot.entries.get('first')).toEqual({ ready: true });
+    expect(snapshot.bytes).toBeInstanceOf(Uint8Array);
+    expect(snapshot.bytes).not.toBe(initial.bytes);
+
+    snapshot.nested.value = 99;
+    snapshot.bytes[0] = 9;
+
+    expect(store.get('nested.value')).toBe(1);
+    expect(store.get('bytes')[0]).toBe(1);
   });
 });
