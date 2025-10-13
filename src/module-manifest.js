@@ -1,4 +1,4 @@
-const SEMVER_REGEX = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-.]+)?(?:\+[0-9A-Za-z-.]+)?$/;
+import { isValidSemver, parseSemver } from './utils/semver.js';
 
 const KNOWN_FIELDS = new Set([
   'id',
@@ -270,7 +270,16 @@ function normalizeDependencies(input) {
     if (dep && typeof dep === 'object' && typeof dep.id === 'string' && dep.id.trim()) {
       const normalized = { id: dep.id.trim() };
       if (typeof dep.version === 'string' && dep.version.trim()) {
-        normalized.version = dep.version.trim();
+        const version = dep.version.trim();
+        if (!isValidSemver(version)) {
+          console.warn(`a11ytb: version de dépendance invalide "${version}" pour "${dep.id}".`);
+        } else {
+          normalized.version = version;
+          const parsed = parseSemver(version);
+          if (parsed) {
+            normalized.versionInfo = parsed;
+          }
+        }
       }
       return normalized;
     }
@@ -462,12 +471,17 @@ export function validateModuleManifest(manifest, moduleId) {
   }
 
   if (manifest.version !== undefined) {
-    if (typeof manifest.version !== 'string' || !SEMVER_REGEX.test(manifest.version.trim())) {
+    if (!isValidSemver(manifest.version)) {
       throw new Error(`Module manifest for "${id}" has an invalid semver version.`);
     }
     normalized.version = manifest.version.trim();
   } else {
     normalized.version = '0.0.0';
+  }
+
+  const parsedVersion = parseSemver(normalized.version);
+  if (parsedVersion) {
+    normalized.versionInfo = parsedVersion;
   }
 
   if (manifest.description && typeof manifest.description === 'string') {

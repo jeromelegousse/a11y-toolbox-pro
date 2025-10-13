@@ -1,6 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import { summarizeStatuses, computeModuleMetrics, getModuleCompatibilityScore } from '../src/status-center.js';
 
+const DEFAULT_SUMMARY = 'Couverture métadonnées simulée.';
+
+function createQuality({
+  level = 'AA',
+  coverage = 0.75,
+  coveragePercent = Math.round(coverage * 100),
+  detail = '',
+  missing = [],
+  summary = DEFAULT_SUMMARY
+} = {}) {
+  return {
+    level,
+    levelLabel: level === 'AAA' ? 'Excellent' : level === 'AA' ? 'Avancé' : level,
+    coverage,
+    coveragePercent,
+    summary,
+    detail,
+    missing: Array.from(missing),
+    recommendations: [],
+    checks: []
+  };
+}
+
 describe('summarizeStatuses', () => {
   it('retourne un état prêt par défaut pour les modules critiques', () => {
     const snapshot = {
@@ -25,18 +48,18 @@ describe('summarizeStatuses', () => {
       spacing: { lineHeight: 1.5, letterSpacing: 0 },
       runtime: {
         modules: {
-          audit: { enabled: true, state: 'ready' },
-          tts: { enabled: true, state: 'ready' },
-          stt: { enabled: true, state: 'ready' },
-          braille: { enabled: true, state: 'ready' },
-          contrast: { enabled: true, state: 'ready' },
-          spacing: { enabled: true, state: 'ready' }
+          audit: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AAA', coverage: 0.95, missing: [] }) },
+          tts: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AA', coverage: 0.82, missing: ['Guides FastPass'] }) },
+          stt: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'A', coverage: 0.6, missing: ['Guides FastPass', 'Licence déclarée'] }) },
+          braille: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AA', coverage: 0.76, missing: [] }) },
+          contrast: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AAA', coverage: 0.9, missing: [] }) },
+          spacing: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AA', coverage: 0.7, missing: ['Licence déclarée'] }) }
         }
       }
     };
 
     const statuses = summarizeStatuses(snapshot);
-    expect(statuses).toHaveLength(7);
+    expect(statuses).toHaveLength(8);
 
     const globalSummary = statuses.find((status) => status.id === 'global-score');
     expect(globalSummary).toBeDefined();
@@ -44,6 +67,15 @@ describe('summarizeStatuses', () => {
     expect(globalSummary.detail).toContain('6/6 modules prêts');
     expect(globalSummary.insights.compatLabel).toBe('Aucun incident');
     expect(globalSummary.tone).toBe('active');
+
+    const metadataSummary = statuses.find((status) => status.id === 'metadata-score');
+    expect(metadataSummary).toBeDefined();
+    expect(metadataSummary.value).toBe('Couverture moyenne 79 %');
+    expect(metadataSummary.detail).toContain('2 AAA');
+    expect(metadataSummary.detail).toContain('Guides FastPass (2)');
+    expect(metadataSummary.tone).toBe('warning');
+    expect(metadataSummary.insights.compatLabel).toBe('Guides FastPass (2) · Licence déclarée (2)');
+    expect(metadataSummary.insights.latencyLabel).toBe('6/6');
 
     const auditSummary = statuses.find((status) => status.id === 'audit');
     expect(auditSummary.value).toBe('En attente');
@@ -94,17 +126,24 @@ describe('summarizeStatuses', () => {
       spacing: { lineHeight: 1.5, letterSpacing: 0 },
       runtime: {
         modules: {
-          audit: { enabled: true, state: 'ready' },
-          tts: { enabled: true, state: 'error', error: 'Échec de chargement' },
+          audit: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AA', coverage: 0.72, missing: ['Guides FastPass'] }) },
+          tts: { enabled: true, state: 'error', error: 'Échec de chargement', metadataQuality: createQuality({ level: 'B', coverage: 0.4, missing: ['Guides FastPass', 'Licence déclarée'] }) },
           stt: { enabled: false, state: 'idle' },
-          braille: { enabled: true, state: 'ready' },
+          braille: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AA', coverage: 0.8, missing: [] }) },
           contrast: { enabled: false, state: 'idle' },
-          spacing: { enabled: true, state: 'error', error: 'Espacement indisponible' }
+          spacing: { enabled: true, state: 'error', error: 'Espacement indisponible', metadataQuality: createQuality({ level: 'A', coverage: 0.62, missing: ['Licence déclarée'] }) }
         }
       }
     };
 
     const statuses = summarizeStatuses(snapshot);
+
+    const metadataSummary = statuses.find((status) => status.id === 'metadata-score');
+    expect(metadataSummary.value).toBe('Couverture moyenne 64 %');
+    expect(metadataSummary.detail).toContain('1 B');
+    expect(metadataSummary.detail).toContain('Guides FastPass (2)');
+    expect(metadataSummary.tone).toBe('alert');
+    expect(metadataSummary.insights.latencyLabel).toBe('4/6');
 
     const globalSummary = statuses.find((status) => status.id === 'global-score');
     expect(globalSummary.value).toBe('Indice AA');
@@ -170,17 +209,23 @@ describe('summarizeStatuses', () => {
       spacing: { lineHeight: 1.9, letterSpacing: 0.1 },
       runtime: {
         modules: {
-          audit: { enabled: true, state: 'ready' },
-          tts: { enabled: true, state: 'ready' },
-          stt: { enabled: true, state: 'ready' },
-          braille: { enabled: true, state: 'ready' },
-          contrast: { enabled: true, state: 'ready' },
-          spacing: { enabled: true, state: 'ready' }
+          audit: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }) },
+          tts: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }) },
+          stt: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }) },
+          braille: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }) },
+          contrast: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }) },
+          spacing: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }) }
         }
       }
     };
 
     const statuses = summarizeStatuses(snapshot);
+
+    const metadataSummary = statuses.find((status) => status.id === 'metadata-score');
+    expect(metadataSummary.value).toBe('Couverture moyenne 92 %');
+    expect(metadataSummary.detail).toContain('6 AAA');
+    expect(metadataSummary.tone).toBe('info');
+    expect(metadataSummary.insights.compatLabel).toBe('Aligné sur Stark');
 
     const globalSummary = statuses.find((status) => status.id === 'global-score');
     expect(globalSummary.value).toBe('Indice A');

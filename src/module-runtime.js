@@ -1,4 +1,5 @@
 import { getModule, listBlocks } from './registry.js';
+import { compareSemver } from './utils/semver.js';
 
 const DEPENDENCY_STATUS_LABELS = {
   ok: 'OK',
@@ -16,20 +17,6 @@ function now() {
     return performance.now();
   }
   return Date.now();
-}
-
-function compareSemver(a = '', b = '') {
-  const normalize = (input) => String(input).split('-')[0].split('.').map((part) => Number.parseInt(part, 10) || 0);
-  const aParts = normalize(a);
-  const bParts = normalize(b);
-  const length = Math.max(aParts.length, bParts.length);
-  for (let index = 0; index < length; index += 1) {
-    const aValue = aParts[index] ?? 0;
-    const bValue = bParts[index] ?? 0;
-    if (aValue > bValue) return 1;
-    if (aValue < bValue) return -1;
-  }
-  return 0;
 }
 
 function createEmptyCompat() {
