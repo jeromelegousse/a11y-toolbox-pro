@@ -536,11 +536,10 @@ function a11ytb_enqueue_admin_assets(string $hook): void
         $plugin_url . 'src/admin/admin-app.js',
         [],
         A11YTB_PLUGIN_VERSION,
-        [
-            'in_footer' => true,
-            'type' => 'module',
-        ]
+        true
     );
+
+    wp_script_add_data('a11ytb/admin-app', 'type', 'module');
 }
 add_action('admin_enqueue_scripts', 'a11ytb_enqueue_admin_assets');
 
