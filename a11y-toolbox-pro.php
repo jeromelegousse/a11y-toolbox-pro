@@ -344,6 +344,7 @@ function a11ytb_render_enable_frontend_field(): void
 {
     $enabled = get_option('a11ytb_enable_frontend', '1') === '1';
     ?>
+    <input type="hidden" name="a11ytb_enable_frontend" value="0" />
     <label for="a11ytb_enable_frontend">
         <input type="checkbox" id="a11ytb_enable_frontend" name="a11ytb_enable_frontend" value="1" <?php checked($enabled); ?> />
         <?php esc_html_e('Activer l’injection de la boîte à outils sur toutes les pages publiques.', 'a11ytb'); ?>
@@ -393,6 +394,7 @@ function a11ytb_render_auto_open_field(): void
 {
     $auto_open = get_option('a11ytb_auto_open_panel', '0') === '1';
     ?>
+    <input type="hidden" name="a11ytb_auto_open_panel" value="0" />
     <label for="a11ytb_auto_open_panel">
         <input type="checkbox" id="a11ytb_auto_open_panel" name="a11ytb_auto_open_panel" value="1" <?php checked($auto_open); ?> />
         <?php esc_html_e('Afficher automatiquement la boîte à outils au premier chargement.', 'a11ytb'); ?>
