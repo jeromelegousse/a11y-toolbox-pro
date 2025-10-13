@@ -46,6 +46,27 @@ function a11ytb_register_assets(): void
 add_action('init', 'a11ytb_register_assets');
 
 /**
+ * Force le type "module" sur le script si la fonction d’aide de WordPress n’est pas disponible.
+ */
+function a11ytb_filter_script_tag($tag, $handle, $src): string
+{
+    if ($handle !== 'a11ytb/app') {
+        return $tag;
+    }
+
+    if (strpos($tag, 'type="module"') !== false) {
+        return $tag;
+    }
+
+    if (false === strpos($tag, ' src=')) {
+        return $tag;
+    }
+
+    return str_replace(' src=', ' type="module" src=', $tag);
+}
+add_filter('script_loader_tag', 'a11ytb_filter_script_tag', 10, 3);
+
+/**
  * Determine si le plugin doit être actif sur la requête courante.
  *
  * @return bool
