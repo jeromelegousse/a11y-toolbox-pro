@@ -103,6 +103,7 @@ export const manifest = {
         pitch: 1,
         volume: 1,
         voice: '',
+        preferredLang: '',
         availableVoices: [],
         speaking: false,
         status: 'idle',
@@ -114,6 +115,78 @@ export const manifest = {
     group: 'Synthèse vocale',
     description: 'Réglez la voix et les paramètres audio utilisés par défaut pour la lecture.',
     fields: [
+      {
+        type: 'select',
+        path: 'tts.preferredLang',
+        label: 'Langue préférée',
+        description: 'Sélectionnez la langue à privilégier pour la voix de lecture.',
+        emptyLabel: 'Détection automatique',
+        getOptions: (state) => {
+          const voices = state.tts?.availableVoices ?? [];
+          const codes = [];
+          const seen = new Set();
+          const register = (code) => {
+            const normalized = (code || '').toLowerCase();
+            if (!normalized || seen.has(normalized)) return;
+            seen.add(normalized);
+            codes.push(code);
+          };
+          voices.forEach((voice) => {
+            if (!voice?.lang) return;
+            register(voice.lang);
+            const prefix = voice.lang.split('-')[0];
+            if (prefix && prefix !== voice.lang) register(prefix);
+          });
+          const docLang = (document.documentElement.lang || '').toLowerCase();
+          const docPrefix = docLang.split('-')[0];
+          register(docLang);
+          if (docPrefix && docPrefix !== docLang) register(docPrefix);
+          const baseLocale = document.documentElement.lang || navigator.language || 'fr';
+          let displayNames;
+          if (typeof Intl?.DisplayNames === 'function') {
+            try {
+              displayNames = new Intl.DisplayNames([baseLocale], { type: 'language' });
+            } catch (error) {
+              displayNames = null;
+            }
+          }
+          return codes
+            .map((code) => {
+              if (!code) {
+                return { value: '', label: 'Détection automatique' };
+              }
+              const normalized = code.toLowerCase();
+              let label = code;
+              if (displayNames) {
+                try {
+                  const name = displayNames.of(normalized);
+                  if (name) label = `${name} — ${code}`;
+                } catch (error) {
+                  label = code;
+                }
+              }
+              return { value: code, label };
+            })
+            .sort((a, b) => a.label.localeCompare(b.label, baseLocale));
+        },
+        onChange: (value, { state }) => {
+          const lang = value ? value : 'détection automatique';
+          window.a11ytb?.logActivity?.(`Langue préférée TTS réglée sur ${lang}`, {
+            tone: 'info',
+            tags: ['tts', 'preferences']
+          });
+          if (!value) return;
+          const voices = state.tts?.availableVoices ?? [];
+          const normalized = value.toLowerCase();
+          const match = voices.find((voice) => voice.lang?.toLowerCase().startsWith(normalized));
+          if (match) {
+            window.a11ytb?.logActivity?.(`Voix alignée sur ${match.name} (${match.lang})`, {
+              tone: 'confirm',
+              tags: ['tts', 'preferences']
+            });
+          }
+        }
+      },
       {
         type: 'select',
         path: 'tts.voice',

@@ -4,6 +4,7 @@
 - Dock gauche/droite/bas
 - Système de blocs (inspiration WordPress)
 - Modules : TTS, STT (si dispo), Braille (grade 1 simpl.), Contraste, Espacements
+- Réglage de la langue préférée pour la synthèse vocale avec détection automatique des voix
 - Panneau « Options & Profils » : profils Vision/Dyslexie/Lecture rapide + réglages centralisés (TTS, Espacements, Contraste)
 - Vue « Guides » (Alt+Shift+P) avec checklists d’onboarding et suivi d’avancement
 - Vue « Raccourcis » (Alt+Shift+H) listant les commandes clavier globales et contextuelles
