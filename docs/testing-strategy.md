@@ -8,7 +8,7 @@ Ce document précise comment nous automatisons les vérifications et comment ajo
 | --- | --- |
 | `npm run lint` | Exécute ESLint (`src/**/*.js`) puis Stylelint (`src/**/*.css`). Le script échoue sur le moindre avertissement. |
 | `npm run test:unit` | Exécute les tests Vitest (store, manifest, logique métier). |
-| `npm run test:visual` | Lance Playwright (Chromium) et vérifie les snapshots du panneau Options & Profils. |
+| `npm run test:visual` | Lance Playwright (Chromium) et vérifie les snapshots du panneau Options & Profils. Définissez `PLAYWRIGHT_SKIP_VISUAL_TESTS=1` si les dépendances système des navigateurs ne sont pas disponibles (CI légère, conteneur minimal, etc.). |
 | `npm run test` | Chaîne `npm run lint`, `npm run test:unit` puis `npm run test:visual`. Utilisée par la CI. |
 
 ## 2. Tests unitaires (Vitest)

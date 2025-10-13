@@ -1,6 +1,15 @@
 import { test, expect } from '@playwright/test';
 
+const shouldSkipVisualTests =
+  process.env.PLAYWRIGHT_SKIP_VISUAL_TESTS === '1' ||
+  process.env.PLAYWRIGHT_SKIP_VISUAL_TESTS === 'true';
+
 test.describe('Organisation — dépendances', () => {
+  test.skip(
+    shouldSkipVisualTests,
+    'Playwright browser dependencies are not available in this environment.'
+  );
+
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.locator('.a11ytb-fab').click();

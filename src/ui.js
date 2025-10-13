@@ -1198,6 +1198,7 @@ export function mountUI({ root, state, config = {} }) {
     btn.setAttribute('aria-pressed', 'false');
     btn.addEventListener('click', () => {
       state.set('ui.view', view.id);
+      syncView();
     });
     viewButtons.set(view.id, btn);
     viewToggle.append(btn);
