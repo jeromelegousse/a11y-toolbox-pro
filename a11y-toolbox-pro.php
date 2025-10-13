@@ -132,6 +132,18 @@ function a11ytb_enqueue_admin_assets(string $hook): void
         [],
         A11YTB_PLUGIN_VERSION
     );
+
+    wp_enqueue_script(
+        'a11ytb/admin-app',
+        $plugin_url . 'src/admin/admin-app.js',
+        [],
+        A11YTB_PLUGIN_VERSION,
+        true
+    );
+
+    if (function_exists('wp_script_add_data')) {
+        wp_script_add_data('a11ytb/admin-app', 'type', 'module');
+    }
 }
 add_action('admin_enqueue_scripts', 'a11ytb_enqueue_admin_assets');
 
@@ -160,19 +172,16 @@ function a11ytb_render_admin_page(): void
 
         <div class="a11ytb-admin-columns">
             <div class="a11ytb-admin-column">
-                <h2><?php esc_html_e('Guide rapide', 'a11ytb'); ?></h2>
-                <ol>
-                    <li><?php esc_html_e('Ouvrez n’importe quelle page publique de votre site pour voir la boîte à outils.', 'a11ytb'); ?></li>
-                    <li><?php esc_html_e('Utilisez le raccourci Alt+Shift+A ou le bouton flottant pour afficher/masquer la barre latérale.', 'a11ytb'); ?></li>
-                    <li><?php esc_html_e('Explorez les vues Modules, Options & Profils et Organisation pour configurer l’expérience.', 'a11ytb'); ?></li>
-                </ol>
-
-                <h2><?php esc_html_e('Astuces utiles', 'a11ytb'); ?></h2>
-                <ul class="a11ytb-admin-shortcuts">
-                    <li><?php esc_html_e('Alt+Shift+O : ouvre la vue Options & Profils.', 'a11ytb'); ?></li>
-                    <li><?php esc_html_e('Alt+Shift+G : affiche la vue Organisation pour trier les modules.', 'a11ytb'); ?></li>
-                    <li><?php esc_html_e('Alt+Shift+H : liste tous les raccourcis clavier disponibles.', 'a11ytb'); ?></li>
-                </ul>
+                <div
+                    id="a11ytb-admin-app"
+                    class="a11ytb-admin-app-mount"
+                    aria-live="polite"
+                    aria-busy="true"
+                >
+                    <p class="a11ytb-admin-app-placeholder">
+                        <?php esc_html_e('Chargement du tableau de bord d’administration…', 'a11ytb'); ?>
+                    </p>
+                </div>
             </div>
 
             <div class="a11ytb-admin-column a11ytb-admin-column--preview">
