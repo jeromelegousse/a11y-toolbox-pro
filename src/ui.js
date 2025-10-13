@@ -3994,6 +3994,20 @@ export function mountUI({ root, state, config = {} }) {
     profileDescription.textContent = profile?.description || '';
   }
 
+  function moveFocusOutOfModule(moduleElement) {
+    if (!moduleElement) return;
+    const active = document.activeElement;
+    if (!active || !moduleElement.contains(active)) return;
+    const focusables = getFocusableElements()
+      .filter((el) => el !== active && !moduleElement.contains(el));
+    const fallback = focusables[0];
+    if (fallback && typeof fallback.focus === 'function') {
+      fallback.focus();
+    } else if (panel && typeof panel.focus === 'function') {
+      panel.focus();
+    }
+  }
+
   function applyModuleLayout() {
     const prefs = getPreferences();
     const searchTerm = (prefs.search || '').trim().toLowerCase();
@@ -4066,6 +4080,7 @@ export function mountUI({ root, state, config = {} }) {
         el.removeAttribute('hidden');
         el.setAttribute('aria-hidden', 'false');
       } else {
+        moveFocusOutOfModule(el);
         el.setAttribute('hidden', '');
         el.setAttribute('aria-hidden', 'true');
       }
