@@ -2,16 +2,20 @@ import { test, expect } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { shouldSkipVisualTests } from './skip-flag.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const BASELINE_PATH = resolve(__dirname, 'baselines/options-panel.png.base64');
 
+const skipVisualTests = shouldSkipVisualTests();
 const shouldUpdateBaseline = process.env.UPDATE_VISUAL_BASELINE === '1';
 
-const BASELINE_SCREENSHOT = shouldUpdateBaseline
-  ? null
-  : (await readFile(BASELINE_PATH, 'utf8')).replace(/\s+/g, '');
+let BASELINE_SCREENSHOT = null;
+
+if (!shouldUpdateBaseline && !skipVisualTests) {
+  BASELINE_SCREENSHOT = (await readFile(BASELINE_PATH, 'utf8')).replace(/\s+/g, '');
+}
 
 const wrapBase64 = (payload) => {
   const chunks = payload.match(/.{1,76}/g);
@@ -28,6 +32,11 @@ const focusableSelectors = [
 ];
 
 test.describe('Panneau Options & Profils', () => {
+  test.skip(
+    skipVisualTests,
+    'Playwright browser dependencies are not available in this environment.'
+  );
+
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.locator('.a11ytb-fab').click();
@@ -41,7 +50,9 @@ test.describe('Panneau Options & Profils', () => {
 
     const cycleLength = await page.evaluate((selectors) => {
       const options = document.querySelector('.a11ytb-view--options');
-      const toggle = document.querySelector('.a11ytb-chip--view[data-view="options"]');
+      const toggle = document.querySelector(
+        '.a11ytb-chip--view[data-view="options"]'
+      );
       if (!options) return 0;
       const focusables = [
         toggle,
