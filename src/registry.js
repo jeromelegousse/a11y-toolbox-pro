@@ -1,13 +1,86 @@
 import { validateModuleManifest } from './module-manifest.js';
+import { compareSemver } from './utils/semver.js';
 
 const _modules = new Map();
 const _moduleManifests = new Map();
+const _moduleManifestHistory = new Map();
+
+function ensureHistoryBucket(manifestId) {
+  if (!_moduleManifestHistory.has(manifestId)) {
+    _moduleManifestHistory.set(manifestId, []);
+  }
+  return _moduleManifestHistory.get(manifestId);
+}
+
+function serializeManifest(manifest) {
+  try {
+    return JSON.stringify(manifest, (key, value) => {
+      if (typeof value === 'function') {
+        return `[function:${value.name || 'anonymous'}]`;
+      }
+      return value;
+    });
+  } catch (error) {
+    console.warn('a11ytb: impossible de sérialiser le manifest pour comparaison.', error);
+    return '';
+  }
+}
+
+function createHistoryEntry(manifest, { status, reason }) {
+  const entry = {
+    version: manifest.version,
+    versionInfo: manifest.versionInfo,
+    metadataQuality: manifest.metadataQuality,
+    status,
+    reason,
+    timestamp: Date.now()
+  };
+  if (manifest.name) {
+    entry.name = manifest.name;
+  }
+  if (manifest.description) {
+    entry.description = manifest.description;
+  }
+  return Object.freeze(entry);
+}
 
 export function registerModuleManifest(manifest, moduleId) {
   const normalized = validateModuleManifest(manifest ?? { id: moduleId }, moduleId);
   const existing = _moduleManifests.get(normalized.id);
-  if (existing) return existing;
+  if (!existing) {
+    _moduleManifests.set(normalized.id, normalized);
+    const bucket = ensureHistoryBucket(normalized.id);
+    bucket.push(createHistoryEntry(normalized, { status: 'accepted', reason: 'initial' }));
+    return normalized;
+  }
+
+  const comparison = compareSemver(normalized.version, existing.version);
+  const bucket = ensureHistoryBucket(normalized.id);
+
+  if (comparison < 0) {
+    console.warn(
+      `a11ytb: manifest "${normalized.id}" ignoré car version ${normalized.version} < ${existing.version}.`
+    );
+    bucket.push(createHistoryEntry(normalized, { status: 'rejected', reason: 'downgrade' }));
+    return existing;
+  }
+
+  if (comparison === 0) {
+    const existingSignature = serializeManifest(existing);
+    const nextSignature = serializeManifest(normalized);
+    if (existingSignature !== nextSignature) {
+      console.warn(
+        `a11ytb: manifest "${normalized.id}" mis à jour sans changement de version (${normalized.version}).`
+      );
+      _moduleManifests.set(normalized.id, normalized);
+      bucket.push(createHistoryEntry(normalized, { status: 'accepted', reason: 'refresh' }));
+      return normalized;
+    }
+    return existing;
+  }
+
   _moduleManifests.set(normalized.id, normalized);
+  bucket.push(createHistoryEntry(normalized, { status: 'accepted', reason: 'upgrade' }));
   return normalized;
 }
 const PLACEHOLDER_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 3a2 2 0 11-2 2 2 2 0 012-2zm0 4a1 1 0 011 1v8a1 1 0 01-2 0V10a1 1 0 011-1z"/></svg>';
@@ -51,6 +124,18 @@ export function listModuleManifests() {
 
 export function getModuleManifest(id) {
   return _moduleManifests.get(id);
+}
+
+export function getModuleManifestHistory(id) {
+  const history = _moduleManifestHistory.get(id);
+  return history ? history.slice() : [];
+}
+
+export function listModuleManifestHistory() {
+  return Array.from(_moduleManifestHistory.entries()).map(([id, entries]) => ({
+    id,
+    history: entries.slice()
+  }));
 }
 
 const _blocks = new Map();
@@ -133,6 +218,8 @@ if (!window.a11ytb.registry) {
     getBlock,
     listModuleManifests,
     getModuleManifest,
-    registerModuleManifest
+    registerModuleManifest,
+    getModuleManifestHistory,
+    listModuleManifestHistory
   };
 }
