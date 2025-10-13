@@ -9,7 +9,10 @@ import { updateDependencyDisplay } from './utils/dependency-display.js';
 
 const DEFAULT_BLOCK_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h7v7H4V5zm9 0h7v7h-7V5zM4 12h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>';
 
-export function mountUI({ root, state }) {
+export function mountUI({ root, state, config = {} }) {
+  const pluginConfig = config || {};
+  const behaviorConfig = pluginConfig.behavior || {};
+  const AUTO_OPEN_STORAGE_KEY = 'a11ytb/auto-opened';
   const categories = [
     { id: 'all', label: 'Tous' },
     { id: 'vision', label: 'Vision' },
@@ -4651,6 +4654,23 @@ export function mountUI({ root, state }) {
       const target = (lastFocusedElement && typeof lastFocusedElement.focus === 'function') ? lastFocusedElement : fab;
       target.focus();
       lastFocusedElement = null;
+    }
+  }
+
+  if (behaviorConfig.autoOpen === true) {
+    let shouldAutoOpen = true;
+    try {
+      if (sessionStorage.getItem(AUTO_OPEN_STORAGE_KEY) === 'yes') {
+        shouldAutoOpen = false;
+      } else {
+        sessionStorage.setItem(AUTO_OPEN_STORAGE_KEY, 'yes');
+      }
+    } catch (error) {
+      // Navigateur privé ou quotas atteints : on tente tout de même une ouverture.
+    }
+
+    if (shouldAutoOpen && panel.dataset.open !== 'true') {
+      window.setTimeout(() => toggle(true), 120);
     }
   }
 
