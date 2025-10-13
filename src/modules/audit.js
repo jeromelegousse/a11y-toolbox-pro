@@ -2,6 +2,7 @@ import { registerModule } from '../registry.js';
 import { safeClone } from '../store.js';
 import { manifest } from './audit.manifest.js';
 import { normalizeAxeReport, summarizeReport } from './audit-report.js';
+import { safeClone } from '../utils/safe-clone.js';
 
 export { manifest };
 

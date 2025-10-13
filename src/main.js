@@ -9,6 +9,7 @@ import { setupModuleRuntime } from './module-runtime.js';
 import { moduleCollections } from './module-collections.js';
 import { setupAudioFeedback } from './audio-feedback.js';
 import { buildAuditStatusText, renderAuditStats, renderAuditViolations } from './modules/audit-view.js';
+import { safeClone } from './utils/safe-clone.js';
 
 const profilePresets = {
   'vision-basse': {
