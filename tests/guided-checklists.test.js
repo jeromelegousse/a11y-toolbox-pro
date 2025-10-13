@@ -2,48 +2,55 @@ import { describe, it, expect } from 'vitest';
 import { buildGuidedChecklists, toggleManualChecklistStep } from '../src/guided-checklists.js';
 
 describe('buildGuidedChecklists', () => {
-  it('computes quickstart progress based on accessibility presets', () => {
+  it('builds a core services overview using runtime metrics', () => {
     const snapshot = {
-      ui: {
-        activeProfile: 'vision-basse',
-        pinned: ['contrast-controls', 'tts-controls']
-      },
-      contrast: { enabled: true },
-      spacing: { lineHeight: 1.8, letterSpacing: 0.05 }
+      runtime: {
+        modules: {
+          tts: { enabled: true, state: 'ready', metrics: { compat: { status: 'full' } } },
+          stt: { enabled: false, state: 'idle' },
+          braille: { enabled: true, state: 'error', error: 'Driver manquant' }
+        }
+      }
     };
-    const [quickstart] = buildGuidedChecklists(snapshot);
-    expect(quickstart.id).toBe('quickstart');
-    expect(quickstart.completedCount).toBe(4);
-    expect(quickstart.progress).toBe(1);
-    expect(quickstart.steps.every((step) => step.completed)).toBe(true);
+    const [coreServices] = buildGuidedChecklists(snapshot);
+    expect(coreServices.id).toBe('core-services');
+    const brailleStep = coreServices.steps.find((step) => step.id === 'critical-braille');
+    expect(brailleStep).toBeTruthy();
+    expect(brailleStep?.completed).toBe(false);
+    expect(coreServices.completedCount).toBeLessThan(coreServices.total);
   });
 
-  it('surfaces manual steps stored in ui.guides.completedSteps', () => {
+  it('reflects manual completion stored in ui.guides.completedSteps', () => {
     const snapshot = {
       ui: {
         guides: {
           completedSteps: {
-            'check-status-center': true
+            'audit-fastpass:audit-share': true
           }
         }
       },
       runtime: {
         modules: {
-          tts: { state: 'ready', enabled: true }
+          audit: { enabled: true, state: 'ready' }
         }
+      },
+      audit: {
+        lastRun: Date.now(),
+        summary: { totals: { critical: 0, serious: 0, moderate: 0, minor: 0 } }
       }
     };
-    const [, observability] = buildGuidedChecklists(snapshot);
-    expect(observability.id).toBe('observability');
-    const manualStep = observability.steps.find((step) => step.id === 'check-status-center');
+    const scenarios = buildGuidedChecklists(snapshot);
+    const auditScenario = scenarios.find((scenario) => scenario.id === 'audit-fastpass');
+    expect(auditScenario).toBeTruthy();
+    const manualStep = auditScenario?.steps.find((step) => step.id === 'audit-share');
     expect(manualStep?.completed).toBe(true);
-    expect(observability.completedCount).toBeGreaterThanOrEqual(1);
+    expect(auditScenario?.completedCount).toBeGreaterThan(0);
   });
 });
 
 describe('toggleManualChecklistStep', () => {
   function createStubState(initial = {}) {
-    const store = structuredClone({ ui: { guides: { completedSteps: {} } }, ...initial });
+    const store = structuredClone({ ui: { guides: { completedSteps: {}, selectedScenario: null, cursors: {} } }, ...initial });
     return {
       get(path) {
         if (!path) return undefined;
@@ -66,15 +73,15 @@ describe('toggleManualChecklistStep', () => {
 
   it('toggles the stored value and returns true on change', () => {
     const state = createStubState();
-    expect(toggleManualChecklistStep(state, 'check-status-center')).toBe(true);
-    expect(state.get('ui.guides.completedSteps')['check-status-center']).toBe(true);
-    expect(toggleManualChecklistStep(state, 'check-status-center')).toBe(true);
-    expect(state.get('ui.guides.completedSteps')['check-status-center']).toBe(false);
+    expect(toggleManualChecklistStep(state, 'audit-fastpass:audit-share')).toBe(true);
+    expect(state.get('ui.guides.completedSteps')['audit-fastpass:audit-share']).toBe(true);
+    expect(toggleManualChecklistStep(state, 'audit-fastpass:audit-share')).toBe(true);
+    expect(state.get('ui.guides.completedSteps')['audit-fastpass:audit-share']).toBe(false);
   });
 
   it('returns false when forcing the same value', () => {
-    const state = createStubState({ ui: { guides: { completedSteps: { 'check-status-center': true } } } });
-    expect(toggleManualChecklistStep(state, 'check-status-center', true)).toBe(false);
-    expect(state.get('ui.guides.completedSteps')['check-status-center']).toBe(true);
+    const state = createStubState({ ui: { guides: { completedSteps: { 'audit-fastpass:audit-share': true } } } });
+    expect(toggleManualChecklistStep(state, 'audit-fastpass:audit-share', true)).toBe(false);
+    expect(state.get('ui.guides.completedSteps')['audit-fastpass:audit-share']).toBe(true);
   });
 });

@@ -109,7 +109,9 @@ const baseInitial = {
     view: 'modules',
     lastProfile: null,
     guides: {
-      completedSteps: {}
+      completedSteps: {},
+      selectedScenario: null,
+      cursors: {}
     },
     collections: {
       disabled: []

@@ -5,6 +5,90 @@ export const manifest = {
   description: 'Lit le contenu sélectionné ou la page complète via l’API SpeechSynthesis.',
   category: 'lecture',
   keywords: ['tts', 'lecture', 'audio', 'speech'],
+  guides: [
+    {
+      id: 'tts-onboarding',
+      title: 'Lecture vocale opérationnelle',
+      description: 'Activez la synthèse vocale, vérifiez les voix disponibles et testez la lecture.',
+      category: 'services',
+      order: 30,
+      prerequisites: [{ type: 'module', id: 'tts' }],
+      assistance: {
+        microcopy: 'Proposez un test de lecture lors de l’onboarding et ajustez vitesse/timbre selon le profil utilisateur.',
+        examples: [
+          {
+            id: 'tts-onboarding-example-1',
+            title: 'Astuce',
+            description: 'Conservez une voix de secours (navigateur) si la voix personnalisée disparaît après une mise à jour.'
+          }
+        ]
+      },
+      steps: [
+        {
+          id: 'tts-module-ready',
+          label: 'Vérifier que la synthèse vocale est activée',
+          mode: 'auto',
+          detail: ({ moduleName, runtime }) => {
+            const name = moduleName || 'Synthèse vocale';
+            if (!runtime?.enabled) return `${name} est désactivée dans la vue Organisation.`;
+            if (runtime?.state === 'error') return runtime?.error ? `Erreur signalée : ${runtime.error}` : `${name} est en erreur.`;
+            if (runtime?.state === 'loading') return `${name} se charge…`;
+            if (runtime?.state === 'ready') return `${name} est prête.`;
+            return `${name} est en attente d’activation.`;
+          },
+          check: ({ runtime }) => !!runtime?.enabled && runtime.state === 'ready'
+        },
+        {
+          id: 'tts-voices',
+          label: 'Recenser les voix disponibles',
+          mode: 'auto',
+          detail: ({ snapshot }) => {
+            const voices = snapshot?.tts?.availableVoices ?? [];
+            if (!voices.length) return 'Aucune voix détectée pour le moment.';
+            const selectedId = snapshot?.tts?.voice || '';
+            const selected = voices.find((voice) => voice.voiceURI === selectedId);
+            if (selected) {
+              return `${voices.length} voix détectées · ${selected.name} (${selected.lang}) sélectionnée.`;
+            }
+            return `${voices.length} voix détectées. Sélectionnez la plus claire pour l’utilisateur.`;
+          },
+          check: ({ snapshot }) => (snapshot?.tts?.availableVoices ?? []).length > 0
+        },
+        {
+          id: 'tts-default-voice',
+          label: 'Définir la voix par défaut',
+          mode: 'auto',
+          detail: ({ snapshot }) => {
+            const voices = snapshot?.tts?.availableVoices ?? [];
+            const selectedId = snapshot?.tts?.voice;
+            if (!voices.length) return 'En attente de voix détectées.';
+            if (!selectedId) return 'Aucune voix sélectionnée : choisissez une option adaptée.';
+            const selected = voices.find((voice) => voice.voiceURI === selectedId);
+            if (selected) {
+              return `Voix active : ${selected.name} (${selected.lang}).`;
+            }
+            return 'Voix personnalisée sélectionnée.';
+          },
+          check: ({ snapshot }) => {
+            const voices = snapshot?.tts?.availableVoices ?? [];
+            const selected = snapshot?.tts?.voice;
+            if (!voices.length) return false;
+            return !!selected;
+          }
+        },
+        {
+          id: 'tts-test',
+          label: 'Tester la lecture d’un extrait',
+          mode: 'manual',
+          detail: 'Lancez la lecture d’un paragraphe représentatif et vérifiez le confort d’écoute.',
+          toggleLabels: {
+            complete: 'Test effectué',
+            reset: 'Tester à nouveau'
+          }
+        }
+      ]
+    }
+  ],
   runtime: {
     preload: 'idle'
   },

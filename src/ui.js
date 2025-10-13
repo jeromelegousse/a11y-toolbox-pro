@@ -1398,146 +1398,425 @@ export function mountUI({ root, state }) {
   guidesDescription.className = 'a11ytb-section-description';
   guidesDescription.textContent = 'Suivez les checklists d’onboarding pour valider les réglages essentiels et surveiller vos services.';
   guidesHeader.append(guidesTitle, guidesDescription);
-  const guidesGrid = document.createElement('div');
-  guidesGrid.className = 'a11ytb-guides-grid';
-  guidesSection.append(guidesHeader, guidesGrid);
+  const guidesLayout = document.createElement('div');
+  guidesLayout.className = 'a11ytb-guides-layout';
+  const guidesList = document.createElement('div');
+  guidesList.className = 'a11ytb-guides-scenarios';
+  guidesList.setAttribute('aria-label', 'Parcours disponibles');
+  const guideDetail = document.createElement('div');
+  guideDetail.className = 'a11ytb-guide-detail';
+  guideDetail.setAttribute('role', 'region');
+  guideDetail.setAttribute('aria-label', 'Détails du guide sélectionné');
+  const guideDetailContent = document.createElement('div');
+  guideDetailContent.className = 'a11ytb-guide-detail-content';
+  guideDetailContent.tabIndex = -1;
+  const guidesLiveRegion = document.createElement('div');
+  guidesLiveRegion.className = 'a11ytb-sr-only';
+  guidesLiveRegion.setAttribute('role', 'status');
+  guidesLiveRegion.setAttribute('aria-live', 'polite');
+  guidesLiveRegion.setAttribute('aria-atomic', 'true');
+  guideDetail.append(guidesLiveRegion, guideDetailContent);
+  guidesLayout.append(guidesList, guideDetail);
+  guidesSection.append(guidesHeader, guidesLayout);
   guidesScroll.append(guidesSection);
   guidesView.append(guidesScroll);
 
-  function renderGuidedChecklists(snapshot) {
-    if (!guidesGrid) return;
-    const checklists = buildGuidedChecklists(snapshot || state.get());
-    guidesGrid.innerHTML = '';
-    if (!checklists.length) {
+  let currentGuideMap = new Map();
+  let currentGuideId = null;
+  let currentGuideStepIndex = 0;
+
+  function renderGuideOptions(scenarios, selectedId) {
+    guidesList.innerHTML = '';
+    guidesList.setAttribute('role', 'list');
+    if (!scenarios.length) {
       const empty = document.createElement('p');
       empty.className = 'a11ytb-empty-state';
-      empty.textContent = 'Aucune checklist disponible pour le moment.';
-      guidesGrid.append(empty);
+      empty.textContent = 'Aucun parcours disponible pour le moment.';
+      guidesList.append(empty);
       return;
     }
-    checklists.forEach((checklist) => {
-      const card = document.createElement('article');
-      card.className = 'a11ytb-config-card a11ytb-guide-card';
-      if (checklist.tone) {
-        card.dataset.tone = checklist.tone;
+    scenarios.forEach((scenario) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'a11ytb-guide-option';
+      button.dataset.scenarioId = scenario.id;
+      if (scenario.tone) button.dataset.tone = scenario.tone;
+      const stateLabel = scenario.blocked
+        ? 'blocked'
+        : (scenario.completedCount === scenario.total ? 'done' : 'active');
+      button.dataset.state = stateLabel;
+      button.setAttribute('aria-pressed', scenario.id === selectedId ? 'true' : 'false');
+
+      const head = document.createElement('div');
+      head.className = 'a11ytb-guide-option-head';
+      const title = document.createElement('span');
+      title.className = 'a11ytb-guide-option-title';
+      title.textContent = scenario.title;
+      const status = document.createElement('span');
+      status.className = 'a11ytb-guide-option-status';
+      status.textContent = scenario.statusLabel || '';
+      head.append(title, status);
+
+      button.append(head);
+
+      if (scenario.description) {
+        const desc = document.createElement('p');
+        desc.className = 'a11ytb-guide-option-description';
+        desc.textContent = scenario.description;
+        button.append(desc);
       }
 
-      const header = document.createElement('div');
-      header.className = 'a11ytb-guide-card-header';
-      const title = document.createElement('h4');
-      title.className = 'a11ytb-guide-title';
-      title.textContent = checklist.title;
-      header.append(title);
-
       const progress = document.createElement('div');
-      progress.className = 'a11ytb-guide-progress';
-      const progressLabel = document.createElement('span');
-      progressLabel.className = 'a11ytb-guide-progress-label';
-      progressLabel.textContent = `${checklist.completedCount}/${checklist.total} terminées`;
+      progress.className = 'a11ytb-guide-option-progress';
+      const count = document.createElement('span');
+      count.className = 'a11ytb-guide-option-count';
+      count.textContent = `${scenario.completedCount}/${scenario.total}`;
       const progressTrack = document.createElement('div');
       progressTrack.className = 'a11ytb-guide-progress-track';
       const progressFill = document.createElement('span');
       progressFill.className = 'a11ytb-guide-progress-fill';
-      const percent = Math.round(checklist.progress * 100);
-      progressFill.style.width = `${percent}%`;
+      progressFill.style.width = `${Math.round((scenario.progress || 0) * 100)}%`;
       progressFill.setAttribute('aria-hidden', 'true');
       progressTrack.append(progressFill);
-      progress.append(progressLabel, progressTrack);
-      header.append(progress);
+      progress.append(count, progressTrack);
+      button.append(progress);
 
-      card.append(header);
-
-      if (checklist.description) {
-        const intro = document.createElement('p');
-        intro.className = 'a11ytb-guide-description';
-        intro.textContent = checklist.description;
-        card.append(intro);
-      }
-
-      if (checklist.nextStep) {
-        const next = document.createElement('p');
-        next.className = 'a11ytb-guide-next-step';
-        next.innerHTML = `<span class="a11ytb-guide-next-label">Prochaine étape :</span> ${checklist.nextStep.label}`;
-        card.append(next);
-      }
-
-      const list = document.createElement('ol');
-      list.className = 'a11ytb-guide-steps';
-      list.setAttribute('aria-label', `Étapes pour ${checklist.title}`);
-
-      checklist.steps.forEach((step) => {
-        const item = document.createElement('li');
-        item.className = 'a11ytb-guide-step';
-        item.dataset.state = step.completed ? 'done' : 'todo';
-        item.dataset.mode = step.state;
-
-        const status = document.createElement('span');
-        status.className = 'a11ytb-guide-step-status';
-        status.setAttribute('aria-hidden', 'true');
-        status.textContent = step.completed ? '✓' : '';
-
-        const body = document.createElement('div');
-        body.className = 'a11ytb-guide-step-body';
-
-        const label = document.createElement('span');
-        label.className = 'a11ytb-guide-step-label';
-        label.textContent = step.label;
-        body.append(label);
-
-        if (step.detail) {
-          const detail = document.createElement('p');
-          detail.className = 'a11ytb-guide-step-detail';
-          detail.textContent = step.detail;
-          body.append(detail);
-        }
-
-        item.append(status, body);
-
-        if (step.state === 'manual') {
-          const toggle = document.createElement('button');
-          toggle.type = 'button';
-          toggle.className = 'a11ytb-guide-step-toggle';
-          toggle.dataset.guideAction = 'toggle-step';
-          toggle.dataset.stepId = step.id;
-          toggle.dataset.stepLabel = step.label;
-          toggle.setAttribute('aria-pressed', String(step.completed));
-          toggle.textContent = step.completed ? 'Marquer à refaire' : 'Marquer comme fait';
-          item.append(toggle);
-        } else {
-          const badge = document.createElement('span');
-          badge.className = 'a11ytb-guide-step-tag';
-          badge.textContent = 'Suivi automatique';
-          item.append(badge);
-        }
-
-        list.append(item);
-      });
-
-      card.append(list);
-      guidesGrid.append(card);
+      guidesList.append(button);
     });
+  }
+
+  function renderGuideDetail(scenarioId, focusDetail = false) {
+    guideDetailContent.innerHTML = '';
+    guideDetail.removeAttribute('data-tone');
+    if (!scenarioId) {
+      const empty = document.createElement('p');
+      empty.className = 'a11ytb-empty-state';
+      empty.textContent = 'Sélectionnez un parcours pour afficher ses étapes.';
+      guideDetailContent.append(empty);
+      guidesLiveRegion.textContent = '';
+      return;
+    }
+    const scenario = currentGuideMap.get(scenarioId);
+    if (!scenario) {
+      const missing = document.createElement('p');
+      missing.className = 'a11ytb-empty-state';
+      missing.textContent = 'Ce parcours n’est plus disponible.';
+      guideDetailContent.append(missing);
+      guidesLiveRegion.textContent = '';
+      return;
+    }
+
+    if (scenario.tone) {
+      guideDetail.dataset.tone = scenario.tone;
+    }
+
+    const cursors = state.get('ui.guides.cursors') || {};
+    const storedIndex = Number.isInteger(cursors[scenarioId]) ? cursors[scenarioId] : null;
+    const validIndex = Number.isInteger(storedIndex) && storedIndex >= 0 && storedIndex < scenario.steps.length
+      ? storedIndex
+      : null;
+    if (validIndex === null) {
+      const fallbackIndex = Math.max(0, scenario.recommendedStepIndex ?? 0);
+      state.set(`ui.guides.cursors.${scenarioId}`, fallbackIndex);
+      return;
+    }
+    currentGuideStepIndex = validIndex;
+
+    const header = document.createElement('div');
+    header.className = 'a11ytb-guide-detail-header';
+    const title = document.createElement('h4');
+    title.className = 'a11ytb-guide-title';
+    title.textContent = scenario.title;
+    header.append(title);
+
+    if (scenario.summary) {
+      const summary = document.createElement('p');
+      summary.className = 'a11ytb-guide-summary';
+      summary.textContent = scenario.summary;
+      header.append(summary);
+    }
+
+    const progress = document.createElement('div');
+    progress.className = 'a11ytb-guide-progress';
+    const progressLabel = document.createElement('span');
+    progressLabel.className = 'a11ytb-guide-progress-label';
+    progressLabel.textContent = `${scenario.completedCount}/${scenario.total} étapes terminées`;
+    const progressTrack = document.createElement('div');
+    progressTrack.className = 'a11ytb-guide-progress-track';
+    const progressFill = document.createElement('span');
+    progressFill.className = 'a11ytb-guide-progress-fill';
+    progressFill.style.width = `${Math.round((scenario.progress || 0) * 100)}%`;
+    progressFill.setAttribute('aria-hidden', 'true');
+    progressTrack.append(progressFill);
+    progress.append(progressLabel, progressTrack);
+    header.append(progress);
+
+    guideDetailContent.append(header);
+
+    if (scenario.prerequisites?.length) {
+      const prereqList = document.createElement('ul');
+      prereqList.className = 'a11ytb-guide-prerequisites';
+      scenario.prerequisites.forEach((prerequisite) => {
+        const item = document.createElement('li');
+        item.className = 'a11ytb-guide-prerequisite';
+        item.dataset.status = prerequisite.status || (prerequisite.met ? 'met' : 'missing');
+        const label = document.createElement('span');
+        label.className = 'a11ytb-guide-prerequisite-label';
+        label.textContent = prerequisite.label;
+        item.append(label);
+        if (prerequisite.detail) {
+          const detail = document.createElement('span');
+          detail.className = 'a11ytb-guide-prerequisite-detail';
+          detail.textContent = prerequisite.detail;
+          item.append(detail);
+        }
+        prereqList.append(item);
+      });
+      guideDetailContent.append(prereqList);
+    }
+
+    if (scenario.assistance?.microcopy) {
+      const micro = document.createElement('p');
+      micro.className = 'a11ytb-guide-microcopy';
+      micro.textContent = scenario.assistance.microcopy;
+      guideDetailContent.append(micro);
+    }
+
+    if (scenario.assistance?.examples?.length) {
+      const examples = document.createElement('div');
+      examples.className = 'a11ytb-guide-examples';
+      scenario.assistance.examples.forEach((example) => {
+        const card = document.createElement('article');
+        card.className = 'a11ytb-guide-example';
+        if (example.title) {
+          const heading = document.createElement('h5');
+          heading.className = 'a11ytb-guide-example-title';
+          heading.textContent = example.title;
+          card.append(heading);
+        }
+        if (example.description) {
+          const desc = document.createElement('p');
+          desc.className = 'a11ytb-guide-example-description';
+          desc.textContent = example.description;
+          card.append(desc);
+        }
+        examples.append(card);
+      });
+      guideDetailContent.append(examples);
+    }
+
+    if (scenario.assistance?.resources?.length) {
+      const resources = document.createElement('ul');
+      resources.className = 'a11ytb-guide-resources';
+      scenario.assistance.resources.forEach((resource) => {
+        const item = document.createElement('li');
+        item.className = 'a11ytb-guide-resource';
+        const link = document.createElement('a');
+        link.href = resource.href;
+        link.target = resource.external ? '_blank' : '_self';
+        if (resource.external) link.rel = 'noopener noreferrer';
+        link.textContent = resource.label;
+        item.append(link);
+        resources.append(item);
+      });
+      guideDetailContent.append(resources);
+    }
+
+    const stepsList = document.createElement('ol');
+    stepsList.className = 'a11ytb-guide-steps';
+    stepsList.setAttribute('aria-label', `Étapes pour ${scenario.title}`);
+    scenario.steps.forEach((step, index) => {
+      const item = document.createElement('li');
+      item.className = 'a11ytb-guide-step';
+      item.dataset.state = step.completed ? 'done' : 'todo';
+      item.dataset.mode = step.mode;
+      item.dataset.active = index === currentGuideStepIndex ? 'true' : 'false';
+      item.dataset.stepIndex = String(index);
+
+      const status = document.createElement('span');
+      status.className = 'a11ytb-guide-step-status';
+      status.setAttribute('aria-hidden', 'true');
+      status.textContent = step.completed ? '✓' : index + 1;
+
+      const body = document.createElement('div');
+      body.className = 'a11ytb-guide-step-body';
+
+      const label = document.createElement('span');
+      label.className = 'a11ytb-guide-step-label';
+      label.textContent = step.label;
+      body.append(label);
+
+      if (step.detail) {
+        const detail = document.createElement('p');
+        detail.className = 'a11ytb-guide-step-detail';
+        detail.textContent = step.detail;
+        body.append(detail);
+      }
+
+      item.append(status, body);
+
+      if (step.mode === 'manual') {
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'a11ytb-guide-step-toggle';
+        toggle.dataset.guideAction = 'toggle-step';
+        toggle.dataset.stepKey = step.key;
+        toggle.dataset.stepLabel = step.label;
+        toggle.dataset.scenarioId = scenario.id;
+        toggle.dataset.toggleComplete = step.toggleLabels.complete;
+        toggle.dataset.toggleReset = step.toggleLabels.reset;
+        toggle.setAttribute('aria-pressed', String(step.completed));
+        toggle.textContent = step.completed ? step.toggleLabels.reset : step.toggleLabels.complete;
+        item.append(toggle);
+      } else if (step.tag) {
+        const badge = document.createElement('span');
+        badge.className = 'a11ytb-guide-step-tag';
+        badge.textContent = step.tag;
+        item.append(badge);
+      }
+
+      stepsList.append(item);
+    });
+    guideDetailContent.append(stepsList);
+
+    const navigation = document.createElement('div');
+    navigation.className = 'a11ytb-guide-step-nav';
+    const position = document.createElement('span');
+    position.className = 'a11ytb-guide-step-position';
+    position.textContent = `Étape ${currentGuideStepIndex + 1} sur ${scenario.steps.length}`;
+    const prevBtn = document.createElement('button');
+    prevBtn.type = 'button';
+    prevBtn.className = 'a11ytb-button a11ytb-button--ghost';
+    prevBtn.dataset.guideNav = 'prev';
+    prevBtn.textContent = 'Étape précédente';
+    prevBtn.disabled = currentGuideStepIndex <= 0;
+    const nextBtn = document.createElement('button');
+    nextBtn.type = 'button';
+    nextBtn.className = 'a11ytb-button';
+    nextBtn.dataset.guideNav = 'next';
+    nextBtn.textContent = 'Étape suivante';
+    nextBtn.disabled = currentGuideStepIndex >= scenario.steps.length - 1;
+    navigation.append(prevBtn, position, nextBtn);
+    guideDetailContent.append(navigation);
+
+    const activeStep = scenario.steps[currentGuideStepIndex];
+    if (activeStep) {
+      const messageParts = [
+        `Étape ${currentGuideStepIndex + 1} sur ${scenario.steps.length} : ${activeStep.label}`
+      ];
+      if (activeStep.detail) messageParts.push(activeStep.detail);
+      guidesLiveRegion.textContent = activeStep.announcement || messageParts.join('. ');
+    } else {
+      guidesLiveRegion.textContent = '';
+    }
+
+    if (focusDetail) {
+      try {
+        guideDetailContent.focus({ preventScroll: true });
+      } catch (error) {
+        guideDetailContent.focus();
+      }
+    }
+  }
+
+  function renderGuidedChecklists(snapshot) {
+    const source = snapshot || state.get();
+    const scenarios = buildGuidedChecklists(source);
+    currentGuideMap = new Map(scenarios.map((scenario) => [scenario.id, scenario]));
+
+    if (!scenarios.length) {
+      renderGuideOptions([], null);
+      guideDetailContent.innerHTML = '';
+      guidesLiveRegion.textContent = '';
+      const empty = document.createElement('p');
+      empty.className = 'a11ytb-empty-state';
+      empty.textContent = 'Aucun parcours n’est disponible avec les modules actuels.';
+      guideDetailContent.append(empty);
+      currentGuideId = null;
+      currentGuideStepIndex = 0;
+      return;
+    }
+
+    let selectedScenarioId = state.get('ui.guides.selectedScenario');
+    if (!selectedScenarioId || !currentGuideMap.has(selectedScenarioId)) {
+      const fallback = scenarios.find((scenario) => !scenario.blocked) || scenarios[0];
+      if (fallback && fallback.id !== selectedScenarioId) {
+        state.set('ui.guides.selectedScenario', fallback.id);
+        return;
+      }
+      selectedScenarioId = fallback?.id ?? scenarios[0].id;
+    }
+
+    const previousGuideId = currentGuideId;
+    currentGuideId = selectedScenarioId;
+    renderGuideOptions(scenarios, selectedScenarioId);
+    renderGuideDetail(selectedScenarioId, previousGuideId !== selectedScenarioId);
   }
 
   renderGuidedChecklists(state.get());
   state.on(renderGuidedChecklists);
 
-  guidesGrid.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-guide-action="toggle-step"]');
+  guidesList.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-scenario-id]');
     if (!button) return;
-    const stepId = button.dataset.stepId;
-    if (!stepId) return;
-    const wasCompleted = button.getAttribute('aria-pressed') === 'true';
-    const changed = toggleManualChecklistStep(state, stepId);
-    if (!changed) return;
-    const nowCompleted = !wasCompleted;
-    const label = button.dataset.stepLabel || stepId;
-    button.setAttribute('aria-pressed', String(nowCompleted));
-    button.textContent = nowCompleted ? 'Marquer à refaire' : 'Marquer comme fait';
-    const tone = nowCompleted ? 'confirm' : 'info';
-    logActivity(`${nowCompleted ? 'Étape validée' : 'Étape réinitialisée'} : ${label}`, {
-      tone,
-      tags: ['guides', stepId]
-    });
+    const scenarioId = button.dataset.scenarioId;
+    if (!scenarioId || !currentGuideMap.has(scenarioId)) return;
+    const current = state.get('ui.guides.selectedScenario');
+    if (current === scenarioId) return;
+    state.set('ui.guides.selectedScenario', scenarioId);
+  });
+
+  guideDetail.addEventListener('click', (event) => {
+    const toggle = event.target.closest('[data-guide-action="toggle-step"]');
+    if (toggle) {
+      const stepKey = toggle.dataset.stepKey;
+      if (!stepKey) return;
+      const wasCompleted = toggle.getAttribute('aria-pressed') === 'true';
+      const changed = toggleManualChecklistStep(state, stepKey);
+      if (!changed) return;
+      const nowCompleted = !wasCompleted;
+      const label = toggle.dataset.stepLabel || stepKey;
+      const scenarioId = toggle.dataset.scenarioId || currentGuideId || 'guides';
+      toggle.setAttribute('aria-pressed', String(nowCompleted));
+      const completeLabel = toggle.dataset.toggleComplete || 'Marquer comme fait';
+      const resetLabel = toggle.dataset.toggleReset || 'Marquer à refaire';
+      toggle.textContent = nowCompleted ? resetLabel : completeLabel;
+      const scenario = currentGuideMap.get(scenarioId);
+      const guideLabel = scenario ? scenario.title : 'Guide';
+      logActivity(`${guideLabel} — ${nowCompleted ? 'étape validée' : 'étape réinitialisée'} : ${label}`, {
+        tone: nowCompleted ? 'confirm' : 'info',
+        tags: ['guides', stepKey]
+      });
+      return;
+    }
+
+    const navButton = event.target.closest('[data-guide-nav]');
+    if (navButton) {
+      if (!currentGuideId) return;
+      const scenario = currentGuideMap.get(currentGuideId);
+      if (!scenario) return;
+      let nextIndex = currentGuideStepIndex;
+      if (navButton.dataset.guideNav === 'next') {
+        nextIndex = Math.min(scenario.steps.length - 1, currentGuideStepIndex + 1);
+      } else if (navButton.dataset.guideNav === 'prev') {
+        nextIndex = Math.max(0, currentGuideStepIndex - 1);
+      }
+      if (nextIndex !== currentGuideStepIndex) {
+        state.set(`ui.guides.cursors.${scenario.id}`, nextIndex);
+      }
+      return;
+    }
+
+    const stepCard = event.target.closest('[data-step-index]');
+    if (stepCard && currentGuideId) {
+      const index = Number.parseInt(stepCard.dataset.stepIndex, 10);
+      const scenario = currentGuideMap.get(currentGuideId);
+      if (!scenario || Number.isNaN(index)) return;
+      const bounded = Math.min(scenario.steps.length - 1, Math.max(0, index));
+      if (bounded !== currentGuideStepIndex) {
+        state.set(`ui.guides.cursors.${scenario.id}`, bounded);
+      }
+    }
   });
 
   function createShortcutComboElement(variants) {
