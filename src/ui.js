@@ -941,6 +941,11 @@ export function mountUI({ root, state, config = {} }) {
     <path d="M12 8a4 4 0 100 8 4 4 0 000-8zm8.94 3a8.94 8.94 0 00-.5-1.47l2.06-1.5-2-3.46-2.44 1a9.09 9.09 0 00-2.02-1.17l-.37-2.6h-4l-.37 2.6A9.09 9.09 0 007.93 4.6l-2.44-1-2 3.46 2.06 1.5A8.94 8.94 0 005.06 11H2v4h3.06c.12.51.29 1 .5 1.47l-2.06 1.5 2 3.46 2.44-1c.62.47 1.3.86 2.02 1.17l.37 2.6h4l.37-2.6c.72-.31 1.4-.7 2.02-1.17l2.44 1 2-3.46-2.06-1.5c.21-.47.38-.96.5-1.47H22v-4h-3.06z"/>
   </svg>`;
 
+  const fullscreenIcons = {
+    expand: '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 4h7v2H6v5H4V4zm10 0h6v6h-2V6h-4V4zM4 14h2v4h5v2H4v-6zm12 4v-4h2v6h-6v-2z"/></svg>',
+    collapse: '<svg viewBox="0 0 24 24" focusable="false"><path d="M8 4v2H6v4H4V4h4zm14 4h-4V6h-2V4h6v4zM4 20v-6h2v4h2v2H4zm18-6v6h-6v-2h4v-4h2z"/></svg>'
+  };
+
   const overlay = document.createElement('div');
   overlay.className = 'a11ytb-overlay';
   overlay.setAttribute('aria-hidden', 'true');
@@ -955,6 +960,7 @@ export function mountUI({ root, state, config = {} }) {
   panel.setAttribute('aria-modal', 'true');
   panel.setAttribute('aria-label', 'A11y Toolbox Pro');
   panel.tabIndex = -1;
+  panel.dataset.fullscreen = String(!!state.get('ui.fullscreen'));
   fab.setAttribute('aria-controls', panel.id);
 
   const header = document.createElement('div');
@@ -980,6 +986,10 @@ export function mountUI({ root, state, config = {} }) {
         </span>
         Dock bas
       </button>
+      <button class="a11ytb-button" data-action="toggle-fullscreen" aria-pressed="false">
+        <span class="a11ytb-button-icon" data-ref="fullscreen-icon" aria-hidden="true">${fullscreenIcons.expand}</span>
+        <span class="a11ytb-button-label" data-ref="fullscreen-label">Plein écran</span>
+      </button>
       <button class="a11ytb-button" data-action="reset">
         <span class="a11ytb-button-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false"><path d="M12 5a7 7 0 015.917 10.777l1.52 1.318A9 9 0 103 12H1l3.5 3.5L8 12H5a7 7 0 017-7z"/></svg>
@@ -994,6 +1004,10 @@ export function mountUI({ root, state, config = {} }) {
       </button>
     </div>
   `;
+
+  const fullscreenToggle = header.querySelector('[data-action="toggle-fullscreen"]');
+  const fullscreenIcon = fullscreenToggle?.querySelector('[data-ref="fullscreen-icon"]');
+  const fullscreenLabel = fullscreenToggle?.querySelector('[data-ref="fullscreen-label"]');
 
   const body = document.createElement('div');
   body.className = 'a11ytb-body';
@@ -4624,6 +4638,22 @@ export function mountUI({ root, state, config = {} }) {
     return collectFocusable(panel);
   }
 
+  function syncFullscreenMode(snapshot) {
+    const fullscreen = !!snapshot?.ui?.fullscreen;
+    panel.dataset.fullscreen = String(fullscreen);
+    if (fullscreenToggle) {
+      fullscreenToggle.setAttribute('aria-pressed', String(fullscreen));
+      fullscreenToggle.classList.toggle('is-active', fullscreen);
+      if (fullscreenLabel) {
+        fullscreenLabel.textContent = fullscreen ? 'Vue compacte' : 'Plein écran';
+      }
+      if (fullscreenIcon) {
+        fullscreenIcon.innerHTML = fullscreen ? fullscreenIcons.collapse : fullscreenIcons.expand;
+      }
+      fullscreenToggle.setAttribute('title', fullscreen ? 'Revenir à la vue compacte' : 'Agrandir la boîte à outils');
+    }
+  }
+
   function toggle(open) {
     const shouldOpen = open ?? panel.dataset.open !== 'true';
     panel.dataset.open = String(shouldOpen);
@@ -4685,6 +4715,12 @@ export function mountUI({ root, state, config = {} }) {
   header.querySelector('[data-action="dock-left"]').addEventListener('click', () => state.set('ui.dock', 'left'));
   header.querySelector('[data-action="dock-right"]').addEventListener('click', () => state.set('ui.dock', 'right'));
   header.querySelector('[data-action="dock-bottom"]').addEventListener('click', () => state.set('ui.dock', 'bottom'));
+  if (fullscreenToggle) {
+    fullscreenToggle.addEventListener('click', () => {
+      const nextValue = !state.get('ui.fullscreen');
+      state.set('ui.fullscreen', nextValue);
+    });
+  }
 
   function executeShortcut(actionId) {
     const definition = CUSTOM_SHORTCUT_LOOKUP.get(actionId);
@@ -4873,6 +4909,7 @@ export function mountUI({ root, state, config = {} }) {
     applyModuleLayout();
     updateActivityLog();
     syncView();
+    syncFullscreenMode(snapshot);
     renderProfiles(snapshot);
     updateActiveShortcuts(snapshot);
     refreshShortcutDisplays(snapshot);
@@ -4887,6 +4924,7 @@ export function mountUI({ root, state, config = {} }) {
   applyModuleLayout();
   updateActivityLog();
   syncView();
+  syncFullscreenMode(initialSnapshot);
   renderProfiles(initialSnapshot);
   updateActiveShortcuts(initialSnapshot);
   refreshShortcutDisplays(initialSnapshot);
