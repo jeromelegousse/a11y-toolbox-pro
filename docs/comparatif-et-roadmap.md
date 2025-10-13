@@ -26,7 +26,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 - **Personnalisation** : les profils préconfigurés peuvent être combinés avec des réglages fins (voix TTS, vitesse, volume, paramètres audio, dictionnaire braille) directement issus des manifestes. La duplication, le partage/import de profils et le premier lot de raccourcis configurables sont disponibles ; il reste à enrichir l’édition collaborative et la gestion avancée des raccourcis pour atteindre la profondeur de Stark.
 - **Administration modulaire** : le builder réordonnable intègre désormais des collections activables en un clic, la désactivation conditionnelle et le lazy-loading des modules au runtime. Il reste à gérer les collections imbriquées, les vues d’ensemble par profil et le chargement différé côté réseau (préchargement progressif, stratégie cache).
 - **Collaboration** : le journal exportable (JSON/CSV) et les métriques runtime apportent une base de partage, mais il n’y a toujours pas d’espace multi-utilisateurs, de commentaires ni de synchronisation cloud comme dans les suites professionnelles.
-- **Gouvernance modules & observabilité** : les manifestes versionnés exposent désormais dépendances, compatibilité, métriques de performance (load/init, compat features) **et un indice `metadataQuality` pondéré** aligné sur les consoles Stark/Accessibility Insights. Un garde-fou semver avec historique bloque les rétrogradations et un tableau de bord de maturité consolide la couverture face aux offres pro ; il manque encore la revue des dépendances transverses et un reporting multi-modules partagé.
+- **Gouvernance modules & observabilité** : les manifestes versionnés exposent désormais dépendances, compatibilité, métriques de performance (load/init, compat features) **et un indice `metadataQuality` pondéré** aligné sur les consoles Stark/Accessibility Insights. Un garde-fou semver avec historique bloque les rétrogradations, un tableau de bord de maturité consolide la couverture face aux offres pro **et une carte « Historique manifestes » rend visibles les derniers upgrades/refus pour rivaliser avec Accessibility Insights** ; il manque encore la revue des dépendances transverses et un reporting multi-modules partagé.
 
 ## Manques par rapport à la feuille de route
 
@@ -43,7 +43,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
   - ✅ Collections de modules : définition (`module-collections.js`), toggles accessibles, compteur d’état et propagation aux profils.
   - ✅ Chargement conditionnel : lazy-loading à l’activation, suivi `runtime.modules.<id>` et reprise après bascule.
   - ✅ Dépendances & compatibilité : calcul semver, badges dans l’admin, logs d’alertes/résolutions et métriques intégrées au centre d’état.
-  - ⏳ Versionnement visible côté UI (historique, comparaison) et collections imbriquées.
+  - ✅ Historique versionné accessible dans le centre d’état ; ⏳ comparaison détaillée et collections imbriquées.
 - **Phase 2 et suivantes** : observabilité temps réel multi-instance, profils dynamiques, catalogue distant et multi-tenant restent à spécifier et exécuter.
 
 ## Manques face à la concurrence
@@ -52,7 +52,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 - **Guidage** : la vue Guides reste statique ; aucune checklist dynamique ni scénarisation interactive façon FastPass.
 - **Personnalisation avancée** : pas de duplication/partage de profils, ni de raccourcis personnalisables ou d’automations, contrairement à Stark.
 - **Collaboration** : toujours aucune intégration Jira/Linear/Slack ni gestion multi-utilisateurs.
-- **Observabilité** : les métriques runtime sont locales, désormais agrégées dans un indice de conformité AA/AAA consolidé. Il manque encore l’agrégation historique et des tableaux de bord partageables comme sur les plateformes enterprise.
+- **Observabilité** : les métriques runtime sont locales, désormais agrégées dans un indice de conformité AA/AAA consolidé **et dans un suivi d’historique manifestes**. Il manque encore l’agrégation historique multi-instance et des tableaux de bord partageables comme sur les plateformes enterprise.
 
 ## Recommandations stratégiques
 
@@ -112,7 +112,7 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
   - ⏳ Panneau "Modules disponibles" dédié avec filtres avancés (profil, collection, compatibilité) et badges "requis/en conflit".
   - ✅ Déchargement sélectif (`unmount`) et stratégies de préchargement progressif (préchargement `idle`, visibilité des blocs, interaction pointeur).
 - ✅ Vue **Dépendances & compatibilité** : calcul semver, badges automatiques, logs d’alertes/résolutions et accessibilité ARIA.
-- ⏳ Historique de versions visible et diff des manifestes depuis l’interface.
+- ✅ Historique de versions visible côté UI (carte centre d’état détaillant mises à jour/rétrogradations) ; ⏳ diff des manifestes depuis l’interface.
 
 ### Prochaines itérations
 

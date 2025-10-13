@@ -6,6 +6,8 @@ const STATUS_TONE_ALERT = 'alert';
 const STATUS_TONE_WARNING = 'warning';
 const STATUS_TONE_MUTED = 'muted';
 
+const HISTORY_RECENT_THRESHOLD_MS = 1000 * 60 * 60 * 24 * 30; // 30 jours
+
 const SCORE_PRIORITY = new Map([
   ['AAA', 0],
   ['AA', 1],
@@ -232,6 +234,203 @@ function buildMetadataSummary(snapshot = {}) {
       latencyLabel: `${tracked}/${totalModules}`,
       compatLabel,
       missingHighlights
+    }
+  };
+}
+
+function getManifestHistoryBuckets(snapshot = {}) {
+  const historyFromManifests = snapshot?.manifests?.history;
+  if (Array.isArray(historyFromManifests)) {
+    return historyFromManifests;
+  }
+  const historyFromRuntime = snapshot?.runtime?.manifestHistory;
+  if (Array.isArray(historyFromRuntime)) {
+    return historyFromRuntime;
+  }
+  return [];
+}
+
+function getDeclaredManifestTotal(snapshot = {}, fallback) {
+  const manifestTotals = snapshot?.manifests?.total;
+  if (Number.isFinite(manifestTotals)) {
+    return manifestTotals;
+  }
+  const runtimeTotal = snapshot?.runtime?.manifestTotal;
+  if (Number.isFinite(runtimeTotal)) {
+    return runtimeTotal;
+  }
+  return fallback;
+}
+
+function analyzeManifestHistory(historyBuckets = [], { now = Date.now() } = {}) {
+  const metrics = {
+    totalModules: historyBuckets.length,
+    trackedModules: 0,
+    pendingModules: 0,
+    totalEntries: 0,
+    accepted: 0,
+    upgrades: 0,
+    refreshes: 0,
+    rejections: 0,
+    downgradeBlocks: 0,
+    recentlyUpdated: 0,
+    staleModules: 0
+  };
+
+  historyBuckets.forEach((bucket) => {
+    const entries = Array.isArray(bucket?.history) ? bucket.history : [];
+    if (!entries.length) {
+      metrics.pendingModules += 1;
+      return;
+    }
+
+    metrics.trackedModules += 1;
+    metrics.totalEntries += entries.length;
+
+    let lastTimestamp = Number.NaN;
+
+    entries.forEach((entry) => {
+      if (!entry || typeof entry !== 'object') {
+        return;
+      }
+      const status = entry.status;
+      const reason = entry.reason;
+      if (status === 'accepted') {
+        metrics.accepted += 1;
+        if (reason === 'upgrade') {
+          metrics.upgrades += 1;
+        } else if (reason === 'refresh') {
+          metrics.refreshes += 1;
+        }
+      }
+      if (status === 'rejected') {
+        metrics.rejections += 1;
+        if (reason === 'downgrade') {
+          metrics.downgradeBlocks += 1;
+        }
+      }
+      const ts = Number(entry.timestamp);
+      if (Number.isFinite(ts) && (Number.isNaN(lastTimestamp) || ts > lastTimestamp)) {
+        lastTimestamp = ts;
+      }
+    });
+
+    if (Number.isFinite(lastTimestamp)) {
+      if (now - lastTimestamp <= HISTORY_RECENT_THRESHOLD_MS) {
+        metrics.recentlyUpdated += 1;
+      } else {
+        metrics.staleModules += 1;
+      }
+    } else {
+      metrics.staleModules += 1;
+    }
+  });
+
+  metrics.coverageRate = metrics.totalModules > 0
+    ? Math.round((metrics.trackedModules / metrics.totalModules) * 100)
+    : metrics.trackedModules > 0
+      ? 100
+      : 0;
+
+  return metrics;
+}
+
+function buildManifestHistorySummary(snapshot = {}) {
+  const historyBuckets = getManifestHistoryBuckets(snapshot);
+  const now = Number.isFinite(snapshot?.now) ? Number(snapshot.now) : Date.now();
+  const metrics = analyzeManifestHistory(historyBuckets, { now });
+  const declaredTotal = getDeclaredManifestTotal(snapshot, Math.max(metrics.totalModules, metrics.trackedModules));
+  const totalFallback = declaredTotal ?? metrics.totalModules ?? metrics.trackedModules;
+
+  if (metrics.trackedModules === 0) {
+    const targetTotal = declaredTotal ?? metrics.totalModules ?? metrics.trackedModules;
+    const moduleCountLabel = targetTotal && targetTotal > 0
+      ? `${targetTotal} manifeste${targetTotal > 1 ? 's' : ''}`
+      : 'vos manifestes';
+    return {
+      id: 'manifest-history',
+      label: 'Historique manifestes',
+      badge: 'Versionnement requis',
+      value: 'Historique inactif',
+      detail: `Initialisez l’historique des versions pour ${moduleCountLabel} et atteindre la parité avec axe DevTools et Stark.`,
+      tone: STATUS_TONE_WARNING,
+      live: 'polite',
+      metaLabels: {
+        latency: 'Mises à jour < 30 j',
+        compat: 'Downgrades bloqués'
+      },
+      insights: {
+        riskLevel: 'AA',
+        riskDescription: 'Aucun manifeste suivi dans l’historique.',
+        announcement: 'Historique manifestes inactif.',
+        trackedModules: 0,
+        totalModules: declaredTotal ?? 0,
+        recentlyUpdated: 0,
+        downgradeBlocks: 0,
+        pendingModules: declaredTotal ?? 0,
+        upgrades: 0,
+        refreshes: 0,
+        totalEntries: 0,
+        latencyLabel: '0/0',
+        compatLabel: 'Aucun blocage',
+        coverageRate: 0
+      }
+    };
+  }
+
+  const detailParts = [];
+  if (metrics.recentlyUpdated > 0) {
+    detailParts.push(`${metrics.recentlyUpdated} mis à jour < 30 j`);
+  }
+  if (metrics.downgradeBlocks > 0) {
+    detailParts.push(`${metrics.downgradeBlocks} rétrogradation${metrics.downgradeBlocks > 1 ? 's' : ''} bloquée${metrics.downgradeBlocks > 1 ? 's' : ''}`);
+  }
+  if (metrics.refreshes > 0) {
+    detailParts.push(`${metrics.refreshes} synchronisation${metrics.refreshes > 1 ? 's' : ''}`);
+  }
+  if (metrics.pendingModules > 0) {
+    detailParts.push(`${metrics.pendingModules} manifeste${metrics.pendingModules > 1 ? 's' : ''} à historiser`);
+  }
+  if (!detailParts.length) {
+    detailParts.push('Suivi aligné sur Accessibility Insights.');
+  }
+
+  let tone = STATUS_TONE_ACTIVE;
+  if (metrics.recentlyUpdated === 0 || metrics.pendingModules > 0) {
+    tone = STATUS_TONE_WARNING;
+  }
+
+  const trackedLabel = `${metrics.trackedModules}/${totalFallback}`;
+
+  return {
+    id: 'manifest-history',
+    label: 'Historique manifestes',
+    badge: 'Versionnement',
+    value: `${trackedLabel} manifestes suivis`,
+    detail: detailParts.join(' · '),
+    tone,
+    live: 'polite',
+    metaLabels: {
+      latency: 'Mises à jour < 30 j',
+      compat: 'Downgrades bloqués'
+    },
+    insights: {
+      riskLevel: tone === STATUS_TONE_WARNING ? 'AA' : 'AAA',
+      riskDescription: `${metrics.trackedModules} manifeste${metrics.trackedModules > 1 ? 's' : ''} suivi${metrics.trackedModules > 1 ? 's' : ''} avec historique versionné.`,
+      announcement: `Historique manifestes ${trackedLabel}.`,
+      trackedModules: metrics.trackedModules,
+      totalModules: totalFallback,
+      recentlyUpdated: metrics.recentlyUpdated,
+      downgradeBlocks: metrics.downgradeBlocks,
+      pendingModules: metrics.pendingModules,
+      upgrades: metrics.upgrades,
+      refreshes: metrics.refreshes,
+      totalEntries: metrics.totalEntries,
+      latencyLabel: `${metrics.recentlyUpdated}/${metrics.trackedModules}`,
+      compatLabel: metrics.downgradeBlocks > 0
+        ? `${metrics.downgradeBlocks} blocage${metrics.downgradeBlocks > 1 ? 's' : ''}`
+        : 'Aucun blocage',
+      coverageRate: metrics.coverageRate
     }
   };
 }
@@ -736,6 +935,7 @@ export function summarizeStatuses(snapshot = {}) {
   return [
     buildGlobalScoreSummary(snapshot),
     buildMetadataSummary(snapshot),
+    buildManifestHistorySummary(snapshot),
     buildAuditSummary(snapshot),
     buildTtsSummary(snapshot),
     buildSttSummary(snapshot),

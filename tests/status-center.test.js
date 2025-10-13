@@ -2,6 +2,29 @@ import { describe, expect, it } from 'vitest';
 import { summarizeStatuses, computeModuleMetrics, getModuleCompatibilityScore } from '../src/status-center.js';
 
 const DEFAULT_SUMMARY = 'Couverture métadonnées simulée.';
+const BASE_NOW = 1700000000000;
+
+function createHistoryEntry({
+  timestamp = BASE_NOW - 7 * 24 * 60 * 60 * 1000,
+  status = 'accepted',
+  reason = 'upgrade',
+  version = '1.1.0',
+  versionInfo,
+  metadataQuality
+} = {}) {
+  return {
+    status,
+    reason,
+    timestamp,
+    version,
+    versionInfo,
+    metadataQuality
+  };
+}
+
+function createHistoryBucket(id, entries = []) {
+  return { id, history: entries };
+}
 
 function createQuality({
   level = 'AA',
@@ -27,6 +50,7 @@ function createQuality({
 describe('summarizeStatuses', () => {
   it('retourne un état prêt par défaut pour les modules critiques', () => {
     const snapshot = {
+      now: BASE_NOW,
       audit: {
         status: 'idle',
         lastReport: null,
@@ -58,8 +82,36 @@ describe('summarizeStatuses', () => {
       }
     };
 
+    snapshot.manifests = {
+      total: 6,
+      history: [
+        createHistoryBucket('audit', [
+          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 40 * 24 * 60 * 60 * 1000 }),
+          createHistoryEntry({ status: 'accepted', reason: 'upgrade', version: '1.1.0', timestamp: BASE_NOW - 5 * 24 * 60 * 60 * 1000 })
+        ]),
+        createHistoryBucket('tts', [
+          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 20 * 24 * 60 * 60 * 1000 }),
+          createHistoryEntry({ status: 'rejected', reason: 'downgrade', version: '0.9.0', timestamp: BASE_NOW - 18 * 24 * 60 * 60 * 1000 }),
+          createHistoryEntry({ status: 'accepted', reason: 'upgrade', version: '1.2.0', timestamp: BASE_NOW - 9 * 24 * 60 * 60 * 1000 })
+        ]),
+        createHistoryBucket('stt', [
+          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 50 * 24 * 60 * 60 * 1000 }),
+          createHistoryEntry({ status: 'accepted', reason: 'refresh', version: '1.0.0', timestamp: BASE_NOW - 40 * 24 * 60 * 60 * 1000 })
+        ]),
+        createHistoryBucket('braille', [
+          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 33 * 24 * 60 * 60 * 1000 })
+        ]),
+        createHistoryBucket('contrast', [
+          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 4 * 24 * 60 * 60 * 1000 })
+        ]),
+        createHistoryBucket('spacing', [
+          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 2 * 24 * 60 * 60 * 1000 })
+        ])
+      ]
+    };
+
     const statuses = summarizeStatuses(snapshot);
-    expect(statuses).toHaveLength(8);
+    expect(statuses).toHaveLength(9);
 
     const globalSummary = statuses.find((status) => status.id === 'global-score');
     expect(globalSummary).toBeDefined();
@@ -76,6 +128,15 @@ describe('summarizeStatuses', () => {
     expect(metadataSummary.tone).toBe('warning');
     expect(metadataSummary.insights.compatLabel).toBe('Guides FastPass (2) · Licence déclarée (2)');
     expect(metadataSummary.insights.latencyLabel).toBe('6/6');
+
+    const historySummary = statuses.find((status) => status.id === 'manifest-history');
+    expect(historySummary).toBeDefined();
+    expect(historySummary.value).toBe('6/6 manifestes suivis');
+    expect(historySummary.detail).toContain('4 mis à jour < 30 j');
+    expect(historySummary.detail).toContain('1 rétrogradation bloquée');
+    expect(historySummary.insights.latencyLabel).toBe('4/6');
+    expect(historySummary.insights.compatLabel).toBe('1 blocage');
+    expect(historySummary.tone).toBe('active');
 
     const auditSummary = statuses.find((status) => status.id === 'audit');
     expect(auditSummary.value).toBe('En attente');
@@ -108,6 +169,7 @@ describe('summarizeStatuses', () => {
 
   it('signale les erreurs de chargement et les modules désactivés', () => {
     const snapshot = {
+      now: BASE_NOW,
       audit: {
         status: 'error',
         error: 'axe-core indisponible',
@@ -136,6 +198,22 @@ describe('summarizeStatuses', () => {
       }
     };
 
+    snapshot.manifests = {
+      total: 5,
+      history: [
+        createHistoryBucket('audit', [
+          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 120 * 24 * 60 * 60 * 1000 })
+        ]),
+        createHistoryBucket('tts', [
+          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 80 * 24 * 60 * 60 * 1000 }),
+          createHistoryEntry({ status: 'rejected', reason: 'downgrade', version: '0.9.0', timestamp: BASE_NOW - 70 * 24 * 60 * 60 * 1000 })
+        ]),
+        createHistoryBucket('stt', []),
+        createHistoryBucket('contrast', []),
+        createHistoryBucket('spacing', [])
+      ]
+    };
+
     const statuses = summarizeStatuses(snapshot);
 
     const metadataSummary = statuses.find((status) => status.id === 'metadata-score');
@@ -150,6 +228,14 @@ describe('summarizeStatuses', () => {
     expect(globalSummary.detail).toContain('2/4 modules prêts');
     expect(globalSummary.detail).toContain('2 en erreur');
     expect(globalSummary.insights.compatLabel).toBe('2 incidents');
+
+    const historySummary = statuses.find((status) => status.id === 'manifest-history');
+    expect(historySummary).toBeDefined();
+    expect(historySummary.value).toBe('2/5 manifestes suivis');
+    expect(historySummary.detail).toContain('3 manifestes à historiser');
+    expect(historySummary.tone).toBe('warning');
+    expect(historySummary.insights.latencyLabel).toBe('0/2');
+    expect(historySummary.insights.compatLabel).toBe('1 blocage');
 
     const auditSummary = statuses.find((status) => status.id === 'audit');
     expect(auditSummary.tone).toBe('warning');
@@ -178,6 +264,7 @@ describe('summarizeStatuses', () => {
 
   it('priorise les états actifs pour lecture, dictée et braille', () => {
     const snapshot = {
+      now: BASE_NOW,
       audit: {
         status: 'critical',
         lastRun: 1700000000000,
@@ -217,6 +304,22 @@ describe('summarizeStatuses', () => {
           spacing: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }) }
         }
       }
+    };
+
+    snapshot.manifests = {
+      total: 4,
+      history: [
+        createHistoryBucket('audit', [
+          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 5 * 24 * 60 * 60 * 1000 })
+        ]),
+        createHistoryBucket('tts', [
+          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 3 * 24 * 60 * 60 * 1000 })
+        ]),
+        createHistoryBucket('stt', [
+          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 40 * 24 * 60 * 60 * 1000 })
+        ]),
+        createHistoryBucket('braille', [])
+      ]
     };
 
     const statuses = summarizeStatuses(snapshot);
@@ -259,6 +362,12 @@ describe('summarizeStatuses', () => {
     expect(spacingSummary.value).toBe('Espacements ajustés');
     expect(spacingSummary.detail).toContain('Interlignage 1.9×');
     expect(spacingSummary.insights.latencyLabel).toBe('Non mesuré');
+
+    const historySummary = statuses.find((status) => status.id === 'manifest-history');
+    expect(historySummary).toBeDefined();
+    expect(historySummary.value).toBe('3/4 manifestes suivis');
+    expect(historySummary.detail).toContain('1 manifeste à historiser');
+    expect(historySummary.tone).toBe('warning');
   });
 
   it('met en avant les métriques de compatibilité et de risque', () => {

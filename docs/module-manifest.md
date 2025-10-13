@@ -53,6 +53,17 @@ Les champs inconnus sont ignorés avec un avertissement console pour éviter les
 
 Ces conventions préparent l’introduction d’un fichier `module.json` par module tout en sécurisant l’intégration multi-équipe.
 
+## Historique et visualisation
+
+Le centre d’état consomme `listModuleManifestHistory()` pour alimenter la carte **Historique manifestes**. Cette carte annonce :
+
+- le nombre de manifestes suivis vs. déclarés ;
+- les mises à jour effectuées sur les 30 derniers jours ;
+- les rétrogradations bloquées par le garde-fou semver ;
+- les manifestes encore dépourvus d’historique.
+
+L’objectif est de fournir un équivalent aux chronologies proposées par Accessibility Insights ou axe DevTools tout en restant léger : la carte se lit au clavier, annonce les ratios clés via `aria-live` et sert de point de repère pour prioriser les manifestes à remettre à niveau avant d’implémenter un diff détaillé.
+
 ## Indice de qualité des métadonnées
 
 Depuis l’itération courante, `validateModuleManifest` calcule automatiquement un objet `metadataQuality`. Cet indice vérifie onze
