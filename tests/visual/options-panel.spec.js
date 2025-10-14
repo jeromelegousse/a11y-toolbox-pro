@@ -25,7 +25,7 @@ const BASELINE_SCREENSHOT = shouldUpdateBaseline || !existsSync(BASELINE_PATH)
   ? null
   : extractBaselinePayload(readFileSync(BASELINE_PATH, 'utf8'));
 
-const BASELINE_DATA = shouldUpdateBaseline ? null : readBaselineData();
+const BASELINE_DATA = shouldUpdateBaseline ? null : loadBaselineData();
 
 const focusableSelectors = [
   'a[href]',
@@ -160,7 +160,7 @@ test.describe('Panneau Options & Profils', () => {
         description: 'options-panel baseline updated (SVG)'
       });
     } else {
-      const { width, height, sha256, buffer } = await readBaselineData();
+      const { width, height, sha256, buffer } = BASELINE_DATA ?? loadBaselineData();
       const { width: captureWidth, height: captureHeight } =
         getPngDimensions(screenshot);
       expect(captureWidth).toBe(width);
@@ -171,7 +171,7 @@ test.describe('Panneau Options & Profils', () => {
   });
 });
 
-function readBaselineData() {
+function loadBaselineData() {
   if (!existsSync(BASELINE_PATH)) {
     throw new Error(
       `Aucun fichier de référence trouvé pour les tests visuels. Lancez le test avec UPDATE_VISUAL_BASELINE=1 pour en générer un : ${BASELINE_PATH}`
