@@ -160,7 +160,7 @@ test.describe('Panneau Options & Profils', () => {
         description: 'options-panel baseline updated (SVG)'
       });
     } else {
-      const { width, height, sha256, buffer } = BASELINE_DATA;
+      const { width, height, sha256, buffer } = await readBaselineData();
       const { width: captureWidth, height: captureHeight } =
         getPngDimensions(screenshot);
       expect(captureWidth).toBe(width);
