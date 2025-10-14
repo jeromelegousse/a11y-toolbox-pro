@@ -60,6 +60,12 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 - **Authentification** : le jeton optionnel est chiffré avec les salts WordPress côté base de données mais est ré-exposé côté frontal pour que le navigateur puisse insérer l’en-tête `Authorization: Bearer …`. Utiliser un secret dédié et révoquable, limiter l’IP source ou ajouter une validation côté serveur reste indispensable pour éviter qu’un visiteur ne détourne l’URL.
 - **Résilience** : les envois sont mis en file d’attente avec relance exponentielle (2s → 30s). Chaque échec ou synchronisation manuelle est journalisé dans l’activité pour assurer la traçabilité sans masquer l’historique initial.
 
+## Flux de synchronisation métriques (authentification & privacy)
+
+- **Collecte côté runtime** : `setupModuleRuntime` sérialise désormais chaque échantillon de métriques avec horodatage, latences (load/init/total), compatibilité et incidents structurés. Le hook `onMetricsUpdate` permet à n’importe quel service d’observer les points (ex. télémétrie interne) sans avoir à sonder le store.
+- **Service `createMetricsSyncService`** : l’agrégateur implémente des fenêtres temporelles (durée configurable) avec normalisation des scores (AAA/AA/…), consolidation par module et calcul des moyennes. Les paquets prêts à l’export sont publiés vers un backend via `fetch` (Bearer optionnel) ou stockés dans IndexedDB/localStorage en mode offline.
+- **Résilience & confidentialité** : les tentatives sont limitées par un timeout configurable et retentées au retour du réseau (`online`, `beforeunload`, `visibilitychange`). Seuls les identifiants de module, des agrégats numériques et des incidents sans contenu utilisateur sont synchronisés pour éviter toute fuite de données personnelles ; la file locale est purgée à la demande.
+
 ## Recommandations stratégiques
 
 1. **Clarifier les cas d'usage**

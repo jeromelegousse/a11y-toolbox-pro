@@ -6,6 +6,7 @@ import { manifest as audioManifest } from './modules/audio.manifest.js';
 import { mergeManifestDefaults } from './module-manifest.js';
 import { moduleCatalog } from './module-catalog.js';
 import { setupModuleRuntime } from './module-runtime.js';
+import { createMetricsSyncService } from './status-center.js';
 import { moduleCollections } from './module-collections.js';
 import { setupAudioFeedback } from './audio-feedback.js';
 import { buildAuditStatusText, renderAuditStats, renderAuditViolations } from './modules/audit-view.js';
@@ -112,6 +113,10 @@ const baseInitial = {
       collection: 'all',
       compatibility: 'all'
     },
+    statusFilters: {
+      profile: 'all',
+      collection: 'all'
+    },
     activity: [],
     view: 'modules',
     lastProfile: null,
@@ -148,6 +153,58 @@ const pluginConfig = window.a11ytbPluginConfig || {};
 const defaultConfig = pluginConfig?.defaults || {};
 const allowedDocks = new Set(['left', 'right', 'bottom']);
 const allowedViews = new Set(['modules', 'options', 'organize', 'guides', 'shortcuts']);
+
+const metricsIntegration = pluginConfig?.integrations?.metrics || {};
+const metricsEndpoint = typeof metricsIntegration.endpoint === 'string'
+  ? metricsIntegration.endpoint.trim()
+  : '';
+const metricsAuthToken = typeof metricsIntegration.authToken === 'string'
+  ? metricsIntegration.authToken
+  : '';
+const metricsWindowMs = Number(metricsIntegration.windowMs);
+const metricsFlushMs = Number(metricsIntegration.flushMs);
+const metricsTimeoutMs = Number(metricsIntegration.timeoutMs);
+let metricsTransport = null;
+if (metricsEndpoint && typeof fetch === 'function') {
+  metricsTransport = async (payload) => {
+    const response = await fetch(metricsEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(metricsAuthToken ? { Authorization: `Bearer ${metricsAuthToken}` } : {})
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+  };
+}
+
+let metricsStorage = null;
+if (typeof window !== 'undefined' && window.localStorage) {
+  const storageKey = metricsIntegration.storageKey || 'a11ytb/metrics-sync-queue';
+  metricsStorage = {
+    async load() {
+      try {
+        const raw = window.localStorage.getItem(storageKey);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        console.warn('a11ytb: stockage métriques indisponible.', error);
+        return [];
+      }
+    },
+    async save(data) {
+      try {
+        window.localStorage.setItem(storageKey, JSON.stringify(Array.isArray(data) ? data : []));
+      } catch (error) {
+        console.warn('a11ytb: impossible d’enregistrer la file métriques.', error);
+      }
+    }
+  };
+}
 
 if (defaultConfig?.dock && allowedDocks.has(defaultConfig.dock)) {
   initial.ui.dock = defaultConfig.dock;
@@ -241,8 +298,43 @@ const feedback = createFeedback({
   initialConfig: state.get('audio'),
   subscribe: (listener) => state.on((snapshot) => listener?.(snapshot.audio))
 });
+
+const metricsOptions = {
+  state,
+  transport: metricsTransport,
+  storage: metricsStorage
+};
+if (Number.isFinite(metricsWindowMs) && metricsWindowMs > 0) {
+  metricsOptions.windowDuration = metricsWindowMs;
+}
+if (Number.isFinite(metricsFlushMs) && metricsFlushMs > 0) {
+  metricsOptions.flushInterval = metricsFlushMs;
+}
+if (Number.isFinite(metricsTimeoutMs) && metricsTimeoutMs > 0) {
+  metricsOptions.timeoutMs = metricsTimeoutMs;
+}
+const metricsSync = createMetricsSyncService(metricsOptions);
+metricsSync.start();
+
 if (!window.a11ytb) window.a11ytb = {};
 window.a11ytb.feedback = feedback;
+window.a11ytb.metricsSync = metricsSync;
+
+window.addEventListener('beforeunload', () => {
+  metricsSync.stop();
+  metricsSync.flush({ force: true }).catch(() => {});
+});
+window.addEventListener('online', () => {
+  metricsSync.flush().catch(() => {});
+});
+
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      metricsSync.flush({ force: true }).catch(() => {});
+    }
+  });
+}
 const ensureDefaults = [
   ['ui.category', initial.ui.category],
   ['ui.search', initial.ui.search],
@@ -665,7 +757,12 @@ registerBlock({
   }
 });
 
-setupModuleRuntime({ state, catalog: moduleCatalog, collections: moduleCollections });
+setupModuleRuntime({
+  state,
+  catalog: moduleCatalog,
+  collections: moduleCollections,
+  onMetricsUpdate: (sample) => metricsSync.ingest(sample)
+});
 
 const root = document.getElementById('a11ytb-root');
 mountUI({ root, state, config: pluginConfig });

@@ -109,37 +109,107 @@ function evaluateCompatibility(manifest) {
   return report;
 }
 
-function serializeMetrics(internal) {
+const METRICS_INCIDENT_LIMIT = 25;
+
+function appendIncident(metrics, incident) {
+  if (!metrics || typeof metrics !== 'object') return;
+  if (!Array.isArray(metrics.incidents)) {
+    metrics.incidents = [];
+  }
+  const entry = {
+    type: incident?.type || 'error',
+    severity: incident?.severity || (incident?.type === 'warning' ? 'warning' : 'error'),
+    message: incident?.message || '',
+    at: Number.isFinite(incident?.at) ? incident.at : Date.now()
+  };
+  metrics.incidents.push(entry);
+  if (metrics.incidents.length > METRICS_INCIDENT_LIMIT) {
+    metrics.incidents.splice(0, metrics.incidents.length - METRICS_INCIDENT_LIMIT);
+  }
+  metrics.lastIncidentAt = entry.at;
+}
+
+function buildLatencySnapshot(internal) {
   const loadSamples = internal.loadTimings.samples || 0;
   const initSamples = internal.initTimings.samples || 0;
   const loadAverage = loadSamples > 0 ? internal.loadTimings.total / loadSamples : null;
   const initAverage = initSamples > 0 ? internal.initTimings.total / initSamples : null;
   const combinedAverage = (Number.isFinite(loadAverage) ? loadAverage : 0) + (Number.isFinite(initAverage) ? initAverage : 0);
   return {
+    load: {
+      last: internal.loadTimings.last,
+      total: internal.loadTimings.total,
+      average: Number.isFinite(loadAverage) ? loadAverage : null,
+      samples: loadSamples
+    },
+    init: {
+      last: internal.initTimings.last,
+      total: internal.initTimings.total,
+      average: Number.isFinite(initAverage) ? initAverage : null,
+      samples: initSamples
+    },
+    combinedAverage: Number.isFinite(combinedAverage) && combinedAverage > 0 ? combinedAverage : null
+  };
+}
+
+function serializeMetrics(internal, { collectedAt }) {
+  const latency = buildLatencySnapshot(internal);
+  const compatSnapshot = internal.compat ? safeClone(internal.compat) : createEmptyCompat();
+  const incidents = Array.isArray(internal.incidents)
+    ? internal.incidents.map((incident) => ({
+      type: incident.type,
+      severity: incident.severity || (incident.type === 'warning' ? 'warning' : 'error'),
+      message: incident.message || '',
+      at: incident.at
+    }))
+    : [];
+  return {
     attempts: internal.attempts,
     successes: internal.successes,
     failures: internal.failures,
     retryCount: Math.max(0, internal.attempts - internal.successes),
     lastAttemptAt: internal.lastAttemptAt,
+    lastSuccessAt: internal.lastSuccessAt,
+    lastFailureAt: internal.lastFailureAt,
+    lastIncidentAt: internal.lastIncidentAt,
     lastError: internal.lastError,
-    timings: {
-      load: {
-        last: internal.loadTimings.last,
-        average: loadAverage,
-        samples: loadSamples
-      },
-      init: {
-        last: internal.initTimings.last,
-        average: initAverage,
-        samples: initSamples
-      },
-      combinedAverage: Number.isFinite(combinedAverage) && combinedAverage > 0 ? combinedAverage : null
-    },
-    compat: internal.compat
+    timings: latency,
+    latency,
+    compat: compatSnapshot,
+    incidents,
+    timestamps: {
+      collectedAt,
+      lastAttemptAt: internal.lastAttemptAt,
+      lastSuccessAt: internal.lastSuccessAt,
+      lastFailureAt: internal.lastFailureAt,
+      lastIncidentAt: internal.lastIncidentAt
+    }
   };
 }
 
-export function setupModuleRuntime({ state, catalog, collections = [] }) {
+function createMetricsSample(moduleId, internal, { collectedAt = Date.now() } = {}) {
+  internal.lastSampleAt = collectedAt;
+  const snapshot = serializeMetrics(internal, { collectedAt });
+  const exportSample = {
+    moduleId,
+    collectedAt,
+    status: {
+      attempts: snapshot.attempts,
+      successes: snapshot.successes,
+      failures: snapshot.failures,
+      retryCount: snapshot.retryCount,
+      lastError: snapshot.lastError
+    },
+    timings: snapshot.timings,
+    latency: snapshot.latency,
+    compat: snapshot.compat,
+    incidents: snapshot.incidents,
+    timestamps: snapshot.timestamps
+  };
+  return { snapshot, exportSample };
+}
+
+export function setupModuleRuntime({ state, catalog, collections = [], onMetricsUpdate } = {}) {
   const loaders = new Map(catalog.map((entry) => [entry.id, entry.loader]));
   const manifests = new Map(catalog.map((entry) => [entry.id, entry.manifest]));
   const moduleToBlocks = new Map();
@@ -190,6 +260,7 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
   const moduleLifecycle = new Map();
   const preloadedModules = new Set();
   const scheduledPreloads = new Map();
+  const metricsListener = typeof onMetricsUpdate === 'function' ? onMetricsUpdate : null;
 
   function getLifecycleEntry(moduleId) {
     if (!moduleLifecycle.has(moduleId)) {
@@ -391,10 +462,15 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
       successes: 0,
       failures: 0,
       lastAttemptAt: null,
+      lastSuccessAt: null,
+      lastFailureAt: null,
+      lastIncidentAt: null,
+      lastSampleAt: null,
       lastError: null,
       loadTimings: { last: null, total: 0, samples: 0 },
       initTimings: { last: null, total: 0, samples: 0 },
-      compat: createEmptyCompat()
+      compat: createEmptyCompat(),
+      incidents: []
     };
     const manifest = manifests.get(moduleId);
     if (manifest) {
@@ -574,19 +650,31 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
 
   snapshotManifestGovernance();
 
+  function captureMetricsSample(moduleId, { collectedAt = Date.now() } = {}) {
+    const internal = ensureMetrics(moduleId);
+    internal.compat = evaluateCompatibility(manifests.get(moduleId));
+    return createMetricsSample(moduleId, internal, { collectedAt });
+  }
+
   function updateModuleRuntime(moduleId, patch) {
     const current = state.get(`runtime.modules.${moduleId}`) || {};
     const next = { ...current, ...patch };
     if (!Object.prototype.hasOwnProperty.call(patch, 'metrics')) {
-      next.metrics = serializeMetrics(ensureMetrics(moduleId));
+      next.metrics = captureMetricsSample(moduleId).snapshot;
     }
     state.set(`runtime.modules.${moduleId}`, next);
   }
 
   function publishMetrics(moduleId) {
-    const internal = ensureMetrics(moduleId);
-    internal.compat = evaluateCompatibility(manifests.get(moduleId));
-    updateModuleRuntime(moduleId, { metrics: serializeMetrics(internal) });
+    const { snapshot, exportSample } = captureMetricsSample(moduleId);
+    updateModuleRuntime(moduleId, { metrics: snapshot });
+    if (metricsListener) {
+      try {
+        metricsListener(exportSample);
+      } catch (error) {
+        console.error('a11ytb: publication métriques impossible.', error);
+      }
+    }
   }
 
   function loadModule(moduleId) {
@@ -605,7 +693,8 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
     metrics.attempts += 1;
     metrics.lastAttemptAt = Date.now();
     metrics.lastError = null;
-    updateModuleRuntime(moduleId, { state: 'loading', error: null, metrics: serializeMetrics(metrics) });
+    const { snapshot: loadingSnapshot } = captureMetricsSample(moduleId);
+    updateModuleRuntime(moduleId, { state: 'loading', error: null, metrics: loadingSnapshot });
     const loadStartedAt = now();
     const promise = Promise.resolve()
       .then(() => loader())
@@ -628,6 +717,13 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
               metrics.failures += 1;
               metrics.lastError = error?.message || "Échec d'initialisation";
               metrics.initTimings.last = null;
+              metrics.lastFailureAt = Date.now();
+              appendIncident(metrics, {
+                type: 'error',
+                message: metrics.lastError,
+                at: metrics.lastFailureAt,
+                severity: 'error'
+              });
               error.__a11ytbTracked = true;
               publishMetrics(moduleId);
               updateModuleRuntime(moduleId, { state: 'error', error: metrics.lastError });
@@ -641,6 +737,8 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
           initialized.add(moduleId);
         }
         metrics.successes += 1;
+        metrics.lastSuccessAt = Date.now();
+        metrics.lastError = null;
         publishMetrics(moduleId);
         updateModuleRuntime(moduleId, { state: 'ready', error: null });
         return mod;
@@ -652,6 +750,13 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
           metrics.failures += 1;
           metrics.lastError = error?.message || 'Échec de chargement';
           metrics.loadTimings.last = null;
+          metrics.lastFailureAt = Date.now();
+          appendIncident(metrics, {
+            type: 'error',
+            message: metrics.lastError,
+            at: metrics.lastFailureAt,
+            severity: 'error'
+          });
           publishMetrics(moduleId);
         }
         console.error(`a11ytb: impossible de charger le module ${moduleId}.`, error);
