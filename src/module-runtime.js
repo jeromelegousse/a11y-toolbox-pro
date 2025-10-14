@@ -677,12 +677,26 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
 
   function refreshManifestGovernance() {
     snapshotManifestGovernance();
+    const runtimeModules = state.get('runtime.modules');
+    const catalogIds = catalog
+      .map((entry) => (entry && typeof entry === 'object' ? entry.id : null))
+      .filter(Boolean);
+    const runtimeModuleIds = runtimeModules && typeof runtimeModules === 'object'
+      ? Object.keys(runtimeModules)
+      : [];
     const knownModuleIds = new Set([
       ...moduleToBlocks.keys(),
-      ...catalog.map((entry) => entry.id)
+      ...catalogIds,
+      ...metricsCache.keys(),
+      ...manifests.keys(),
+      ...runtimeModuleIds
     ]);
     knownModuleIds.forEach((moduleId) => {
       if (!moduleId) return;
+      const manifest = manifests.get(moduleId);
+      const metrics = ensureMetrics(moduleId);
+      metrics.compat = evaluateCompatibility(manifest);
+      updateModuleRuntime(moduleId, { metrics: serializeMetrics(metrics) });
       applyModuleMetadata(moduleId);
     });
   }
