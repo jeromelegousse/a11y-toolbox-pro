@@ -1,5 +1,6 @@
 import { registerModule } from '../registry.js';
-import { manifest } from './audio-feedback.manifest.js';
+import { AUDIO_SEVERITIES, DEFAULT_AUDIO_VOLUME, createDefaultAudioState, normalizeAudioEvents } from '../audio-config.js';
+import { manifest } from './audio.manifest.js';
 
 export { manifest };
 
@@ -10,38 +11,63 @@ const clone = (value) => {
   return JSON.parse(JSON.stringify(value));
 };
 
-const FALLBACK_AUDIO = {
-  masterVolume: 0.9,
-  theme: 'classic',
-  events: {
-    confirm: true,
-    alert: true,
-    warning: true,
-    info: true
-  }
+function clampVolume(value, fallback = DEFAULT_AUDIO_VOLUME) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(1, Math.max(0, numeric));
+}
+
+const DEFAULT_AUDIO_SOURCE = manifest.defaults?.state?.audio ?? createDefaultAudioState();
+const DEFAULT_AUDIO = {
+  volume: clampVolume(DEFAULT_AUDIO_SOURCE.volume, DEFAULT_AUDIO_VOLUME),
+  events: normalizeAudioEvents(DEFAULT_AUDIO_SOURCE.events)
 };
 
-const DEFAULT_AUDIO = manifest.defaults?.state?.audio
-  ? clone(manifest.defaults.state.audio)
-  : clone(FALLBACK_AUDIO);
+function sanitizeEventEntry(entry) {
+  if (entry && typeof entry === 'object') {
+    return { ...entry };
+  }
+  if (typeof entry === 'boolean') {
+    return { enabled: entry };
+  }
+  if (typeof entry === 'string' && entry.trim()) {
+    return { enabled: true, sound: entry.trim() };
+  }
+  return null;
+}
+
+function migrateEvents(rawEvents) {
+  const sanitized = {};
+  if (rawEvents && typeof rawEvents === 'object') {
+    AUDIO_SEVERITIES.forEach((severity) => {
+      const entry = sanitizeEventEntry(rawEvents[severity]);
+      if (entry) {
+        sanitized[severity] = entry;
+      }
+    });
+    if (sanitized.success === undefined && Object.prototype.hasOwnProperty.call(rawEvents, 'confirm')) {
+      const legacyConfirm = sanitizeEventEntry(rawEvents.confirm);
+      if (legacyConfirm) {
+        sanitized.success = legacyConfirm;
+      }
+    }
+  }
+  return normalizeAudioEvents(sanitized);
+}
+
+function migrateAudioState(raw) {
+  const next = clone(DEFAULT_AUDIO);
+  if (!raw || typeof raw !== 'object') {
+    return next;
+  }
+  next.volume = clampVolume(raw.volume ?? raw.masterVolume, next.volume);
+  next.events = migrateEvents(raw.events ?? {});
+  return next;
+}
 
 function normalizeConfig(snapshot = {}) {
   const audioState = snapshot.audio ?? snapshot;
-  const baseEvents = DEFAULT_AUDIO.events ?? {};
-  const events = { ...baseEvents };
-  const providedEvents = audioState.events ?? {};
-  Object.keys(baseEvents).forEach((key) => {
-    if (key in providedEvents) {
-      events[key] = !!providedEvents[key];
-    }
-  });
-  const masterVolume = typeof audioState.masterVolume === 'number'
-    ? Math.min(1, Math.max(0, audioState.masterVolume))
-    : DEFAULT_AUDIO.masterVolume ?? 1;
-  const theme = typeof audioState.theme === 'string' && audioState.theme.trim()
-    ? audioState.theme.trim()
-    : DEFAULT_AUDIO.theme ?? 'classic';
-  return { theme, masterVolume, events };
+  return migrateAudioState(audioState);
 }
 
 let feedbackInstance = null;
@@ -50,11 +76,13 @@ let applyConfig = null;
 let lastSignature = '';
 
 function buildSilentSnapshot() {
-  const events = Object.keys(DEFAULT_AUDIO.events || {}).reduce((acc, key) => {
-    acc[key] = false;
-    return acc;
-  }, {});
-  return { audio: { ...DEFAULT_AUDIO, masterVolume: 0, events } };
+  const defaults = migrateEvents(DEFAULT_AUDIO.events);
+  const events = {};
+  AUDIO_SEVERITIES.forEach((severity) => {
+    const entry = defaults[severity] || { enabled: true, sound: null };
+    events[severity] = { ...entry, enabled: false };
+  });
+  return { audio: { volume: 0, events } };
 }
 
 const audioFeedback = {
@@ -68,27 +96,37 @@ const audioFeedback = {
       return;
     }
 
-    const ensureDefaults = clone(DEFAULT_AUDIO);
     const current = state.get('audio');
+    const migrated = migrateAudioState(current);
     if (!current) {
-      state.set('audio', clone(ensureDefaults));
+      state.set('audio', clone(migrated));
     } else {
-      const merged = { ...ensureDefaults, ...current };
-      merged.events = { ...ensureDefaults.events, ...(current.events || {}) };
       const previousSignature = JSON.stringify(current);
-      const nextSignature = JSON.stringify(merged);
+      const nextSignature = JSON.stringify(migrated);
       if (previousSignature !== nextSignature) {
-        state.set('audio', merged);
+        state.set('audio', clone(migrated));
       }
     }
 
     applyConfig = (snapshot) => {
       if (!feedbackInstance) return;
       const config = normalizeConfig(snapshot);
-      const signature = JSON.stringify(config);
+      const payload = {
+        volume: config.volume,
+        events: {}
+      };
+      AUDIO_SEVERITIES.forEach((severity) => {
+        const entry = config.events?.[severity];
+        if (!entry) return;
+        payload.events[severity] = {
+          enabled: entry.enabled !== false,
+          sound: entry.sound
+        };
+      });
+      const signature = JSON.stringify(payload);
       if (signature === lastSignature) return;
       lastSignature = signature;
-      feedbackInstance.configure(config);
+      feedbackInstance.configure(payload);
     };
   },
   mount({ state }) {

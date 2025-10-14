@@ -1,4 +1,4 @@
-import { manifest as audioFeedbackManifest } from './modules/audio-feedback.manifest.js';
+import { manifest as audioFeedbackManifest } from './modules/audio.manifest.js';
 import { manifest as auditManifest } from './modules/audit.manifest.js';
 import { manifest as ttsManifest } from './modules/tts.manifest.js';
 import { manifest as sttManifest } from './modules/stt.manifest.js';
