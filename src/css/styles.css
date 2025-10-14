@@ -2442,6 +2442,80 @@ body {
   margin-top: -4px;
 }
 
+.a11ytb-admin-live {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--a11ytb-fg) 70%, transparent);
+}
+
+.a11ytb-admin-sync-list,
+.a11ytb-admin-export-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.a11ytb-admin-sync-item,
+.a11ytb-admin-export-item {
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--a11ytb-surface-alt) 85%, transparent);
+  border: 1px solid color-mix(in srgb, var(--a11ytb-border) 65%, transparent);
+  display: grid;
+  gap: 6px;
+}
+
+.a11ytb-admin-sync-head,
+.a11ytb-admin-export-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.a11ytb-admin-sync-connector,
+.a11ytb-admin-export-format {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.a11ytb-admin-sync-badge,
+.a11ytb-admin-export-badge {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.a11ytb-admin-sync-badge[data-status='success'],
+.a11ytb-admin-export-badge[data-status='success'] {
+  background: color-mix(in srgb, var(--a11ytb-success) 25%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-success) 80%, white 15%);
+}
+
+.a11ytb-admin-sync-badge[data-status='error'],
+.a11ytb-admin-export-badge[data-status='error'] {
+  background: color-mix(in srgb, var(--a11ytb-danger) 25%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-danger) 82%, white 10%);
+}
+
+.a11ytb-admin-sync-badge[data-status='queued'],
+.a11ytb-admin-export-badge[data-status='queued'] {
+  background: color-mix(in srgb, var(--a11ytb-warning) 25%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-warning) 80%, white 12%);
+}
+
+.a11ytb-admin-sync-meta,
+.a11ytb-admin-export-meta {
+  margin: 0;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--a11ytb-fg) 70%, transparent);
+}
+
 .a11ytb-admin-list {
   list-style: none;
   margin: 0;
@@ -3702,9 +3776,94 @@ body {
   opacity: 0.92;
 }
 
-.a11ytb-activity {
+.a11ytb-activity { 
   margin-left: auto;
   color: color-mix(in srgb, var(--a11ytb-fg) 85%, transparent);
+}
+
+.a11ytb-activity-syncs {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--a11ytb-border) 65%, transparent);
+  background: color-mix(in srgb, var(--a11ytb-surface) 88%, transparent);
+}
+
+.a11ytb-activity-syncs-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.a11ytb-activity-syncs-help {
+  margin: 4px 0 12px;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--a11ytb-fg) 70%, transparent);
+}
+
+.a11ytb-activity-connectors {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.a11ytb-activity-connector {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--a11ytb-surface-alt) 82%, transparent);
+}
+
+.a11ytb-activity-connector--empty {
+  padding: 6px 0;
+  background: none;
+  color: color-mix(in srgb, var(--a11ytb-fg) 60%, transparent);
+}
+
+.a11ytb-activity-connector-title {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.a11ytb-activity-connector-status {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.a11ytb-activity-connector-status--enabled {
+  color: var(--a11ytb-success);
+}
+
+.a11ytb-activity-connector-status--disabled {
+  color: color-mix(in srgb, var(--a11ytb-fg) 55%, transparent);
+}
+
+.a11ytb-activity-connector-help {
+  margin: 0;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--a11ytb-fg) 72%, transparent);
+}
+
+.a11ytb-activity-connector-fields {
+  margin: 4px 0 0;
+  display: grid;
+  gap: 2px;
+  font-size: 11px;
+  color: color-mix(in srgb, var(--a11ytb-fg) 65%, transparent);
+}
+
+.a11ytb-activity-connector-fields dt {
+  font-weight: 600;
+}
+
+.a11ytb-activity-connector-fields dd {
+  margin: 0;
 }
 
 .a11ytb-activity summary {

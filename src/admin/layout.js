@@ -148,7 +148,73 @@ export function createAdminLayout(runtimePanel) {
 
   dashboard.append(dashboardHeader, statusGrid, filterBar, moduleGrid, emptyState);
 
-  mainColumn.append(introSection, dashboard);
+  const syncSection = document.createElement('section');
+  syncSection.className = 'a11ytb-admin-section';
+
+  const syncHeader = document.createElement('div');
+  syncHeader.className = 'a11ytb-admin-section-header';
+
+  const syncTitle = document.createElement('h2');
+  syncTitle.className = 'a11ytb-admin-section-title';
+  syncTitle.textContent = 'Synchronisations externes';
+
+  const syncDescription = document.createElement('p');
+  syncDescription.className = 'a11ytb-admin-section-description';
+  syncDescription.textContent = 'Suivez les envois automatiques (webhook, Jira, Linear, Slack) et vérifiez les dernières tentatives.';
+
+  const syncStatus = document.createElement('p');
+  syncStatus.className = 'a11ytb-admin-live';
+  syncStatus.setAttribute('role', 'status');
+  syncStatus.setAttribute('aria-live', 'polite');
+  syncStatus.textContent = 'Aucune synchronisation enregistrée pour le moment.';
+
+  syncHeader.append(syncTitle, syncDescription, syncStatus);
+
+  const syncList = document.createElement('ul');
+  syncList.className = 'a11ytb-admin-sync-list';
+  syncList.setAttribute('role', 'list');
+  syncList.hidden = true;
+
+  const syncEmpty = document.createElement('p');
+  syncEmpty.className = 'a11ytb-admin-empty';
+  syncEmpty.textContent = 'Aucune synchronisation planifiée ou exécutée.';
+
+  syncSection.append(syncHeader, syncList, syncEmpty);
+
+  const exportSection = document.createElement('section');
+  exportSection.className = 'a11ytb-admin-section';
+
+  const exportHeader = document.createElement('div');
+  exportHeader.className = 'a11ytb-admin-section-header';
+
+  const exportTitle = document.createElement('h2');
+  exportTitle.className = 'a11ytb-admin-section-title';
+  exportTitle.textContent = 'Statut des exports';
+
+  const exportDescription = document.createElement('p');
+  exportDescription.className = 'a11ytb-admin-section-description';
+  exportDescription.textContent = 'Historique des exports JSON/CSV et copies du journal d’activité.';
+
+  const exportStatus = document.createElement('p');
+  exportStatus.className = 'a11ytb-admin-live';
+  exportStatus.setAttribute('role', 'status');
+  exportStatus.setAttribute('aria-live', 'polite');
+  exportStatus.textContent = 'Aucun export recensé.';
+
+  exportHeader.append(exportTitle, exportDescription, exportStatus);
+
+  const exportList = document.createElement('ul');
+  exportList.className = 'a11ytb-admin-export-list';
+  exportList.setAttribute('role', 'list');
+  exportList.hidden = true;
+
+  const exportEmpty = document.createElement('p');
+  exportEmpty.className = 'a11ytb-admin-empty';
+  exportEmpty.textContent = 'Aucun export enregistré.';
+
+  exportSection.append(exportHeader, exportList, exportEmpty);
+
+  mainColumn.append(introSection, dashboard, syncSection, exportSection);
   layout.append(mainColumn, runtimePanel.element);
 
   return {
@@ -160,6 +226,12 @@ export function createAdminLayout(runtimePanel) {
     emptyState,
     connectionStatus,
     geminiStatus,
+    syncList,
+    syncEmpty,
+    syncStatus,
+    exportList,
+    exportEmpty,
+    exportStatus,
     filters: {
       profile: profileFilter.control,
       collection: collectionFilter.control,

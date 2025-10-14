@@ -136,6 +136,37 @@ const baseInitial = {
   profiles: profilePresets,
   runtime: {
     modules: {}
+  },
+  collaboration: {
+    accounts: [],
+    teams: [],
+    workflow: {
+      defaultState: 'draft',
+      states: {
+        draft: {
+          label: 'Brouillon',
+          description: 'Préparation interne en attente de revue.',
+          roles: ['owner', 'editor']
+        },
+        review: {
+          label: 'Revue',
+          description: 'Validation par un pair ou un référent accessibilité.',
+          roles: ['reviewer', 'owner']
+        },
+        published: {
+          label: 'Publication',
+          description: 'Workflow validé et visible par l’équipe élargie.',
+          roles: ['owner', 'admin']
+        }
+      },
+      transitions: [
+        { from: 'draft', to: 'review', label: 'Envoyer en revue', roles: ['owner', 'editor'] },
+        { from: 'review', to: 'draft', label: 'Retourner en brouillon', roles: ['reviewer', 'owner'] },
+        { from: 'review', to: 'published', label: 'Approuver & publier', roles: ['reviewer', 'owner'] }
+      ]
+    },
+    syncs: [],
+    exports: []
   }
 };
 
@@ -266,7 +297,8 @@ const ensureDefaults = [
   ['profiles', initial.profiles],
   ['audit', initial.audit],
   ['runtime.modules', initial.runtime.modules],
-  ['tts.progress', initial.tts.progress]
+  ['tts.progress', initial.tts.progress],
+  ['collaboration', initial.collaboration]
 ];
 
 ensureDefaults.forEach(([path, fallback]) => {

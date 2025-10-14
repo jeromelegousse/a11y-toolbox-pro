@@ -15,6 +15,7 @@ const KNOWN_FIELDS = new Set([
   'authors',
   'defaults',
   'lifecycle',
+  'workflow',
   'config',
   'compat',
   'runtime',
@@ -300,6 +301,107 @@ function normalizeLifecycle(lifecycle) {
   return Object.keys(output).length ? output : undefined;
 }
 
+function normalizeWorkflow(workflow) {
+  if (!workflow || typeof workflow !== 'object') return undefined;
+
+  const states = [];
+  if (Array.isArray(workflow.states)) {
+    workflow.states.forEach((entry) => {
+      let id = '';
+      let label = '';
+      let description = '';
+      let roles = [];
+      if (typeof entry === 'string') {
+        id = entry.trim();
+        label = id;
+      } else if (entry && typeof entry === 'object') {
+        id = typeof entry.id === 'string' ? entry.id.trim() : '';
+        label = typeof entry.label === 'string' ? entry.label.trim() : '';
+        description = typeof entry.description === 'string' ? entry.description.trim() : '';
+        roles = ensureArray(entry.roles, (role) => (typeof role === 'string' ? role.trim() : undefined)).filter(Boolean);
+      }
+      if (!id) {
+        console.warn('a11ytb: état de workflow ignoré car sans identifiant.', entry);
+        return;
+      }
+      states.push(Object.freeze({
+        id,
+        label: label || id,
+        description: description || undefined,
+        roles: roles.length ? Object.freeze(roles) : undefined
+      }));
+    });
+  } else if (workflow.states && typeof workflow.states === 'object') {
+    Object.entries(workflow.states).forEach(([key, value]) => {
+      if (!key) return;
+      const label = typeof value === 'string' ? value.trim() : (value?.label ? String(value.label).trim() : key);
+      const description = value && typeof value === 'object' && typeof value.description === 'string'
+        ? value.description.trim()
+        : '';
+      const roles = value && typeof value === 'object'
+        ? ensureArray(value.roles, (role) => (typeof role === 'string' ? role.trim() : undefined)).filter(Boolean)
+        : [];
+      states.push(Object.freeze({
+        id: key.trim(),
+        label: label || key.trim(),
+        description: description || undefined,
+        roles: roles.length ? Object.freeze(roles) : undefined
+      }));
+    });
+  }
+
+  if (!states.length) {
+    console.warn('a11ytb: workflow de module ignoré car aucun état valide.');
+    return undefined;
+  }
+
+  const transitions = ensureArray(workflow.transitions, (transition) => {
+    if (!transition || typeof transition !== 'object') return undefined;
+    const from = typeof transition.from === 'string' ? transition.from.trim() : '';
+    const to = typeof transition.to === 'string' ? transition.to.trim() : '';
+    if (!from || !to) return undefined;
+    const id = typeof transition.id === 'string' ? transition.id.trim() : '';
+    const label = typeof transition.label === 'string' ? transition.label.trim() : '';
+    const roles = ensureArray(transition.roles, (role) => (typeof role === 'string' ? role.trim() : undefined)).filter(Boolean);
+    return Object.freeze({
+      id: id || undefined,
+      from,
+      to,
+      label: label || undefined,
+      roles: roles.length ? Object.freeze(roles) : undefined
+    });
+  }).filter(Boolean);
+
+  const defaultState = typeof workflow.defaultState === 'string'
+    ? workflow.defaultState.trim()
+    : states[0].id;
+  const normalizedDefault = states.some((state) => state.id === defaultState)
+    ? defaultState
+    : states[0].id;
+
+  const normalized = {
+    defaultState: normalizedDefault,
+    states: Object.freeze(states)
+  };
+  if (transitions.length) {
+    normalized.transitions = Object.freeze(transitions);
+  }
+
+  const derivedPermissions = new Set();
+  states.forEach((state) => {
+    derivedPermissions.add(`workflow:state:${state.id}`);
+  });
+  transitions.forEach((transition) => {
+    const key = transition.id || `${transition.from}:${transition.to}`;
+    derivedPermissions.add(`workflow:transition:${key}`);
+  });
+
+  return {
+    definition: Object.freeze(normalized),
+    permissions: Array.from(derivedPermissions)
+  };
+}
+
 function normalizeCompat(compat) {
   if (!compat || typeof compat !== 'object') return undefined;
   const normalized = {};
@@ -513,14 +615,11 @@ export function validateModuleManifest(manifest, moduleId) {
     normalized.keywords = Array.from(new Set(keywords));
   }
 
-  const permissions = ensureArray(manifest.permissions, (perm) => {
+  let permissions = ensureArray(manifest.permissions, (perm) => {
     if (typeof perm !== 'string') return undefined;
     const trimmed = perm.trim();
     return trimmed ? trimmed : undefined;
   });
-  if (permissions?.length) {
-    normalized.permissions = Array.from(new Set(permissions));
-  }
 
   const dependencies = normalizeDependencies(manifest.dependencies);
   if (dependencies?.length) {
@@ -575,6 +674,14 @@ export function validateModuleManifest(manifest, moduleId) {
     normalized.lifecycle = lifecycle;
   }
 
+  const workflow = normalizeWorkflow(manifest.workflow);
+  if (workflow) {
+    normalized.workflow = workflow.definition;
+    if (workflow.permissions?.length) {
+      permissions = (permissions || []).concat(workflow.permissions);
+    }
+  }
+
   if (manifest.config && typeof manifest.config === 'object') {
     const config = normalizeConfig(manifest.config, id);
     if (config) normalized.config = config;
@@ -593,6 +700,10 @@ export function validateModuleManifest(manifest, moduleId) {
   const guides = normalizeGuides(manifest.guides, id);
   if (guides) {
     normalized.guides = guides;
+  }
+
+  if (permissions?.length) {
+    normalized.permissions = Array.from(new Set(permissions));
   }
 
   normalized.metadataQuality = assessManifestQuality(normalized);
