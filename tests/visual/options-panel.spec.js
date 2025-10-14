@@ -1,22 +1,67 @@
 import { test, expect } from '@playwright/test';
-import { readFile, writeFile } from 'node:fs/promises';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const BASELINE_PATH = resolve(__dirname, 'baselines/options-panel.png.base64');
+const BASELINE_JSON_PATH = resolve(__dirname, 'baselines/options-panel.json');
+const BASELINE_PREVIEW_DIR = resolve(__dirname, 'baselines/.artifacts');
+const BASELINE_PREVIEW_PATH = resolve(BASELINE_PREVIEW_DIR, 'options-panel.png');
 
 const shouldUpdateBaseline = process.env.UPDATE_VISUAL_BASELINE === '1';
 
-const BASELINE_SCREENSHOT = shouldUpdateBaseline
-  ? null
-  : (await readFile(BASELINE_PATH, 'utf8')).replace(/\s+/g, '');
-
-const wrapBase64 = (payload) => {
-  const chunks = payload.match(/.{1,76}/g);
-  return (chunks ?? [payload]).join('\n');
+const readBaselineMetadata = () => {
+  if (!existsSync(BASELINE_JSON_PATH)) {
+    throw new Error(
+      "La capture de référence est absente. Exécutez `UPDATE_VISUAL_BASELINE=1 npm run test:visual` pour la régénérer."
+    );
+  }
+  try {
+    const metadata = JSON.parse(readFileSync(BASELINE_JSON_PATH, 'utf8'));
+    const { width, height, sha256 } = metadata ?? {};
+    if (
+      typeof width !== 'number' ||
+      typeof height !== 'number' ||
+      typeof sha256 !== 'string'
+    ) {
+      throw new Error();
+    }
+    return metadata;
+  } catch (error) {
+    throw new Error(
+      'Le fichier de référence est illisible. Régénérez la baseline avec `UPDATE_VISUAL_BASELINE=1 npm run test:visual`.'
+    );
+  }
 };
+
+const getPngDimensions = (pngBuffer) => ({
+  width: pngBuffer.readUInt32BE(16),
+  height: pngBuffer.readUInt32BE(20)
+});
+
+const computeScreenshotHash = (pngBuffer) =>
+  createHash('sha256').update(pngBuffer).digest('hex');
+
+const writeBaselineMetadata = (pngBuffer) => {
+  const { width, height } = getPngDimensions(pngBuffer);
+  const metadata = {
+    width,
+    height,
+    sha256: computeScreenshotHash(pngBuffer)
+  };
+  writeFileSync(
+    BASELINE_JSON_PATH,
+    `${JSON.stringify(metadata, null, 2)}\n`,
+    'utf8'
+  );
+  mkdirSync(BASELINE_PREVIEW_DIR, { recursive: true });
+  writeFileSync(BASELINE_PREVIEW_PATH, pngBuffer);
+  return metadata;
+};
+
+const BASELINE_METADATA = shouldUpdateBaseline ? null : readBaselineMetadata();
 
 const focusableSelectors = [
   'a[href]',
@@ -95,16 +140,19 @@ test.describe('Panneau Options & Profils', () => {
       maskColor: '#000'
     });
 
-    const actual = screenshot.toString('base64');
-
     if (shouldUpdateBaseline) {
-      await writeFile(BASELINE_PATH, `${wrapBase64(actual)}\n`, 'utf8');
+      const metadata = writeBaselineMetadata(screenshot);
       test.info().annotations.push({
         type: 'baseline',
-        description: 'options-panel baseline updated'
+        description: `options-panel baseline mise à jour (sha256: ${metadata.sha256})`
       });
     } else {
-      expect(actual).toBe(BASELINE_SCREENSHOT);
+      const { width, height, sha256 } = BASELINE_METADATA;
+      const { width: captureWidth, height: captureHeight } =
+        getPngDimensions(screenshot);
+      expect(captureWidth).toBe(width);
+      expect(captureHeight).toBe(height);
+      expect(computeScreenshotHash(screenshot)).toBe(sha256);
     }
   });
 });

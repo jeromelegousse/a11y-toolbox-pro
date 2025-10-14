@@ -25,11 +25,11 @@ Ce document précise comment nous automatisons les vérifications et comment ajo
 
 - Les tests résident dans `tests/visual/`.
 - Après `npm install`, exécutez `npx playwright install` pour récupérer les navigateurs locaux (non requis en CI GitHub Actions).
-- Les captures de référence sont stockées sous forme Base64 texte dans `tests/visual/baselines/` (une ligne = 76 caractères).
+- Les captures de référence sont stockées sous forme de métadonnées JSON (`options-panel.json`) contenant les dimensions et le hachage SHA-256 de la capture PNG attendue. Une prévisualisation non versionnée est générée dans `tests/visual/baselines/.artifacts/` pour consultation locale.
 - Pour mettre à jour une capture de référence après un changement visuel :
   1. Vérifiez manuellement que le rendu est conforme.
-  2. Exécutez `UPDATE_VISUAL_BASELINE=1 npm run test:visual` (le test régénère le fichier Base64).
-  3. Commitez le fichier `.base64` mis à jour et mentionnez le changement dans la PR.
+  2. Exécutez `UPDATE_VISUAL_BASELINE=1 npm run test:visual` (le test régénère le fichier `.json` et rafraîchit la prévisualisation locale).
+  3. Commitez le fichier JSON mis à jour et mentionnez le changement dans la PR.
 - Les zones sujettes à variation (journal d’activité) sont masquées via l’option `mask` de `locator.screenshot` dans le test.
 - Ajoutez un nouveau fichier `*.spec.js` pour chaque bloc nécessitant une capture dédiée. Inspirez-vous de `options-panel.spec.js` pour :
   - monter la UI via le serveur statique (`http-server`),
