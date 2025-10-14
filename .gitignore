@@ -2,7 +2,6 @@ node_modules/
 test-results/
 playwright-report/
 tests/visual/report/
-tests/visual/baselines/.artifacts/
 tests/visual/**/*.png
 *.fig
 .env*

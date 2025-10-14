@@ -1,34 +1,37 @@
 import { test, expect } from '@playwright/test';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const BASELINE_JSON_PATH = resolve(__dirname, 'baselines/options-panel.json');
-const BASELINE_PREVIEW_DIR = resolve(__dirname, 'baselines/.artifacts');
-const BASELINE_PREVIEW_PATH = resolve(BASELINE_PREVIEW_DIR, 'options-panel.png');
+const BASELINE_SVG_PATH = resolve(__dirname, 'baselines/options-panel.svg');
 
 const shouldUpdateBaseline = process.env.UPDATE_VISUAL_BASELINE === '1';
 
-const readBaselineMetadata = () => {
-  if (!existsSync(BASELINE_JSON_PATH)) {
+const readBaselineData = () => {
+  if (!existsSync(BASELINE_SVG_PATH)) {
     throw new Error(
       "La capture de référence est absente. Exécutez `UPDATE_VISUAL_BASELINE=1 npm run test:visual` pour la régénérer."
     );
   }
   try {
-    const metadata = JSON.parse(readFileSync(BASELINE_JSON_PATH, 'utf8'));
-    const { width, height, sha256 } = metadata ?? {};
-    if (
-      typeof width !== 'number' ||
-      typeof height !== 'number' ||
-      typeof sha256 !== 'string'
-    ) {
+    const svg = readFileSync(BASELINE_SVG_PATH, 'utf8');
+    const dataMatch = svg.match(
+      /href=['"']data:image\/png;base64,([A-Za-z0-9+/=\s]+)['"']/
+    );
+    if (!dataMatch) {
       throw new Error();
     }
-    return metadata;
+    const pngBuffer = Buffer.from(dataMatch[1].replace(/\s+/g, ''), 'base64');
+    const { width, height } = getPngDimensions(pngBuffer);
+    return {
+      buffer: pngBuffer,
+      width,
+      height,
+      sha256: computeScreenshotHash(pngBuffer)
+    };
   } catch (error) {
     throw new Error(
       'Le fichier de référence est illisible. Régénérez la baseline avec `UPDATE_VISUAL_BASELINE=1 npm run test:visual`.'
@@ -44,24 +47,31 @@ const getPngDimensions = (pngBuffer) => ({
 const computeScreenshotHash = (pngBuffer) =>
   createHash('sha256').update(pngBuffer).digest('hex');
 
-const writeBaselineMetadata = (pngBuffer) => {
+const renderBaselineSvg = ({ width, height, base64 }) => `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <title>Baseline visuelle Options &amp; Profils</title>
+  <desc>Image PNG encodée en Base64 utilisée comme référence pour le test Playwright.</desc>
+  <image width="${width}" height="${height}" href="data:image/png;base64,${base64}" />
+</svg>
+`;
+
+const writeBaselineSvg = (pngBuffer) => {
   const { width, height } = getPngDimensions(pngBuffer);
   const metadata = {
     width,
     height,
     sha256: computeScreenshotHash(pngBuffer)
   };
+  const base64 = pngBuffer.toString('base64');
   writeFileSync(
-    BASELINE_JSON_PATH,
-    `${JSON.stringify(metadata, null, 2)}\n`,
+    BASELINE_SVG_PATH,
+    renderBaselineSvg({ width, height, base64 }),
     'utf8'
   );
-  mkdirSync(BASELINE_PREVIEW_DIR, { recursive: true });
-  writeFileSync(BASELINE_PREVIEW_PATH, pngBuffer);
   return metadata;
 };
 
-const BASELINE_METADATA = shouldUpdateBaseline ? null : readBaselineMetadata();
+const BASELINE_DATA = shouldUpdateBaseline ? null : readBaselineData();
 
 const focusableSelectors = [
   'a[href]',
@@ -141,18 +151,19 @@ test.describe('Panneau Options & Profils', () => {
     });
 
     if (shouldUpdateBaseline) {
-      const metadata = writeBaselineMetadata(screenshot);
+      const metadata = writeBaselineSvg(screenshot);
       test.info().annotations.push({
         type: 'baseline',
         description: `options-panel baseline mise à jour (sha256: ${metadata.sha256})`
       });
     } else {
-      const { width, height, sha256 } = BASELINE_METADATA;
+      const { width, height, sha256, buffer } = BASELINE_DATA;
       const { width: captureWidth, height: captureHeight } =
         getPngDimensions(screenshot);
       expect(captureWidth).toBe(width);
       expect(captureHeight).toBe(height);
       expect(computeScreenshotHash(screenshot)).toBe(sha256);
+      expect(buffer.equals(screenshot)).toBe(true);
     }
   });
 });
