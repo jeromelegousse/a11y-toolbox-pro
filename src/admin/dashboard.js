@@ -1,4 +1,4 @@
-import { moduleCollections } from '../module-collections.js';
+import { flattenedModuleCollections } from '../module-collections.js';
 import { summarizeStatuses } from '../status-center.js';
 import { buildModuleEntries, computeProfiles, filterModules, sortModules } from './data-model.js';
 import { createAdminLayout } from './layout.js';
@@ -81,10 +81,14 @@ export function initAdminDashboard(mount) {
 
     const collectionOptions = [
       { value: 'all', label: 'Toutes les collections' },
-      ...moduleCollections.map((collection) => ({
-        value: collection.id,
-        label: collection.label || collection.id
-      }))
+      ...flattenedModuleCollections.map((collection) => {
+        const indent = collection.depth > 0 ? `${' '.repeat(collection.depth * 2)}⤷ ` : '';
+        return {
+          value: collection.id,
+          label: `${indent}${collection.label || collection.id}`.trim(),
+          ariaLabel: collection.pathLabel || collection.label || collection.id
+        };
+      })
     ];
     updateFilterOptions(layout.filters.collection, collectionOptions, filters.collection);
     filters.collection = layout.filters.collection.value;

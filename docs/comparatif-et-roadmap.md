@@ -24,7 +24,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 
 - **Portée fonctionnelle** : la démo embarque maintenant un module d’audit axe-core complet (lancement manuel, synthèse, exports JSON/CSV) et un centre d’état corrélé, ce qui rapproche l’outil d’axe DevTools/Accessibility Insights. La planification récurrente (toutes les heures/quotidienne/hebdomadaire avec plage horaire) est accessible depuis Options & Profils avec journalisation automatique des exécutions, et les parcours FastPass (Audit, Synthèse vocale, Dictée, Contraste, Braille, Espacements) sont disponibles dans la vue Guides. Reste à corréler ces parcours avec des scénarios utilisateurs pour compléter la boucle d’observation.
 - **Personnalisation** : les profils préconfigurés peuvent être combinés avec des réglages fins (voix TTS, vitesse, volume, paramètres audio, dictionnaire braille) directement issus des manifestes. La duplication, le partage/import de profils et le premier lot de raccourcis configurables sont disponibles ; il reste à enrichir l’édition collaborative et la gestion avancée des raccourcis pour atteindre la profondeur de Stark.
-- **Administration modulaire** : le builder réordonnable intègre désormais des collections activables en un clic, la désactivation conditionnelle et le lazy-loading des modules au runtime. Il reste à gérer les collections imbriquées, les vues d’ensemble par profil et le chargement différé côté réseau (préchargement progressif, stratégie cache).
+- **Administration modulaire** : le builder réordonnable intègre désormais des collections activables en un clic, la désactivation conditionnelle, le lazy-loading des modules au runtime **et une hiérarchie imbriquée accessible (indentation visuelle, libellés ARIA complets, verrouillage parent/enfant)**. Il reste à gérer les dépendances entre collections, les vues d’ensemble par profil et le chargement différé côté réseau (préchargement progressif, stratégie cache).
 - **Collaboration** : le journal exportable (JSON/CSV) et les métriques runtime apportent une base de partage, mais il n’y a toujours pas d’espace multi-utilisateurs, de commentaires ni de synchronisation cloud comme dans les suites professionnelles.
 - **Gouvernance modules & observabilité** : les manifestes versionnés exposent désormais dépendances, compatibilité, métriques de performance (load/init, compat features) **et un indice `metadataQuality` pondéré** aligné sur les consoles Stark/Accessibility Insights. Un garde-fou semver avec historique bloque les rétrogradations, un tableau de bord de maturité consolide la couverture face aux offres pro **et une carte « Historique manifestes » rend visibles les derniers upgrades/refus pour rivaliser avec Accessibility Insights** ; il manque encore la revue des dépendances transverses et un reporting multi-modules partagé.
 
@@ -57,7 +57,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 
 - **Audit automatisé continu** : l’analyse axe-core manuelle, ses exports et désormais une planification locale (heure, jour, semaine, fenêtre horaire) existent, et les parcours guidés FastPass couvrent les vérifications critiques ; le suivi multi-pages proposé par Accessibility Insights reste cependant absent.
 - **Guidage** : la vue Guides propose désormais des checklists dynamiques inspirées des FastPass (prérequis, annonces `aria-live`, ressources). Il reste à scénariser des parcours utilisateurs complets et à ajouter des exports résumés.
-- **Personnalisation avancée** : pas de duplication/partage de profils, ni de raccourcis personnalisables ou d’automations, contrairement à Stark.
+- **Personnalisation avancée** : la hiérarchie de collections rapproche l’outil des regroupements modulaires proposés par Stark (groupes imbriqués, états parent/enfant), mais il manque encore la duplication/partage de profils, les raccourcis personnalisables et les automatisations.
 - **Collaboration** : toujours aucune intégration Jira/Linear/Slack ni gestion multi-utilisateurs.
 - **Observabilité** : les métriques runtime sont locales, désormais agrégées dans un indice de conformité AA/AAA consolidé **et dans un suivi d’historique manifestes**. Il manque encore l’agrégation historique multi-instance et des tableaux de bord partageables comme sur les plateformes enterprise.
 
@@ -128,7 +128,7 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
 
 - ✅ Première itération du **builder drag & drop** livrée : liste réordonnable accessible (clavier, annonces live, souris/tactile) avec sauvegarde optimiste et rollback de base.
 - ✅ **Collections de modules** disponibles (vision, audio, interaction) avec bascule globale, comptage des modules actifs et propagation dans les profils.
-  - ⏳ Collections imbriquées et dépendances entre collections.
+  - ✅ Collections imbriquées accessibles (indentation, libellés hiérarchiques, verrouillage parent/enfant) ; ⏳ dépendances automatiques entre collections.
 - ✅ **Chargement conditionnel** opérationnel : lazy-loading des modules à l’activation, suivi `runtime.modules` (états `ready/error/loading`) et notifications en cas d’échec.
   - ⏳ Panneau "Modules disponibles" dédié avec filtres avancés (profil, collection, compatibilité) et badges "requis/en conflit".
   - ✅ Déchargement sélectif (`unmount`) et stratégies de préchargement progressif (préchargement `idle`, visibilité des blocs, interaction pointeur).
@@ -138,7 +138,7 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
 ### Prochaines itérations
 
 - **Personnalisation avancée** : permettre la duplication/partage de profils, l’édition des raccourcis clavier et des presets audio détaillés.
-- **Collections évoluées** : gérer les collections imbriquées, les dépendances entre collections et proposer des suggestions automatiques par profil.
+- **Collections évoluées** : finaliser les dépendances entre collections et proposer des suggestions automatiques par profil.
 - **Chargement conditionnel étendu** : vue dédiée "Modules disponibles", lazy-loading réseau granulaire et politique de cache/offline.
 - **Instrumentation** : agréger les métriques runtime dans un tableau de bord (temps de chargement, compatibilité, erreurs) avec export partagé.
 - **Audit enrichi** : séquencer des plans FastPass, permettre l’analyse multi-onglets et historiser les résultats.
