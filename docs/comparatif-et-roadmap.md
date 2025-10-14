@@ -28,6 +28,13 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 - **Collaboration** : le journal exportable (JSON/CSV) et les métriques runtime apportent une base de partage, mais il n’y a toujours pas d’espace multi-utilisateurs, de commentaires ni de synchronisation cloud comme dans les suites professionnelles.
 - **Gouvernance modules & observabilité** : les manifestes versionnés exposent désormais dépendances, compatibilité, métriques de performance (load/init, compat features) **et un indice `metadataQuality` pondéré** aligné sur les consoles Stark/Accessibility Insights. Un garde-fou semver avec historique bloque les rétrogradations, un tableau de bord de maturité consolide la couverture face aux offres pro **et une carte « Historique manifestes » rend visibles les derniers upgrades/refus pour rivaliser avec Accessibility Insights** ; il manque encore la revue des dépendances transverses et un reporting multi-modules partagé.
 
+## Parcours d’onboarding collaboratif
+
+1. **Configurer les connecteurs** : depuis l’admin, l’équipe active les intégrations REST (webhook générique, Jira, Linear, Slack) et renseigne les métadonnées accessibles (libellés, aides contextuelles) exposées dans le panneau d’activité. Chaque connecteur est documenté et testé via le nouveau moteur `createActivityIntegration`.
+2. **Structurer l’organisation** : les comptes et équipes sont stockés dans `state.collaboration` (comptes, équipes, historique des synchronisations/exports) pour préparer un mode multi-tenant. Les manifestes peuvent désormais déclarer un `workflow` (brouillon → revue → publication) qui ajoute automatiquement les permissions associées (`workflow:state:*`, `workflow:transition:*`).
+3. **Suivre les synchronisations** : deux panneaux accessibles ont été ajoutés dans l’admin (liste des synchronisations externes, statut des exports) avec hiérarchie typographique claire, annonces ARIA (`role="status"`) et navigation clavier. Ils permettent de vérifier rapidement qu’un onboarding s’est déroulé correctement (premier envoi webhook, création d’un ticket Jira/Linear, notification Slack).
+4. **Valider le cycle** : un test d’intégration simule la création/validation d’un ticket, évitant les régressions sur l’enchaînement « brouillon → revue → publication ». Les événements sont horodatés et persistent dans `collaboration.syncs`/`collaboration.exports`, formant un fil d’Ariane pour les nouveaux utilisateurs.
+
 ## Manques par rapport à la feuille de route
 
 - **Phase 0** :

@@ -200,7 +200,7 @@ test.describe('Panneau Options & Profils', () => {
         '</svg>',
         ''
       ].join('\n');
-      await writeFile(BASELINE_PATH, svgPayload, 'utf8');
+      writeFileSync(BASELINE_PATH, svgPayload, 'utf8');
       test.info().annotations.push({
         type: 'baseline',
         description: 'options-panel baseline updated (SVG)'
@@ -216,3 +216,42 @@ test.describe('Panneau Options & Profils', () => {
     }
   });
 });
+
+function readBaselineData() {
+  if (!existsSync(BASELINE_PATH)) {
+    throw new Error(
+      `Aucun fichier de référence trouvé pour les tests visuels. Lancez le test avec UPDATE_VISUAL_BASELINE=1 pour en générer un : ${BASELINE_PATH}`
+    );
+  }
+
+  if (!BASELINE_SCREENSHOT) {
+    throw new Error(
+      `Le fichier de référence est vide ou corrompu : ${BASELINE_PATH}`
+    );
+  }
+
+  const buffer = Buffer.from(BASELINE_SCREENSHOT, 'base64');
+  const { width, height } = getPngDimensions(buffer);
+
+  return {
+    width,
+    height,
+    sha256: computeScreenshotHash(buffer),
+    buffer
+  };
+}
+
+function getPngDimensions(buffer) {
+  if (buffer.length < 24) {
+    throw new Error('Donnée PNG invalide : en-tête trop court.');
+  }
+
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20)
+  };
+}
+
+function computeScreenshotHash(buffer) {
+  return createHash('sha256').update(buffer).digest('hex');
+}

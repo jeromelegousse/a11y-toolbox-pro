@@ -5,7 +5,7 @@ import { createAdminLayout } from './layout.js';
 import { buildRuntimePanel, updateRuntimePanel } from './runtime-panel.js';
 import { createModuleCard } from './render/module-card.js';
 import { renderStatusCards } from './render/status-cards.js';
-import { ensureArray, getGeminiConfig, updateFilterOptions } from './utils.js';
+import { ensureArray, formatDateRelative, getGeminiConfig, updateFilterOptions } from './utils.js';
 
 const DEFAULT_FILTERS = {
   profile: 'all',
@@ -106,6 +106,115 @@ export function initAdminDashboard(mount) {
     });
   }
 
+  function renderSyncTimeline(events) {
+    if (!layout.syncList || !layout.syncEmpty) return;
+    const items = Array.isArray(events) ? events.slice(0, 6) : [];
+    layout.syncList.innerHTML = '';
+    if (!items.length) {
+      layout.syncEmpty.hidden = false;
+      layout.syncList.hidden = true;
+      if (layout.syncStatus) {
+        layout.syncStatus.textContent = 'Aucune synchronisation enregistrée pour le moment.';
+      }
+      return;
+    }
+    layout.syncEmpty.hidden = true;
+    layout.syncList.hidden = false;
+    items.forEach((entry) => {
+      const item = document.createElement('li');
+      item.className = 'a11ytb-admin-sync-item';
+
+      const head = document.createElement('div');
+      head.className = 'a11ytb-admin-sync-head';
+
+      const connector = document.createElement('span');
+      connector.className = 'a11ytb-admin-sync-connector';
+      connector.textContent = entry.connector === 'all'
+        ? 'Connecteurs activité'
+        : `Connecteur ${entry.connector}`;
+
+      const badge = document.createElement('span');
+      badge.className = 'a11ytb-admin-sync-badge';
+      badge.dataset.status = entry.status || 'queued';
+      switch (entry.status) {
+        case 'success':
+          badge.textContent = 'Succès';
+          break;
+        case 'error':
+          badge.textContent = 'Échec';
+          break;
+        default:
+          badge.textContent = 'En attente';
+      }
+
+      head.append(connector, badge);
+
+      const meta = document.createElement('p');
+      meta.className = 'a11ytb-admin-sync-meta';
+      const count = Number.isFinite(entry.count) ? entry.count : 0;
+      const jobLabel = entry.jobType === 'bulk' ? `${count} entrée${count > 1 ? 's' : ''}` : 'Entrée unique';
+      const timeLabel = formatDateRelative(entry.timestamp);
+      meta.textContent = `${jobLabel} • ${timeLabel}`;
+
+      item.append(head, meta);
+
+      layout.syncList.append(item);
+    });
+
+    if (layout.syncStatus) {
+      layout.syncStatus.textContent = `Dernier envoi ${formatDateRelative(items[0].timestamp)}`;
+    }
+  }
+
+  function renderExportTimeline(events) {
+    if (!layout.exportList || !layout.exportEmpty) return;
+    const items = Array.isArray(events) ? events.slice(0, 8) : [];
+    layout.exportList.innerHTML = '';
+    if (!items.length) {
+      layout.exportEmpty.hidden = false;
+      layout.exportList.hidden = true;
+      if (layout.exportStatus) {
+        layout.exportStatus.textContent = 'Aucun export recensé.';
+      }
+      return;
+    }
+    layout.exportEmpty.hidden = true;
+    layout.exportList.hidden = false;
+    items.forEach((entry) => {
+      const item = document.createElement('li');
+      item.className = 'a11ytb-admin-export-item';
+
+      const head = document.createElement('div');
+      head.className = 'a11ytb-admin-export-head';
+
+      const format = document.createElement('span');
+      format.className = 'a11ytb-admin-export-format';
+      const formatLabel = String(entry.format || 'json').toUpperCase();
+      format.textContent = `Export ${formatLabel}`;
+
+      const badge = document.createElement('span');
+      badge.className = 'a11ytb-admin-export-badge';
+      badge.dataset.status = entry.status || 'success';
+      badge.textContent = entry.status === 'error' ? 'Erreur' : 'Terminé';
+
+      head.append(format, badge);
+
+      const meta = document.createElement('p');
+      meta.className = 'a11ytb-admin-export-meta';
+      const modeLabel = entry.mode === 'clipboard' ? 'Presse-papiers' : 'Téléchargement';
+      const timeLabel = formatDateRelative(entry.timestamp);
+      const count = Number.isFinite(entry.count) ? entry.count : 0;
+      meta.textContent = `${modeLabel} • ${count} entrée${count > 1 ? 's' : ''} • ${timeLabel}`;
+
+      item.append(head, meta);
+      layout.exportList.append(item);
+    });
+
+    if (layout.exportStatus) {
+      layout.exportStatus.textContent = `Dernier export ${formatDateRelative(items[0].timestamp)}`;
+    }
+  }
+
   function sync(snapshot) {
     currentSnapshot = snapshot || {};
     const summaries = summarizeStatuses(currentSnapshot);
@@ -114,6 +223,9 @@ export function initAdminDashboard(mount) {
     updateRuntimePanel(runtimePanel, currentEntries);
     updateFiltersFromSnapshot(currentSnapshot);
     renderModules(currentEntries);
+    const collaboration = currentSnapshot.collaboration || {};
+    renderSyncTimeline(collaboration.syncs);
+    renderExportTimeline(collaboration.exports);
   }
 
   const actions = {
