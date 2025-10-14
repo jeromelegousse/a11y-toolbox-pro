@@ -69,6 +69,11 @@ export function createAdminLayout(runtimePanel) {
   connectionStatus.textContent = 'Connexion à l’aperçu en cours…';
   dashboardHeader.append(connectionStatus);
 
+  const geminiStatus = document.createElement('p');
+  geminiStatus.className = 'a11ytb-admin-gemini';
+  geminiStatus.hidden = true;
+  dashboardHeader.append(geminiStatus);
+
   const statusGrid = document.createElement('div');
   statusGrid.className = 'a11ytb-admin-status-grid';
 
@@ -154,6 +159,7 @@ export function createAdminLayout(runtimePanel) {
     moduleGrid,
     emptyState,
     connectionStatus,
+    geminiStatus,
     filters: {
       profile: profileFilter.control,
       collection: collectionFilter.control,

@@ -107,14 +107,6 @@ function a11ytb_enqueue_frontend_assets(): void
         'before'
     );
 
-    if (current_user_can('manage_options')) {
-        $admin_config = a11ytb_get_gemini_admin_config();
-        wp_add_inline_script(
-            'a11ytb/app',
-            'window.a11ytbGeminiConfig = ' . wp_json_encode($admin_config) . ';',
-            'before'
-        );
-    }
 }
 add_action('wp_enqueue_scripts', 'a11ytb_enqueue_frontend_assets');
 
@@ -468,12 +460,13 @@ function a11ytb_get_gemini_admin_config(): array
 {
     $config = [
         'quota' => (int) get_option('a11ytb_gemini_quota', 15),
+        'hasKey' => false,
     ];
 
     $api_key = get_option('a11ytb_gemini_api_key', '');
     if ($api_key) {
-        $config['apiKey'] = $api_key;
         $config['masked'] = a11ytb_mask_secret($api_key);
+        $config['hasKey'] = true;
     }
 
     return $config;
@@ -547,6 +540,18 @@ function a11ytb_enqueue_admin_assets(string $hook): void
     );
 
     wp_script_add_data('a11ytb/admin-app', 'type', 'module');
+
+    if (current_user_can('manage_options')) {
+        $admin_data = [
+            'gemini' => a11ytb_get_gemini_admin_config(),
+        ];
+
+        wp_add_inline_script(
+            'a11ytb/admin-app',
+            'window.a11ytbAdminData = Object.freeze(' . wp_json_encode($admin_data) . ');',
+            'before'
+        );
+    }
 }
 add_action('admin_enqueue_scripts', 'a11ytb_enqueue_admin_assets');
 

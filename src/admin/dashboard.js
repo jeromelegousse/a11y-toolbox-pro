@@ -5,7 +5,7 @@ import { createAdminLayout } from './layout.js';
 import { buildRuntimePanel, updateRuntimePanel } from './runtime-panel.js';
 import { createModuleCard } from './render/module-card.js';
 import { renderStatusCards } from './render/status-cards.js';
-import { ensureArray, updateFilterOptions } from './utils.js';
+import { ensureArray, getGeminiConfig, updateFilterOptions } from './utils.js';
 
 const DEFAULT_FILTERS = {
   profile: 'all',
@@ -33,6 +33,19 @@ export function initAdminDashboard(mount) {
   mount.append(layout.root);
 
   const filters = { ...DEFAULT_FILTERS };
+
+  const geminiConfig = getGeminiConfig();
+  if (layout.geminiStatus) {
+    layout.geminiStatus.hidden = false;
+    if (geminiConfig?.hasKey) {
+      const mask = geminiConfig.masked || '••••••••';
+      const quota = Number.isFinite(geminiConfig.quota) ? geminiConfig.quota : null;
+      const quotaLabel = quota === null ? 'quota non précisé' : `${quota} requête(s)/min`;
+      layout.geminiStatus.textContent = `Clé Gemini configurée (${mask}) – ${quotaLabel}.`;
+    } else {
+      layout.geminiStatus.textContent = 'Aucune clé Gemini enregistrée. Les intégrations IA restent désactivées.';
+    }
+  }
 
   const compatibilityOptions = [
     { value: 'all', label: 'Compatibilité : toutes' },
