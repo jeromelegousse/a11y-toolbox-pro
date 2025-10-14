@@ -49,10 +49,12 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 ## Manques face à la concurrence
 
 - **Audit automatisé continu** : l’analyse axe-core manuelle, ses exports et désormais une planification locale (heure, jour, semaine, fenêtre horaire) existent, mais il manque encore les parcours guidés FastPass et le suivi multi-pages proposé par Accessibility Insights.
-- **Guidage** : la vue Guides reste statique ; aucune checklist dynamique ni scénarisation interactive façon FastPass.
-- **Personnalisation avancée** : la duplication et l’import/export de profils sont opérationnels, tout comme un premier lot de raccourcis configurables. Il manque néanmoins les presets collaboratifs, la coédition temps réel et les automatisations poussées que Stark propose autour de ses profils partagés.
+- **Guidage** : les Guides proposent désormais des checklists dynamiques avec prérequis, étapes automatiques/manuelles et aides contextuelles, mais ils restent limités à des scénarios mono-page sans collaboration ni capture multi-onglets comme les FastPass.
+- **Personnalisation avancée** : pas de duplication/partage de profils, ni de raccourcis personnalisables ou d’automations, contrairement à Stark.
 - **Collaboration** : toujours aucune intégration Jira/Linear/Slack ni gestion multi-utilisateurs.
 - **Observabilité** : les métriques runtime sont locales, désormais agrégées dans un indice de conformité AA/AAA consolidé **et dans un suivi d’historique manifestes**. Il manque encore l’agrégation historique multi-instance et des tableaux de bord partageables comme sur les plateformes enterprise.
+
+> *Exemple* : le guide « Formulaire accessible » enchaîne désormais un précheck des prérequis (structure de formulaire, attributs ARIA requis), déclenche les tests automatiques (axe-core ciblé) puis propose des validations manuelles assistées (annonces clavier, revues visuelles). Cela le rapproche des FastPass, mais il manque encore la capture d'un scénario multi-pages et le co-tri des résultats avec un collègue dans l'interface.
 
 ## Webhooks d’activité & implications de sécurité
 
