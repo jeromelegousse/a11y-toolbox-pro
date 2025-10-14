@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { readFile, writeFile } from 'node:fs/promises';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -25,33 +25,7 @@ const BASELINE_SCREENSHOT = shouldUpdateBaseline || !existsSync(BASELINE_PATH)
   ? null
   : extractBaselinePayload(readFileSync(BASELINE_PATH, 'utf8'));
 
-const BASELINE_DATA = shouldUpdateBaseline ? null : await readBaselineData();
-
-function getPngDimensions(buffer) {
-  return {
-    width: buffer.readUInt32BE(16),
-    height: buffer.readUInt32BE(20)
-  };
-}
-
-function computeScreenshotHash(buffer) {
-  return createHash('sha256').update(buffer).digest('hex');
-}
-
-async function readBaselineData() {
-  if (!BASELINE_SCREENSHOT) {
-    throw new Error(
-      `Aucune capture de référence disponible pour ${BASELINE_PATH}. ` +
-        'Définissez UPDATE_VISUAL_BASELINE=1 pour générer une nouvelle base.'
-    );
-  }
-
-  const buffer = Buffer.from(BASELINE_SCREENSHOT, 'base64');
-  const { width, height } = getPngDimensions(buffer);
-  const sha256 = computeScreenshotHash(buffer);
-
-  return { width, height, sha256, buffer };
-}
+const BASELINE_DATA = shouldUpdateBaseline ? null : readBaselineData();
 
 const focusableSelectors = [
   'a[href]',
