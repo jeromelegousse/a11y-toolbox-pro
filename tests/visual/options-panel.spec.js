@@ -5,18 +5,23 @@ import { dirname, resolve } from 'node:path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const BASELINE_PATH = resolve(__dirname, 'baselines/options-panel.png.base64');
+const BASELINE_PATH = resolve(__dirname, 'baselines/options-panel.svg');
 
 const shouldUpdateBaseline = process.env.UPDATE_VISUAL_BASELINE === '1';
 
+const extractBaselinePayload = (svg) => {
+  const match = svg.match(/href="data:image\/png;base64,([^"\s]+)"/);
+  if (!match) {
+    throw new Error(
+      `Impossible d'extraire la donnée PNG du fichier de référence : ${BASELINE_PATH}`
+    );
+  }
+  return match[1];
+};
+
 const BASELINE_SCREENSHOT = shouldUpdateBaseline
   ? null
-  : (await readFile(BASELINE_PATH, 'utf8')).replace(/\s+/g, '');
-
-const wrapBase64 = (payload) => {
-  const chunks = payload.match(/.{1,76}/g);
-  return (chunks ?? [payload]).join('\n');
-};
+  : extractBaselinePayload(await readFile(BASELINE_PATH, 'utf8'));
 
 const focusableSelectors = [
   'a[href]',
@@ -96,12 +101,20 @@ test.describe('Panneau Options & Profils', () => {
     });
 
     const actual = screenshot.toString('base64');
+    const pngWidth = screenshot.readUInt32BE(16);
+    const pngHeight = screenshot.readUInt32BE(20);
 
     if (shouldUpdateBaseline) {
-      await writeFile(BASELINE_PATH, `${wrapBase64(actual)}\n`, 'utf8');
+      const svgPayload = [
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${pngWidth}" height="${pngHeight}" viewBox="0 0 ${pngWidth} ${pngHeight}">`,
+        `  <image width="${pngWidth}" height="${pngHeight}" href="data:image/png;base64,${actual}" />`,
+        '</svg>',
+        ''
+      ].join('\n');
+      await writeFile(BASELINE_PATH, svgPayload, 'utf8');
       test.info().annotations.push({
         type: 'baseline',
-        description: 'options-panel baseline updated'
+        description: 'options-panel baseline updated (SVG)'
       });
     } else {
       expect(actual).toBe(BASELINE_SCREENSHOT);
