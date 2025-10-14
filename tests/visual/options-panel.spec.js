@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -9,6 +9,7 @@ const __dirname = dirname(__filename);
 const BASELINE_PATH = resolve(__dirname, 'baselines/options-panel.svg');
 
 const shouldUpdateBaseline = process.env.UPDATE_VISUAL_BASELINE === '1';
+const FIXED_SCHEDULE_TIMESTAMP = Date.UTC(2024, 0, 8, 9, 0);
 
 const extractBaselinePayload = (svg) => {
   const match = svg.match(/href="data:image\/png;base64,([^"\s]+)"/);
@@ -20,11 +21,57 @@ const extractBaselinePayload = (svg) => {
   return match[1];
 };
 
-const BASELINE_SCREENSHOT = shouldUpdateBaseline
-  ? null
-  : extractBaselinePayload(await readFile(BASELINE_PATH, 'utf8'));
+function getPngDimensions(buffer) {
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20)
+  };
+}
 
-const BASELINE_DATA = shouldUpdateBaseline ? null : readBaselineData();
+function computeScreenshotHash(buffer) {
+  return createHash('sha256').update(buffer).digest('hex');
+}
+
+let baselineDataPromise;
+
+async function readBaselineData() {
+  if (shouldUpdateBaseline) {
+    throw new Error(
+      'La lecture de la capture de référence est désactivée lorsque ' +
+        'UPDATE_VISUAL_BASELINE=1.'
+    );
+  }
+
+  if (!baselineDataPromise) {
+    baselineDataPromise = (async () => {
+      let svg;
+      try {
+        svg = await readFile(BASELINE_PATH, 'utf8');
+      } catch (error) {
+        if (error && error.code === 'ENOENT') {
+          throw new Error(
+            `Aucune capture de référence disponible pour ${BASELINE_PATH}. ` +
+              'Définissez UPDATE_VISUAL_BASELINE=1 pour générer une nouvelle base.'
+          );
+        }
+        throw error;
+      }
+
+      const base64Payload = extractBaselinePayload(svg);
+      const buffer = Buffer.from(base64Payload, 'base64');
+      const { width, height } = getPngDimensions(buffer);
+
+      return {
+        width,
+        height,
+        sha256: computeScreenshotHash(buffer),
+        buffer
+      };
+    })();
+  }
+
+  return baselineDataPromise;
+}
 
 const focusableSelectors = [
   'a[href]',
@@ -159,7 +206,7 @@ test.describe('Panneau Options & Profils', () => {
         description: 'options-panel baseline updated (SVG)'
       });
     } else {
-      const { width, height, sha256, buffer } = BASELINE_DATA;
+      const { width, height, sha256, buffer } = await readBaselineData();
       const { width: captureWidth, height: captureHeight } =
         getPngDimensions(screenshot);
       expect(captureWidth).toBe(width);
