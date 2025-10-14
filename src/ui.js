@@ -4007,6 +4007,7 @@ export function mountUI({ root, state, config = {} }) {
     const moduleId = li.dataset.moduleId;
     if (moduleId) {
       const view = {
+        moduleId,
         wrapper: dependenciesSection,
         list: dependenciesList,
         summary: dependenciesSummary,
@@ -4020,7 +4021,7 @@ export function mountUI({ root, state, config = {} }) {
       }
       const runtimeInfo = state.get(`runtime.modules.${moduleId}`) || {};
       const dependencies = Array.isArray(runtimeInfo.dependencies) ? runtimeInfo.dependencies : [];
-      updateDependencyDisplay(view, dependencies, { moduleName: runtimeInfo.manifestName || block.title || moduleId });
+      updateDependencyDisplay(view, dependencies, { moduleName: runtimeInfo.manifestName || view.moduleName });
     }
 
     prioritySelect.addEventListener('change', () => {
@@ -4274,6 +4275,22 @@ export function mountUI({ root, state, config = {} }) {
       }
     });
     updateAdminPositions();
+  }
+
+  function syncDependencyViews(snapshot = state.get()) {
+    const runtimeModules = snapshot?.runtime?.modules || {};
+    dependencyViews.forEach((views, moduleId) => {
+      const runtimeInfo = runtimeModules[moduleId] || {};
+      const dependencies = Array.isArray(runtimeInfo.dependencies) ? runtimeInfo.dependencies : [];
+      const manifestName = runtimeInfo.manifestName || runtimeInfo.name || '';
+      views.forEach((view) => {
+        if (!view) return;
+        if (manifestName) {
+          view.moduleName = manifestName;
+        }
+        updateDependencyDisplay(view, dependencies, { moduleName: view.moduleName || moduleId });
+      });
+    });
   }
 
   function syncCollectionPanel() {
@@ -6046,6 +6063,7 @@ export function mountUI({ root, state, config = {} }) {
     updateActiveShortcuts(snapshot);
     refreshShortcutDisplays(snapshot);
     footerTitle.textContent = buildShortcutSummary(snapshot);
+    syncDependencyViews(snapshot);
     optionBindings.forEach((binding) => binding(snapshot));
   });
 
@@ -6064,5 +6082,6 @@ export function mountUI({ root, state, config = {} }) {
   updateActiveShortcuts(initialSnapshot);
   refreshShortcutDisplays(initialSnapshot);
   footerTitle.textContent = buildShortcutSummary(initialSnapshot);
+  syncDependencyViews(initialSnapshot);
   optionBindings.forEach((binding) => binding(initialSnapshot));
 }
