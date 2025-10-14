@@ -6,70 +6,23 @@ import { dirname, resolve } from 'node:path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const BASELINE_SVG_PATH = resolve(__dirname, 'baselines/options-panel.svg');
+const BASELINE_PATH = resolve(__dirname, 'baselines/options-panel.svg');
 
 const shouldUpdateBaseline = process.env.UPDATE_VISUAL_BASELINE === '1';
 
-const readBaselineData = () => {
-  if (!existsSync(BASELINE_SVG_PATH)) {
+const extractBaselinePayload = (svg) => {
+  const match = svg.match(/href="data:image\/png;base64,([^"\s]+)"/);
+  if (!match) {
     throw new Error(
-      "La capture de référence est absente. Exécutez `UPDATE_VISUAL_BASELINE=1 npm run test:visual` pour la régénérer."
+      `Impossible d'extraire la donnée PNG du fichier de référence : ${BASELINE_PATH}`
     );
   }
-  try {
-    const svg = readFileSync(BASELINE_SVG_PATH, 'utf8');
-    const dataMatch = svg.match(
-      /href=['"']data:image\/png;base64,([A-Za-z0-9+/=\s]+)['"']/
-    );
-    if (!dataMatch) {
-      throw new Error();
-    }
-    const pngBuffer = Buffer.from(dataMatch[1].replace(/\s+/g, ''), 'base64');
-    const { width, height } = getPngDimensions(pngBuffer);
-    return {
-      buffer: pngBuffer,
-      width,
-      height,
-      sha256: computeScreenshotHash(pngBuffer)
-    };
-  } catch (error) {
-    throw new Error(
-      'Le fichier de référence est illisible. Régénérez la baseline avec `UPDATE_VISUAL_BASELINE=1 npm run test:visual`.'
-    );
-  }
+  return match[1];
 };
 
-const getPngDimensions = (pngBuffer) => ({
-  width: pngBuffer.readUInt32BE(16),
-  height: pngBuffer.readUInt32BE(20)
-});
-
-const computeScreenshotHash = (pngBuffer) =>
-  createHash('sha256').update(pngBuffer).digest('hex');
-
-const renderBaselineSvg = ({ width, height, base64 }) => `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-  <title>Baseline visuelle Options &amp; Profils</title>
-  <desc>Image PNG encodée en Base64 utilisée comme référence pour le test Playwright.</desc>
-  <image width="${width}" height="${height}" href="data:image/png;base64,${base64}" />
-</svg>
-`;
-
-const writeBaselineSvg = (pngBuffer) => {
-  const { width, height } = getPngDimensions(pngBuffer);
-  const metadata = {
-    width,
-    height,
-    sha256: computeScreenshotHash(pngBuffer)
-  };
-  const base64 = pngBuffer.toString('base64');
-  writeFileSync(
-    BASELINE_SVG_PATH,
-    renderBaselineSvg({ width, height, base64 }),
-    'utf8'
-  );
-  return metadata;
-};
+const BASELINE_SCREENSHOT = shouldUpdateBaseline
+  ? null
+  : extractBaselinePayload(await readFile(BASELINE_PATH, 'utf8'));
 
 const BASELINE_DATA = shouldUpdateBaseline ? null : readBaselineData();
 
@@ -189,11 +142,21 @@ test.describe('Panneau Options & Profils', () => {
       maskColor: '#000'
     });
 
+    const actual = screenshot.toString('base64');
+    const pngWidth = screenshot.readUInt32BE(16);
+    const pngHeight = screenshot.readUInt32BE(20);
+
     if (shouldUpdateBaseline) {
-      const metadata = writeBaselineSvg(screenshot);
+      const svgPayload = [
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${pngWidth}" height="${pngHeight}" viewBox="0 0 ${pngWidth} ${pngHeight}">`,
+        `  <image width="${pngWidth}" height="${pngHeight}" href="data:image/png;base64,${actual}" />`,
+        '</svg>',
+        ''
+      ].join('\n');
+      await writeFile(BASELINE_PATH, svgPayload, 'utf8');
       test.info().annotations.push({
         type: 'baseline',
-        description: `options-panel baseline mise à jour (sha256: ${metadata.sha256})`
+        description: 'options-panel baseline updated (SVG)'
       });
     } else {
       const { width, height, sha256, buffer } = BASELINE_DATA;
