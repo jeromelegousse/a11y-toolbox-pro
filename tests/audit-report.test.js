@@ -64,6 +64,12 @@ describe('audit report helpers', () => {
         detail: '1 critique',
         totals: { critical: 1, serious: 0, moderate: 0, minor: 0, unknown: 0, total: 1 },
         tone: 'alert'
+      },
+      preferences: {
+        schedule: {
+          enabled: true,
+          nextRunAt: 1700003600000
+        }
       }
     };
 
@@ -71,6 +77,7 @@ describe('audit report helpers', () => {
     expect(statusText.label).toBe('1 erreur critique');
     expect(statusText.detail).toContain('Dernier audit');
     expect(statusText.detail).toContain('critique');
+    expect(statusText.detail).toContain('Prochain audit planifié');
   });
 
   it('produit un HTML accessible pour les violations et les statistiques', () => {
@@ -92,8 +99,12 @@ describe('audit report helpers', () => {
     expect(violationsMarkup).toContain('<code>.btn-primary</code>');
     expect(violationsMarkup).toContain('axe-core');
 
-    const statsMarkup = renderAuditStats({ totals: { critical: 1, serious: 0, moderate: 0, minor: 0, total: 1 }, totalNodes: 1 });
+    const statsMarkup = renderAuditStats(
+      { totals: { critical: 1, serious: 0, moderate: 0, minor: 0, total: 1 }, totalNodes: 1 },
+      { schedule: { enabled: true, nextRunAt: 1700007200000 } }
+    );
     expect(statsMarkup).toContain('Critiques');
     expect(statsMarkup).toContain('1');
+    expect(statsMarkup).toContain('Prochain audit planifié');
   });
 });

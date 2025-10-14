@@ -308,7 +308,7 @@ registerBlock({
       </div>
       <p class="a11ytb-note" role="status" aria-live="polite" data-ref="audit-status">${label}</p>
       <p class="a11ytb-note" data-ref="audit-detail">${detail}</p>
-      <div data-ref="audit-stats">${renderAuditStats(audit.summary)}</div>
+      <div data-ref="audit-stats">${renderAuditStats(audit.summary, { schedule: audit.preferences?.schedule })}</div>
       <div data-ref="audit-violations">${renderAuditViolations(audit.lastReport)}</div>
     `;
   },
@@ -366,7 +366,7 @@ registerBlock({
       const { label, detail } = buildAuditStatusText(audit);
       if (statusNode) statusNode.textContent = label;
       if (detailNode) detailNode.textContent = detail;
-      if (statsNode) statsNode.innerHTML = renderAuditStats(audit.summary);
+      if (statsNode) statsNode.innerHTML = renderAuditStats(audit.summary, { schedule: audit.preferences?.schedule });
       if (violationsNode) violationsNode.innerHTML = renderAuditViolations(audit.lastReport);
       const running = audit.status === 'running';
       if (runBtn) {

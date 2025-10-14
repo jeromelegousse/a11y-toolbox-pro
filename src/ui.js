@@ -2434,13 +2434,6 @@ export function mountUI({ root, state, config = {} }) {
     return disabled;
   }
 
-  const moduleElements = new Map();
-  const adminItems = new Map();
-  const dependencyViews = new Map();
-  const adminToolbarCounts = { active: null, hidden: null, pinned: null };
-  const organizeFilterToggles = new Map();
-  const collectionButtons = new Map();
-
   function refreshDependencyViews(snapshot) {
     const runtimeModules = snapshot?.runtime?.modules || state.get('runtime.modules') || {};
     dependencyViews.forEach((views, moduleId) => {
@@ -3468,6 +3461,73 @@ export function mountUI({ root, state, config = {} }) {
         const checked = current === trueValue;
         input.checked = checked;
         syncToggleVisual(current);
+      };
+    } else if (field.type === 'time') {
+      const label = document.createElement('label');
+      label.className = 'a11ytb-option-label';
+      const title = document.createElement('span');
+      title.className = 'a11ytb-option-title';
+      title.textContent = field.label || field.path;
+      label.append(title);
+
+      const input = document.createElement('input');
+      input.type = 'time';
+      input.className = 'a11ytb-option-input';
+      input.setAttribute('aria-label', field.label || field.path);
+      if (field.step !== undefined) {
+        input.step = String(field.step);
+      }
+      label.append(input);
+      wrapper.append(label);
+
+      if (field.description) {
+        const hint = document.createElement('p');
+        hint.className = 'a11ytb-option-description';
+        hint.textContent = field.description;
+        wrapper.append(hint);
+      }
+
+      const normalizeTimeValue = (value, fallbackValue = '00:00') => {
+        if (typeof value !== 'string') return fallbackValue;
+        const trimmed = value.trim();
+        if (!trimmed) return fallbackValue;
+        const match = /^([0-2]?\d)(?::([0-5]\d))?$/.exec(trimmed);
+        if (!match) return fallbackValue;
+        let hours = Number.parseInt(match[1], 10);
+        let minutes = match[2] !== undefined ? Number.parseInt(match[2], 10) : 0;
+        if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return fallbackValue;
+        if (hours < 0) hours = 0;
+        if (hours > 23) hours = 23;
+        if (minutes < 0) minutes = 0;
+        if (minutes > 59) minutes = 59;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+      };
+
+      const fallback = normalizeTimeValue(typeof field.defaultValue === 'string' ? field.defaultValue : '', '00:00');
+
+      const commitValue = (raw) => {
+        const safe = normalizeTimeValue(raw, fallback);
+        state.set(field.path, safe);
+        if (typeof field.onChange === 'function') {
+          field.onChange(safe, { state: state.get(), field, manifest });
+        }
+        return safe;
+      };
+
+      input.addEventListener('change', () => {
+        input.value = commitValue(input.value);
+      });
+
+      input.addEventListener('blur', () => {
+        input.value = normalizeTimeValue(input.value, fallback);
+      });
+
+      update = (snapshot) => {
+        const current = readValue(snapshot, field.path);
+        const safe = normalizeTimeValue(typeof current === 'string' ? current : '', fallback);
+        if (document.activeElement !== input) {
+          input.value = safe;
+        }
       };
     } else if (field.type === 'select') {
       const label = document.createElement('label');

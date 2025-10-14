@@ -114,7 +114,11 @@ export function createStore(key, initial) {
     try {
       const snapshot = safeClone(state);
       if (snapshot && typeof snapshot === 'object') {
-        snapshot.runtime = safeClone(initial?.runtime) ?? {};
+        if (initial && typeof initial === 'object' && Object.prototype.hasOwnProperty.call(initial, 'runtime')) {
+          snapshot.runtime = safeClone(initial.runtime);
+        } else {
+          delete snapshot.runtime;
+        }
       }
       localStorage.setItem(key, JSON.stringify(snapshot));
     } catch (error) {

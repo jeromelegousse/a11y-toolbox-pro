@@ -126,7 +126,17 @@ export const manifest = {
         preferences: {
           autoRunOnLoad: false,
           includeBestPractices: true,
-          includeExperimental: false
+          includeExperimental: false,
+          schedule: {
+            enabled: false,
+            frequency: 'weekly',
+            timeWindow: {
+              start: '09:00',
+              end: '18:00'
+            },
+            lastRunAt: null,
+            nextRunAt: null
+          }
         }
       }
     }
@@ -160,6 +170,53 @@ export const manifest = {
         description: 'Active les règles axe-core en version expérimentale pour détecter les risques émergents.',
         onChange: (value) => {
           window.a11ytb?.logActivity?.(`Règles expérimentales ${value ? 'activées' : 'désactivées'}`, { tags: ['audit'] });
+        }
+      },
+      {
+        type: 'toggle',
+        path: 'audit.preferences.schedule.enabled',
+        label: 'Planifier des audits récurrents',
+        description: 'Active le lancement automatique d’un audit axe-core à la fréquence souhaitée.',
+        onChange: (value) => {
+          window.a11ytb?.logActivity?.(`Audit programmé ${value ? 'activé' : 'désactivé'}`, { tags: ['audit', 'schedule'] });
+        }
+      },
+      {
+        type: 'select',
+        path: 'audit.preferences.schedule.frequency',
+        label: 'Fréquence des audits programmés',
+        description: 'Détermine à quel rythme l’audit automatique sera exécuté.',
+        options: [
+          { value: 'hourly', label: 'Toutes les heures' },
+          { value: 'daily', label: 'Quotidien' },
+          { value: 'weekly', label: 'Hebdomadaire' }
+        ],
+        onChange: (value) => {
+          const labels = {
+            hourly: 'toutes les heures',
+            daily: 'quotidien',
+            weekly: 'hebdomadaire'
+          };
+          const label = labels[value] || value;
+          window.a11ytb?.logActivity?.(`Fréquence audit programmé : ${label}`, { tags: ['audit', 'schedule'] });
+        }
+      },
+      {
+        type: 'time',
+        path: 'audit.preferences.schedule.timeWindow.start',
+        label: 'Début de la plage horaire',
+        description: 'Heure à partir de laquelle un audit programmé peut démarrer.',
+        onChange: (value) => {
+          window.a11ytb?.logActivity?.(`Fenêtre audit – début ajusté à ${value || '00:00'}`, { tags: ['audit', 'schedule'] });
+        }
+      },
+      {
+        type: 'time',
+        path: 'audit.preferences.schedule.timeWindow.end',
+        label: 'Fin de la plage horaire',
+        description: 'Heure après laquelle aucun audit programmé ne sera lancé.',
+        onChange: (value) => {
+          window.a11ytb?.logActivity?.(`Fenêtre audit – fin ajustée à ${value || '00:00'}`, { tags: ['audit', 'schedule'] });
         }
       }
     ]

@@ -22,7 +22,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 
 ## Écarts actuels
 
-- **Portée fonctionnelle** : la démo embarque maintenant un module d’audit axe-core complet (lancement manuel, synthèse, exports JSON/CSV) et un centre d’état corrélé, ce qui rapproche l’outil d’axe DevTools/Accessibility Insights. Il manque toutefois l’orchestration automatique (planification, FastPass) et la corrélation avec des parcours utilisateurs.
+- **Portée fonctionnelle** : la démo embarque maintenant un module d’audit axe-core complet (lancement manuel, synthèse, exports JSON/CSV) et un centre d’état corrélé, ce qui rapproche l’outil d’axe DevTools/Accessibility Insights. La planification récurrente (toutes les heures/quotidienne/hebdomadaire avec plage horaire) est accessible depuis Options & Profils avec journalisation automatique des exécutions, mais il manque encore les parcours FastPass et la corrélation avec des parcours utilisateurs.
 - **Personnalisation** : les profils préconfigurés peuvent être combinés avec des réglages fins (voix TTS, vitesse, volume, paramètres audio, dictionnaire braille) directement issus des manifestes. La duplication, le partage/import de profils et le premier lot de raccourcis configurables sont disponibles ; il reste à enrichir l’édition collaborative et la gestion avancée des raccourcis pour atteindre la profondeur de Stark.
 - **Administration modulaire** : le builder réordonnable intègre désormais des collections activables en un clic, la désactivation conditionnelle et le lazy-loading des modules au runtime. Il reste à gérer les collections imbriquées, les vues d’ensemble par profil et le chargement différé côté réseau (préchargement progressif, stratégie cache).
 - **Collaboration** : le journal exportable (JSON/CSV) et les métriques runtime apportent une base de partage, mais il n’y a toujours pas d’espace multi-utilisateurs, de commentaires ni de synchronisation cloud comme dans les suites professionnelles.
@@ -48,7 +48,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 
 ## Manques face à la concurrence
 
-- **Audit automatisé continu** : l’analyse axe-core manuelle et ses exports existent, mais il manque les audits programmés, les parcours guidés FastPass et le suivi multi-pages proposé par Accessibility Insights.
+- **Audit automatisé continu** : l’analyse axe-core manuelle, ses exports et désormais une planification locale (heure, jour, semaine, fenêtre horaire) existent, mais il manque encore les parcours guidés FastPass et le suivi multi-pages proposé par Accessibility Insights.
 - **Guidage** : la vue Guides reste statique ; aucune checklist dynamique ni scénarisation interactive façon FastPass.
 - **Personnalisation avancée** : pas de duplication/partage de profils, ni de raccourcis personnalisables ou d’automations, contrairement à Stark.
 - **Collaboration** : toujours aucune intégration Jira/Linear/Slack ni gestion multi-utilisateurs.

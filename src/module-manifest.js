@@ -428,6 +428,18 @@ function normalizeConfig(config, manifestId) {
         }
         break;
       }
+      case 'time': {
+        if (typeof field.defaultValue === 'string' && field.defaultValue.trim()) {
+          normalizedField.defaultValue = field.defaultValue.trim();
+        }
+        if (field.step !== undefined) {
+          const step = Number(field.step);
+          if (!Number.isNaN(step) && step > 0) {
+            normalizedField.step = step;
+          }
+        }
+        break;
+      }
       default: {
         console.warn(`a11ytb: type de champ de configuration inconnu "${type}" pour "${manifestId}".`);
         return;

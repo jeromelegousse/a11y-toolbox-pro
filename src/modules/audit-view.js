@@ -15,7 +15,7 @@ function escapeAttribute(value) {
   return String(value).replace(/"/g, '&quot;');
 }
 
-export function renderAuditStats(summary = {}) {
+export function renderAuditStats(summary = {}, options = {}) {
   const totals = summary?.totals ?? {};
   const critical = totals.critical ?? 0;
   const serious = totals.serious ?? 0;
@@ -23,6 +23,17 @@ export function renderAuditStats(summary = {}) {
   const minor = totals.minor ?? 0;
   const total = totals.total ?? 0;
   const totalNodes = summary?.totalNodes ?? 0;
+  const schedule = options?.schedule ?? {};
+  let scheduleNote = '';
+  if (schedule?.enabled) {
+    const nextRunTs = typeof schedule.nextRunAt === 'number' ? schedule.nextRunAt : null;
+    if (Number.isFinite(nextRunTs)) {
+      const formatted = formatTimestamp(nextRunTs);
+      if (formatted) {
+        scheduleNote = `<p class="a11ytb-note" data-ref="audit-next-run">Prochain audit planifié : ${escapeHtml(formatted)}</p>`;
+      }
+    }
+  }
 
   return `
     <dl class="a11ytb-summary" data-total-violations="${total}" data-total-nodes="${totalNodes}">
@@ -43,6 +54,7 @@ export function renderAuditStats(summary = {}) {
         <dd>${totalNodes}</dd>
       </div>
     </dl>
+    ${scheduleNote}
   `;
 }
 
@@ -108,6 +120,14 @@ export function buildAuditStatusText(auditState = {}) {
   const parts = [];
   if (timestamp) parts.push(`Dernier audit : ${timestamp}`);
   if (summary?.detail) parts.push(summary.detail);
+  const schedule = auditState?.preferences?.schedule;
+  if (schedule?.enabled) {
+    const nextRunTs = typeof schedule.nextRunAt === 'number' ? schedule.nextRunAt : null;
+    if (Number.isFinite(nextRunTs)) {
+      const formatted = formatTimestamp(nextRunTs);
+      if (formatted) parts.push(`Prochain audit planifié : ${formatted}`);
+    }
+  }
   if (!parts.length) parts.push('Lancez une analyse pour générer un rapport.');
   return {
     label,
