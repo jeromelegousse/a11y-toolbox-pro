@@ -2108,7 +2108,7 @@ body {
   align-items: flex-start;
 }
 
-.a11ytb-admin-dependencies {
+.a11ytb-admin-dependencies-wrapper {
   display: flex;
   flex-direction: column;
   gap: 6px;

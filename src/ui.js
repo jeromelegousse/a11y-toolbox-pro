@@ -2144,6 +2144,20 @@ export function mountUI({ root, state, config = {} }) {
   const moduleElements = new Map();
   const adminItems = new Map();
   const dependencyViews = new Map();
+
+  function refreshDependencyViews(snapshot) {
+    const runtimeModules = snapshot?.runtime?.modules ?? state.get('runtime.modules') ?? {};
+    dependencyViews.forEach((views, moduleId) => {
+      if (!Array.isArray(views) || !views.length) return;
+      const runtimeInfo = runtimeModules?.[moduleId] || {};
+      const dependencies = Array.isArray(runtimeInfo.dependencies) ? runtimeInfo.dependencies : [];
+      const resolvedName = runtimeInfo.manifestName || runtimeInfo.manifestTitle || views[0]?.moduleName || moduleId;
+      views.forEach((view) => {
+        if (!view?.wrapper?.isConnected) return;
+        updateDependencyDisplay(view, dependencies, { moduleName: resolvedName || view.moduleName });
+      });
+    });
+  }
   const adminToolbarCounts = { active: null, hidden: null, pinned: null };
   const organizeFilterToggles = new Map();
   const collectionButtons = new Map();
@@ -3571,7 +3585,8 @@ export function mountUI({ root, state, config = {} }) {
     meta.append(priorityWrapper);
 
     const dependenciesSection = document.createElement('div');
-    dependenciesSection.className = 'a11ytb-admin-dependencies';
+    dependenciesSection.className = 'a11ytb-admin-dependencies-wrapper';
+    dependenciesSection.hidden = true;
 
     const dependenciesTitle = document.createElement('h4');
     dependenciesTitle.className = 'a11ytb-admin-dependencies-title';
@@ -4216,13 +4231,10 @@ export function mountUI({ root, state, config = {} }) {
     });
     viewElements.forEach((element, id) => {
       const isActive = id === currentView;
-      if (isActive) {
-        element.removeAttribute('hidden');
-        element.setAttribute('aria-hidden', 'false');
-      } else {
-        element.setAttribute('hidden', '');
-        element.setAttribute('aria-hidden', 'true');
-      }
+      element.hidden = !isActive;
+      element.style.display = isActive ? '' : 'none';
+      element.style.visibility = isActive ? 'visible' : 'hidden';
+      element.setAttribute('aria-hidden', isActive ? 'false' : 'true');
     });
     if (currentView === 'options') {
       if (activeViewId !== 'options') {
@@ -4909,6 +4921,7 @@ export function mountUI({ root, state, config = {} }) {
     applyModuleLayout();
     updateActivityLog();
     syncView();
+    refreshDependencyViews(snapshot);
     syncFullscreenMode(snapshot);
     renderProfiles(snapshot);
     updateActiveShortcuts(snapshot);
@@ -4924,6 +4937,7 @@ export function mountUI({ root, state, config = {} }) {
   applyModuleLayout();
   updateActivityLog();
   syncView();
+  refreshDependencyViews(initialSnapshot);
   syncFullscreenMode(initialSnapshot);
   renderProfiles(initialSnapshot);
   updateActiveShortcuts(initialSnapshot);

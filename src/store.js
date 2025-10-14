@@ -91,6 +91,12 @@ function safeClone(value) {
 export function createStore(key, initial) {
   const subs = new Set();
   let state = load() ?? safeClone(initial);
+  if (initial?.runtime) {
+    if (!state) {
+      state = safeClone(initial);
+    }
+    state.runtime = safeClone(initial.runtime);
+  }
 
   function load() {
     try {
@@ -124,7 +130,9 @@ export function createStore(key, initial) {
         ref = ref[k];
       }
       ref[keys.at(-1)] = value;
-      persist();
+      if (keys[0] !== 'runtime') {
+        persist();
+      }
       subs.forEach(fn => fn(safeClone(state)));
     },
     tx(patch) {

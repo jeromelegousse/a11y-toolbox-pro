@@ -83,7 +83,8 @@ export function updateDependencyDisplay(view, dependencies = [], { moduleName } 
   });
 
   let summaryText;
-  if (!normalized.length) {
+  const hasDependencies = normalized.length > 0;
+  if (!hasDependencies) {
     summaryText = 'Ce module ne déclare aucune dépendance.';
   } else {
     const conflicts = normalized.filter((entry) => entry.status && entry.status !== 'ok');
@@ -99,7 +100,13 @@ export function updateDependencyDisplay(view, dependencies = [], { moduleName } 
 
   view.summary.textContent = summaryText;
   if (view.wrapper) {
-    view.wrapper.hidden = false;
+    if (hasDependencies) {
+      view.wrapper.hidden = false;
+      view.wrapper.classList.add('a11ytb-admin-dependencies');
+    } else {
+      view.wrapper.hidden = true;
+      view.wrapper.classList.remove('a11ytb-admin-dependencies');
+    }
   }
 
   const liveMessage = summarizeDependencyLiveMessage(normalized, moduleName);
