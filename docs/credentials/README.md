@@ -49,3 +49,8 @@ Ce dossier centralise les informations nécessaires pour récupérer et configur
 - `ANTHROPIC_API_KEY` : clé générée depuis [Anthropic Console](https://console.anthropic.com/).
 
 > ✅ Mettre à jour ce document au fur et à mesure de l'ajout de nouveaux fournisseurs.
+
+## Stockage dans WordPress
+
+- Dans l'interface d’administration du plugin, la clé Gemini est désormais chiffrée à l’enregistrement à l’aide d’une clé dérivée des salts WordPress (`wp_salt`).
+- La valeur est déchiffrée à la volée lorsqu’elle doit être affichée ou exportée pour les administrateurs. En cas d’échec du déchiffrement (salts modifiés, extension manquante, etc.), un message s’affiche et la clé doit être resaisie.
