@@ -27,12 +27,12 @@ const profilePresets = {
       'tts.rate': 0.9,
       'tts.pitch': 0.9,
       'tts.volume': 1,
-      'audio.theme': 'vigilance',
-      'audio.masterVolume': 1,
-      'audio.events.alert.volume': 1,
-      'audio.events.alert.timbre': 'bright',
-      'audio.events.confirm.volume': 0.9,
-      'audio.events.info.volume': 0.85
+      'audio.theme': 'digital',
+      'audio.volume': 1,
+      'audio.events.alert.sound': 'alert',
+      'audio.events.warning.sound': 'warning',
+      'audio.events.success.sound': 'success',
+      'audio.events.info.sound': 'toggle'
     }
   },
   dyslexie: {
@@ -51,11 +51,12 @@ const profilePresets = {
       'tts.rate': 0.85,
       'tts.pitch': 1,
       'tts.volume': 0.95,
-      'audio.theme': 'calm-focus',
-      'audio.masterVolume': 0.85,
-      'audio.events.alert.volume': 0.85,
-      'audio.events.confirm.volume': 0.7,
-      'audio.events.info.volume': 0.6
+      'audio.theme': 'soft',
+      'audio.volume': 0.85,
+      'audio.events.alert.enabled': false,
+      'audio.events.warning.sound': 'warning',
+      'audio.events.success.sound': 'confirm',
+      'audio.events.info.sound': 'toggle'
     }
   },
   'lecture-rapide': {
@@ -74,11 +75,12 @@ const profilePresets = {
       'tts.rate': 1.25,
       'tts.pitch': 1,
       'tts.volume': 1,
-      'audio.theme': 'tempo-dynamic',
-      'audio.masterVolume': 0.95,
-      'audio.events.alert.volume': 0.95,
-      'audio.events.confirm.volume': 1,
-      'audio.events.info.volume': 0.9
+      'audio.theme': 'classic',
+      'audio.volume': 0.95,
+      'audio.events.alert.sound': 'alert',
+      'audio.events.warning.sound': 'confirm',
+      'audio.events.success.sound': 'success',
+      'audio.events.info.sound': 'info'
     }
   }
 };
