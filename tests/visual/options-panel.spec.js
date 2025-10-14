@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -9,6 +9,7 @@ const __dirname = dirname(__filename);
 const BASELINE_PATH = resolve(__dirname, 'baselines/options-panel.svg');
 
 const shouldUpdateBaseline = process.env.UPDATE_VISUAL_BASELINE === '1';
+const FIXED_SCHEDULE_TIMESTAMP = Date.UTC(2024, 0, 8, 9, 0);
 
 const extractBaselinePayload = (svg) => {
   const match = svg.match(/href="data:image\/png;base64,([^"\s]+)"/);
@@ -24,7 +25,33 @@ const BASELINE_SCREENSHOT = shouldUpdateBaseline || !existsSync(BASELINE_PATH)
   ? null
   : extractBaselinePayload(readFileSync(BASELINE_PATH, 'utf8'));
 
-const BASELINE_DATA = shouldUpdateBaseline ? null : readBaselineData();
+const BASELINE_DATA = shouldUpdateBaseline ? null : await readBaselineData();
+
+function getPngDimensions(buffer) {
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20)
+  };
+}
+
+function computeScreenshotHash(buffer) {
+  return createHash('sha256').update(buffer).digest('hex');
+}
+
+async function readBaselineData() {
+  if (!BASELINE_SCREENSHOT) {
+    throw new Error(
+      `Aucune capture de référence disponible pour ${BASELINE_PATH}. ` +
+        'Définissez UPDATE_VISUAL_BASELINE=1 pour générer une nouvelle base.'
+    );
+  }
+
+  const buffer = Buffer.from(BASELINE_SCREENSHOT, 'base64');
+  const { width, height } = getPngDimensions(buffer);
+  const sha256 = computeScreenshotHash(buffer);
+
+  return { width, height, sha256, buffer };
+}
 
 const focusableSelectors = [
   'a[href]',
