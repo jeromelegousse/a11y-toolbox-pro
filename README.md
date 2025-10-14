@@ -16,6 +16,20 @@
 
 Ouvrez `index.html` dans un navigateur moderne (Alt+Shift+A pour ouvrir).
 
+## Développement
+
+```bash
+npm install
+```
+
+> ℹ️ L'installation télécharge automatiquement les navigateurs Playwright nécessaires aux tests visuels (`playwright install`).
+
+Ensuite, vous pouvez lancer les vérifications locales :
+
+```bash
+npm run test
+```
+
 ## Installation comme extension WordPress
 
 1. Téléchargez l’archive du dépôt (`Code` → `Download ZIP`).
