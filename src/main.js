@@ -27,12 +27,12 @@ const profilePresets = {
       'tts.rate': 0.9,
       'tts.pitch': 0.9,
       'tts.volume': 1,
-      'audio.theme': 'vigilance',
-      'audio.masterVolume': 1,
-      'audio.events.alert.volume': 1,
-      'audio.events.alert.timbre': 'bright',
-      'audio.events.confirm.volume': 0.9,
-      'audio.events.info.volume': 0.85
+      'audio.theme': 'digital',
+      'audio.volume': 1,
+      'audio.events.alert.sound': 'alert',
+      'audio.events.warning.sound': 'warning',
+      'audio.events.success.sound': 'success',
+      'audio.events.info.sound': 'toggle'
     }
   },
   dyslexie: {
@@ -51,11 +51,12 @@ const profilePresets = {
       'tts.rate': 0.85,
       'tts.pitch': 1,
       'tts.volume': 0.95,
-      'audio.theme': 'calm-focus',
-      'audio.masterVolume': 0.85,
-      'audio.events.alert.volume': 0.85,
-      'audio.events.confirm.volume': 0.7,
-      'audio.events.info.volume': 0.6
+      'audio.theme': 'soft',
+      'audio.volume': 0.85,
+      'audio.events.alert.enabled': false,
+      'audio.events.warning.sound': 'warning',
+      'audio.events.success.sound': 'confirm',
+      'audio.events.info.sound': 'toggle'
     }
   },
   'lecture-rapide': {
@@ -74,11 +75,12 @@ const profilePresets = {
       'tts.rate': 1.25,
       'tts.pitch': 1,
       'tts.volume': 1,
-      'audio.theme': 'tempo-dynamic',
-      'audio.masterVolume': 0.95,
-      'audio.events.alert.volume': 0.95,
-      'audio.events.confirm.volume': 1,
-      'audio.events.info.volume': 0.9
+      'audio.theme': 'classic',
+      'audio.volume': 0.95,
+      'audio.events.alert.sound': 'alert',
+      'audio.events.warning.sound': 'confirm',
+      'audio.events.success.sound': 'success',
+      'audio.events.info.sound': 'info'
     }
   }
 };
@@ -308,7 +310,7 @@ registerBlock({
       </div>
       <p class="a11ytb-note" role="status" aria-live="polite" data-ref="audit-status">${label}</p>
       <p class="a11ytb-note" data-ref="audit-detail">${detail}</p>
-      <div data-ref="audit-stats">${renderAuditStats(audit.summary)}</div>
+      <div data-ref="audit-stats">${renderAuditStats(audit.summary, { schedule: audit.preferences?.schedule })}</div>
       <div data-ref="audit-violations">${renderAuditViolations(audit.lastReport)}</div>
     `;
   },
@@ -366,7 +368,7 @@ registerBlock({
       const { label, detail } = buildAuditStatusText(audit);
       if (statusNode) statusNode.textContent = label;
       if (detailNode) detailNode.textContent = detail;
-      if (statsNode) statsNode.innerHTML = renderAuditStats(audit.summary);
+      if (statsNode) statsNode.innerHTML = renderAuditStats(audit.summary, { schedule: audit.preferences?.schedule });
       if (violationsNode) violationsNode.innerHTML = renderAuditViolations(audit.lastReport);
       const running = audit.status === 'running';
       if (runBtn) {

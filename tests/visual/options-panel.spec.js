@@ -84,6 +84,33 @@ const focusableSelectors = [
 
 test.describe('Panneau Options & Profils', () => {
   test.beforeEach(async ({ page }) => {
+    await page.addInitScript((fixedTs) => {
+      const NativeDate = Date;
+      class FrozenDate extends NativeDate {
+        constructor(...args) {
+          if (args.length === 0) {
+            return new NativeDate(fixedTs);
+          }
+          return new NativeDate(...args);
+        }
+
+        static now() {
+          return fixedTs;
+        }
+
+        static UTC(...args) {
+          return NativeDate.UTC(...args);
+        }
+
+        static parse(input) {
+          return NativeDate.parse(input);
+        }
+      }
+
+      FrozenDate.prototype = NativeDate.prototype;
+      Object.defineProperty(window, 'Date', { value: FrozenDate });
+    }, FIXED_SCHEDULE_TIMESTAMP);
+
     await page.goto('/');
     await page.locator('.a11ytb-fab').click();
     await page.getByRole('button', { name: 'Options & Profils' }).click();
@@ -135,6 +162,18 @@ test.describe('Panneau Options & Profils', () => {
   });
 
   test('capture visuelle du panneau', async ({ page }) => {
+    await page.evaluate(() => {
+      const state = window.a11ytb?.state;
+      if (!state?.set) return;
+
+      state.set('audit.preferences.schedule.enabled', true);
+      state.set('audit.preferences.schedule.frequency', 'weekly');
+      state.set('audit.preferences.schedule.timeWindow.start', '09:00');
+      state.set('audit.preferences.schedule.timeWindow.end', '18:00');
+      state.set('audit.preferences.schedule.lastRunAt', Date.UTC(2024, 0, 8, 9, 0));
+      state.set('audit.preferences.schedule.nextRunAt', Date.UTC(2024, 0, 15, 9, 0));
+    });
+
     const panel = page.locator('.a11ytb-panel');
     await expect(panel).toBeVisible();
     await page.evaluate(() => {

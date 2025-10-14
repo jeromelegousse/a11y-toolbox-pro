@@ -8,6 +8,7 @@ const BASE_EVENT_DEFAULTS = {
 };
 
 export const DEFAULT_AUDIO_VOLUME = 1;
+export const DEFAULT_AUDIO_THEME = 'classic';
 
 export function createDefaultAudioEvents() {
   return AUDIO_SEVERITIES.reduce((acc, severity) => {
@@ -20,6 +21,7 @@ export function createDefaultAudioEvents() {
 export function createDefaultAudioState() {
   return {
     volume: DEFAULT_AUDIO_VOLUME,
+    theme: DEFAULT_AUDIO_THEME,
     events: createDefaultAudioEvents()
   };
 }
