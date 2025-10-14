@@ -1260,6 +1260,30 @@ export function mountUI({ root, state, config = {} }) {
     return card;
   }
 
+  const namespaceToModule = new Map([
+    ['contrast', 'contrast'],
+    ['spacing', 'spacing'],
+    ['tts', 'tts'],
+    ['stt', 'stt'],
+    ['braille', 'braille'],
+    ['audio', 'audio-feedback'],
+    ['audit', 'audit']
+  ]);
+
+  function extractModulesFromProfile(settings = {}) {
+    const modules = new Set();
+    Object.keys(settings).forEach((path) => {
+      if (typeof path !== 'string') return;
+      const namespace = path.split('.')[0];
+      if (!namespace) return;
+      const moduleId = namespaceToModule.get(namespace);
+      if (moduleId) {
+        modules.add(moduleId);
+      }
+    });
+    return Array.from(modules);
+  }
+
   function updateAggregationPanel(snapshot = state.get()) {
     const data = snapshot || state.get();
     const filterPrefs = data?.ui?.statusFilters || {};
@@ -2791,30 +2815,6 @@ export function mountUI({ root, state, config = {} }) {
   let builderDragState = null;
 
   syncCollectionStructures(state.get());
-
-  const namespaceToModule = new Map([
-    ['contrast', 'contrast'],
-    ['spacing', 'spacing'],
-    ['tts', 'tts'],
-    ['stt', 'stt'],
-    ['braille', 'braille'],
-    ['audio', 'audio-feedback'],
-    ['audit', 'audit']
-  ]);
-
-  function extractModulesFromProfile(settings = {}) {
-    const modules = new Set();
-    Object.keys(settings).forEach((path) => {
-      if (typeof path !== 'string') return;
-      const namespace = path.split('.')[0];
-      if (!namespace) return;
-      const moduleId = namespaceToModule.get(namespace);
-      if (moduleId) {
-        modules.add(moduleId);
-      }
-    });
-    return Array.from(modules);
-  }
 
   const presetProfiles = state.get('profiles') || {};
   const profileFilterEntries = Object.entries(presetProfiles)
