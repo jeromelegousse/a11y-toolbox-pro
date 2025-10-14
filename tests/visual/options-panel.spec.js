@@ -21,12 +21,6 @@ const extractBaselinePayload = (svg) => {
   return match[1];
 };
 
-const BASELINE_SCREENSHOT = shouldUpdateBaseline || !existsSync(BASELINE_PATH)
-  ? null
-  : extractBaselinePayload(readFileSync(BASELINE_PATH, 'utf8'));
-
-const BASELINE_DATA = shouldUpdateBaseline ? null : await readBaselineData();
-
 function getPngDimensions(buffer) {
   return {
     width: buffer.readUInt32BE(16),
@@ -38,19 +32,45 @@ function computeScreenshotHash(buffer) {
   return createHash('sha256').update(buffer).digest('hex');
 }
 
+let baselineDataPromise;
+
 async function readBaselineData() {
-  if (!BASELINE_SCREENSHOT) {
+  if (shouldUpdateBaseline) {
     throw new Error(
-      `Aucune capture de référence disponible pour ${BASELINE_PATH}. ` +
-        'Définissez UPDATE_VISUAL_BASELINE=1 pour générer une nouvelle base.'
+      'La lecture de la capture de référence est désactivée lorsque ' +
+        'UPDATE_VISUAL_BASELINE=1.'
     );
   }
 
-  const buffer = Buffer.from(BASELINE_SCREENSHOT, 'base64');
-  const { width, height } = getPngDimensions(buffer);
-  const sha256 = computeScreenshotHash(buffer);
+  if (!baselineDataPromise) {
+    baselineDataPromise = (async () => {
+      let svg;
+      try {
+        svg = await readFile(BASELINE_PATH, 'utf8');
+      } catch (error) {
+        if (error && error.code === 'ENOENT') {
+          throw new Error(
+            `Aucune capture de référence disponible pour ${BASELINE_PATH}. ` +
+              'Définissez UPDATE_VISUAL_BASELINE=1 pour générer une nouvelle base.'
+          );
+        }
+        throw error;
+      }
 
-  return { width, height, sha256, buffer };
+      const base64Payload = extractBaselinePayload(svg);
+      const buffer = Buffer.from(base64Payload, 'base64');
+      const { width, height } = getPngDimensions(buffer);
+
+      return {
+        width,
+        height,
+        sha256: computeScreenshotHash(buffer),
+        buffer
+      };
+    })();
+  }
+
+  return baselineDataPromise;
 }
 
 const focusableSelectors = [
@@ -186,7 +206,7 @@ test.describe('Panneau Options & Profils', () => {
         description: 'options-panel baseline updated (SVG)'
       });
     } else {
-      const { width, height, sha256, buffer } = BASELINE_DATA;
+      const { width, height, sha256, buffer } = await readBaselineData();
       const { width: captureWidth, height: captureHeight } =
         getPngDimensions(screenshot);
       expect(captureWidth).toBe(width);
