@@ -312,7 +312,7 @@ function a11ytb_sanitize_view($value): string
 /**
  * Nettoie une clé API ou un secret.
  */
-function a11ytb_sanitize_secret($value): string
+function a11ytb_sanitize_secret_option($value, string $option_name): string
 {
     if (!is_string($value)) {
         return '';
@@ -332,12 +332,52 @@ function a11ytb_sanitize_secret($value): string
 
     add_settings_error(
         'a11ytb_options',
-        'a11ytb_options_encryption_error',
-        esc_html__('Impossible de chiffrer la clé fournie. La valeur précédente a été conservée.', 'a11ytb'),
+        'a11ytb_options_encryption_error_' . sanitize_key($option_name),
+        esc_html__('Impossible de chiffrer la valeur fournie. La valeur précédente a été conservée.', 'a11ytb'),
         'error'
     );
 
-    $previous = get_option('a11ytb_gemini_api_key', '');
+    $previous = get_option($option_name, '');
+
+    return is_string($previous) ? $previous : '';
+}
+
+function a11ytb_sanitize_secret($value): string
+{
+    return a11ytb_sanitize_secret_option($value, 'a11ytb_gemini_api_key');
+}
+
+function a11ytb_sanitize_activity_webhook_token($value): string
+{
+    return a11ytb_sanitize_secret_option($value, 'a11ytb_activity_webhook_token');
+}
+
+function a11ytb_sanitize_webhook_url($value): string
+{
+    if (!is_string($value)) {
+        return '';
+    }
+
+    $normalized = trim($value);
+
+    if ($normalized === '') {
+        return '';
+    }
+
+    $sanitized = esc_url_raw($normalized);
+
+    if ($sanitized !== '') {
+        return $sanitized;
+    }
+
+    add_settings_error(
+        'a11ytb_options',
+        'a11ytb_activity_webhook_url_invalid',
+        esc_html__('URL de webhook invalide. La valeur précédente a été conservée.', 'a11ytb'),
+        'error'
+    );
+
+    $previous = get_option('a11ytb_activity_webhook_url', '');
 
     return is_string($previous) ? $previous : '';
 }
@@ -644,9 +684,14 @@ function a11ytb_get_frontend_config(): array
         'autoOpen' => get_option('a11ytb_auto_open_panel', '0') === '1',
     ];
 
+    $integrations = [
+        'activity' => a11ytb_get_activity_integration_config(),
+    ];
+
     return [
         'defaults' => $defaults,
         'behavior' => $behavior,
+        'integrations' => $integrations,
     ];
 }
 
@@ -667,6 +712,25 @@ function a11ytb_get_gemini_admin_config(): array
     }
 
     return $config;
+}
+
+/**
+ * Construit la configuration d’intégration du journal d’activité.
+ */
+function a11ytb_get_activity_integration_config(): array
+{
+    $url = get_option('a11ytb_activity_webhook_url', '');
+    $normalized_url = is_string($url) ? trim($url) : '';
+    $stored_token = get_option('a11ytb_activity_webhook_token', '');
+    $decrypted_token = $stored_token === '' ? '' : a11ytb_decrypt_secret($stored_token);
+    $token = ($decrypted_token === null) ? '' : (string) $decrypted_token;
+
+    return [
+        'enabled' => $normalized_url !== '',
+        'webhookUrl' => $normalized_url,
+        'authToken' => $token,
+        'hasAuthToken' => $token !== '',
+    ];
 }
 
 /**
@@ -741,6 +805,7 @@ function a11ytb_enqueue_admin_assets(string $hook): void
     if (current_user_can('manage_options')) {
         $admin_data = [
             'gemini' => a11ytb_get_gemini_admin_config(),
+            'activity' => a11ytb_get_activity_integration_config(),
         ];
 
         wp_add_inline_script(
@@ -774,6 +839,26 @@ function a11ytb_register_admin_settings(): void
             'type' => 'integer',
             'sanitize_callback' => 'a11ytb_sanitize_quota',
             'default' => 15,
+        ]
+    );
+
+    register_setting(
+        'a11ytb_options',
+        'a11ytb_activity_webhook_url',
+        [
+            'type' => 'string',
+            'sanitize_callback' => 'a11ytb_sanitize_webhook_url',
+            'default' => '',
+        ]
+    );
+
+    register_setting(
+        'a11ytb_options',
+        'a11ytb_activity_webhook_token',
+        [
+            'type' => 'string',
+            'sanitize_callback' => 'a11ytb_sanitize_activity_webhook_token',
+            'default' => '',
         ]
     );
 }
@@ -819,6 +904,11 @@ function a11ytb_render_admin_page(): void
     $gemini_key_error = ($stored_gemini_api_key !== '' && $decrypted_gemini_api_key === null);
     $gemini_api_key = ($decrypted_gemini_api_key === null) ? '' : (string) $decrypted_gemini_api_key;
     $gemini_quota = (int) get_option('a11ytb_gemini_quota', 15);
+    $activity_webhook_url = (string) get_option('a11ytb_activity_webhook_url', '');
+    $stored_activity_webhook_token = get_option('a11ytb_activity_webhook_token', '');
+    $decrypted_activity_webhook_token = a11ytb_decrypt_secret($stored_activity_webhook_token);
+    $activity_token_error = ($stored_activity_webhook_token !== '' && $decrypted_activity_webhook_token === null);
+    $activity_webhook_token = ($decrypted_activity_webhook_token === null) ? '' : (string) $decrypted_activity_webhook_token;
     ?>
     <div class="wrap a11ytb-admin-page">
         <h1><?php esc_html_e('A11y Toolbox Pro', 'a11ytb'); ?></h1>
@@ -897,6 +987,53 @@ function a11ytb_render_admin_page(): void
                 />
                 <p class="description">
                     <?php esc_html_e('15 requêtes/minute offertes sur Gemini 1.5 Flash.', 'a11ytb'); ?>
+                </p>
+            </div>
+
+            <div class="a11ytb-admin-field">
+                <label for="a11ytb_activity_webhook_url" class="a11ytb-admin-label">
+                    <?php esc_html_e('Webhook activité (URL)', 'a11ytb'); ?>
+                </label>
+                <input
+                    type="url"
+                    id="a11ytb_activity_webhook_url"
+                    name="a11ytb_activity_webhook_url"
+                    value="<?php echo esc_attr($activity_webhook_url); ?>"
+                    class="regular-text"
+                />
+                <p class="description">
+                    <?php esc_html_e('Utilisez une URL HTTPS dédiée (par exemple un connecteur Slack ou un endpoint serverless).', 'a11ytb'); ?>
+                </p>
+            </div>
+
+            <div class="a11ytb-admin-field">
+                <label for="a11ytb_activity_webhook_token" class="a11ytb-admin-label">
+                    <?php esc_html_e('Webhook activité (jeton)', 'a11ytb'); ?>
+                </label>
+                <input
+                    type="password"
+                    id="a11ytb_activity_webhook_token"
+                    name="a11ytb_activity_webhook_token"
+                    value="<?php echo esc_attr($activity_webhook_token); ?>"
+                    class="regular-text"
+                    autocomplete="off"
+                />
+                <p class="description">
+                    <?php
+                    if ($activity_webhook_token !== '') {
+                        printf(
+                            /* translators: %s: masked webhook token */
+                            esc_html__('Jeton actuel : %s', 'a11ytb'),
+                            esc_html(a11ytb_mask_secret($activity_webhook_token))
+                        );
+                        echo '<br />';
+                    }
+                    if ($activity_token_error) {
+                        esc_html_e('Le jeton enregistré n’a pas pu être déchiffré. Veuillez vérifier vos salts WordPress ou saisir une nouvelle valeur.', 'a11ytb');
+                        echo '<br />';
+                    }
+                    esc_html_e('Optionnel : sera envoyé dans l’en-tête Authorization (Bearer). Les valeurs sont chiffrées via les salts WordPress.', 'a11ytb');
+                    ?>
                 </p>
             </div>
 

@@ -54,6 +54,12 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 - **Collaboration** : toujours aucune intégration Jira/Linear/Slack ni gestion multi-utilisateurs.
 - **Observabilité** : les métriques runtime sont locales, désormais agrégées dans un indice de conformité AA/AAA consolidé **et dans un suivi d’historique manifestes**. Il manque encore l’agrégation historique multi-instance et des tableaux de bord partageables comme sur les plateformes enterprise.
 
+## Webhooks d’activité & implications de sécurité
+
+- **Activation** : l’écran d’administration expose désormais deux champs dans la section intégrations — `Webhook activité (URL)` et `Webhook activité (jeton)` — pour router le journal (`window.a11ytb.logActivity`) vers un endpoint HTTPS externe (connecteur Slack, fonction serverless, etc.). Une fois l’URL enregistrée, chaque entrée est poussée en JSON et un bouton « Envoyer au webhook » permet de relancer manuellement l’ensemble du journal depuis la vue Export.
+- **Authentification** : le jeton optionnel est chiffré avec les salts WordPress côté base de données mais est ré-exposé côté frontal pour que le navigateur puisse insérer l’en-tête `Authorization: Bearer …`. Utiliser un secret dédié et révoquable, limiter l’IP source ou ajouter une validation côté serveur reste indispensable pour éviter qu’un visiteur ne détourne l’URL.
+- **Résilience** : les envois sont mis en file d’attente avec relance exponentielle (2s → 30s). Chaque échec ou synchronisation manuelle est journalisé dans l’activité pour assurer la traçabilité sans masquer l’historique initial.
+
 ## Recommandations stratégiques
 
 1. **Clarifier les cas d'usage**
