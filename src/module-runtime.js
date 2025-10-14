@@ -679,10 +679,15 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
     snapshotManifestGovernance();
     const knownModuleIds = new Set([
       ...moduleToBlocks.keys(),
-      ...catalog.map((entry) => entry.id)
+      ...catalog.map((entry) => entry.id),
+      ...metricsCache.keys()
     ]);
     knownModuleIds.forEach((moduleId) => {
       if (!moduleId) return;
+      const manifest = manifests.get(moduleId);
+      const metrics = ensureMetrics(moduleId);
+      metrics.compat = evaluateCompatibility(manifest);
+      updateModuleRuntime(moduleId, { metrics: serializeMetrics(metrics) });
       applyModuleMetadata(moduleId);
     });
   }
