@@ -156,7 +156,11 @@ export function createModuleCard(entry, actions) {
   entry.collections.slice(0, 4).forEach((collectionId) => {
     const data = collectionLookup.get(collectionId);
     const label = data?.label || collectionId;
-    collectionTags.append(createTag(label));
+    const tag = createTag(label);
+    const fullLabel = data?.pathLabel || label;
+    tag.title = fullLabel;
+    tag.setAttribute('aria-label', fullLabel);
+    collectionTags.append(tag);
   });
   if (entry.collections.length > 4) {
     collectionTags.append(createTag(`+${entry.collections.length - 4}`));

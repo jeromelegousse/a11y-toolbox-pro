@@ -4,7 +4,7 @@ import { applyInertToSiblings } from './utils/inert.js';
 import { summarizeStatuses } from './status-center.js';
 import { buildGuidedChecklists, toggleManualChecklistStep } from './guided-checklists.js';
 import { normalizeAudioEvents } from './audio-config.js';
-import { moduleCollections } from './module-collections.js';
+import { moduleCollections, flattenedModuleCollections, moduleCollectionsById } from './module-collections.js';
 import { updateDependencyDisplay } from './utils/dependency-display.js';
 import { createActivityIntegration } from './integrations/activity.js';
 
@@ -1119,6 +1119,9 @@ export function mountUI({ root, state, config = {} }) {
       const opt = document.createElement('option');
       opt.value = option.value;
       opt.textContent = option.label;
+      if (option.ariaLabel) {
+        opt.setAttribute('aria-label', option.ariaLabel);
+      }
       select.append(opt);
     });
     const nextValue = allowedValues.has(preferredValue)
@@ -1286,7 +1289,7 @@ export function mountUI({ root, state, config = {} }) {
 
     const collectionOptions = [{ value: 'all', label: 'Toutes les collections' }];
     collectionDefinitions.forEach((definition) => {
-      collectionOptions.push({ value: definition.id, label: definition.label || definition.id });
+      collectionOptions.push(formatCollectionOption(definition));
     });
     const nextCollection = setAggregationSelectOptions(aggregationCollectionSelect, collectionOptions, preferredCollection);
     aggregationFilterState.collection = nextCollection;
@@ -2630,13 +2633,19 @@ export function mountUI({ root, state, config = {} }) {
     ...manifestByModuleId.keys()
   ]));
 
-  const baseCollectionDefinitions = moduleCollections
+  const baseCollectionDefinitions = flattenedModuleCollections
     .filter((entry) => entry && entry.id && Array.isArray(entry.modules))
     .map((entry) => ({
       id: entry.id,
       label: entry.label || entry.id,
       description: entry.description || '',
-      modules: Array.from(new Set((entry.modules || []).filter(Boolean)))
+      modules: Array.from(new Set((entry.modules || []).filter(Boolean))),
+      depth: entry.depth || 0,
+      parentId: entry.parentId || null,
+      pathLabel: entry.pathLabel || entry.label || entry.id,
+      ancestors: Array.isArray(entry.ancestors) ? entry.ancestors.slice() : [],
+      descendants: Array.isArray(entry.descendants) ? entry.descendants.slice() : [],
+      directModules: Array.isArray(entry.directModules) ? entry.directModules.slice() : []
     }))
     .filter((entry) => entry.modules.length);
 
@@ -2654,7 +2663,13 @@ export function mountUI({ root, state, config = {} }) {
         id: entry.id,
         label: override?.label || entry.label,
         description: override?.description ?? entry.description ?? '',
-        modules: overrideModules && overrideModules.length ? overrideModules : entry.modules.slice()
+        modules: overrideModules && overrideModules.length ? overrideModules : entry.modules.slice(),
+        depth: entry.depth || 0,
+        parentId: entry.parentId || null,
+        ancestors: Array.isArray(entry.ancestors) ? entry.ancestors.slice() : [],
+        descendants: Array.isArray(entry.descendants) ? entry.descendants.slice() : [],
+        pathLabel: entry.pathLabel || entry.label || entry.id,
+        directModules: entry.directModules && entry.directModules.length ? entry.directModules.slice() : []
       };
       resolved.push(definition);
       seen.add(entry.id);
@@ -2671,7 +2686,13 @@ export function mountUI({ root, state, config = {} }) {
           id,
           label: override?.label || id,
           description: override?.description || '',
-          modules
+          modules,
+          depth: Number.isFinite(override?.depth) ? override.depth : 0,
+          parentId: override?.parentId || null,
+          ancestors: Array.isArray(override?.ancestors) ? override.ancestors.slice() : [],
+          descendants: Array.isArray(override?.descendants) ? override.descendants.slice() : [],
+          pathLabel: override?.pathLabel || override?.label || id,
+          directModules: modules.slice()
         });
         seen.add(id);
       });
@@ -2686,7 +2707,15 @@ export function mountUI({ root, state, config = {} }) {
         id: definition.id,
         label: definition.label,
         description: definition.description,
-        modules: members
+        modules: members,
+        depth: Number.isFinite(definition.depth) ? definition.depth : 0,
+        parentId: definition.parentId || null,
+        ancestors: Array.isArray(definition.ancestors) ? definition.ancestors.slice() : [],
+        descendants: Array.isArray(definition.descendants) ? definition.descendants.slice() : [],
+        pathLabel: definition.pathLabel || definition.label,
+        directModules: Array.isArray(definition.directModules)
+          ? definition.directModules.filter((moduleId) => moduleToBlockIds.has(moduleId))
+          : members
       };
       byId.set(next.id, next);
       blockIds.set(next.id, members.flatMap((moduleId) => moduleToBlockIds.get(moduleId) ?? []));
@@ -2697,6 +2726,18 @@ export function mountUI({ root, state, config = {} }) {
         moduleIndex.get(moduleId).add(next.id);
       });
       return next;
+    });
+
+    normalized.forEach((definition) => {
+      const ancestorLabels = Array.isArray(definition.ancestors)
+        ? definition.ancestors
+            .map((ancestorId) => byId.get(ancestorId)?.label || moduleCollectionsById.get(ancestorId)?.label || ancestorId)
+        : [];
+      if (ancestorLabels.length) {
+        definition.pathLabel = `${ancestorLabels.join(' › ')} › ${definition.label}`;
+      } else {
+        definition.pathLabel = definition.label;
+      }
     });
 
     return {
@@ -2874,6 +2915,9 @@ export function mountUI({ root, state, config = {} }) {
       const opt = document.createElement('option');
       opt.value = option.value;
       opt.textContent = option.label;
+      if (option.ariaLabel) {
+        opt.setAttribute('aria-label', option.ariaLabel);
+      }
       select.append(opt);
     });
     availableFilterSelects[key] = select;
@@ -2888,6 +2932,14 @@ export function mountUI({ root, state, config = {} }) {
     return container;
   }
 
+  function formatCollectionOption(collection) {
+    const indent = collection.depth > 0 ? `${' '.repeat(collection.depth * 2)}⤷ ` : '';
+    const label = collection.label || collection.id;
+    const optionLabel = `${indent}${label}`.trim();
+    const aria = collection.pathLabel || label;
+    return { value: collection.id, label: optionLabel, ariaLabel: aria };
+  }
+
   function updateCollectionFilterOptions() {
     const select = availableFilterSelects.collection;
     if (!select) return;
@@ -2895,12 +2947,15 @@ export function mountUI({ root, state, config = {} }) {
     select.innerHTML = '';
     const options = [
       { value: 'all', label: 'Toutes les collections' },
-      ...collectionDefinitions.map((collection) => ({ value: collection.id, label: collection.label || collection.id }))
+      ...collectionDefinitions.map((collection) => formatCollectionOption(collection))
     ];
     options.forEach((option) => {
       const opt = document.createElement('option');
       opt.value = option.value;
       opt.textContent = option.label;
+      if (option.ariaLabel) {
+        opt.setAttribute('aria-label', option.ariaLabel);
+      }
       select.append(opt);
     });
     ensureSelectValue(select, current);
@@ -2913,7 +2968,7 @@ export function mountUI({ root, state, config = {} }) {
 
   const collectionFilterChoices = [
     { value: 'all', label: 'Toutes les collections' },
-    ...collectionDefinitions.map((collection) => ({ value: collection.id, label: collection.label || collection.id }))
+    ...collectionDefinitions.map((collection) => formatCollectionOption(collection))
   ];
 
   const compatibilityFilterChoices = [
@@ -4770,16 +4825,52 @@ export function mountUI({ root, state, config = {} }) {
     const prefs = getPreferences();
     const disabledSet = new Set(prefs.collections.disabled);
     collectionButtons.forEach((button, collectionId) => {
-      const enabled = !disabledSet.has(collectionId);
+      const storedEnabled = !disabledSet.has(collectionId);
       const label = button.dataset.collectionLabel || collectionId;
-      button.setAttribute('aria-pressed', String(enabled));
-      button.classList.toggle('is-active', enabled);
-      const action = enabled ? 'Désactiver' : 'Activer';
-      const text = `${action} ${label}`.trim();
+      const pathLabel = button.dataset.collectionPath || label;
+      let effectiveEnabled = storedEnabled;
+      let action = effectiveEnabled ? 'Désactiver' : 'Activer';
+      let text = `${action} ${label}`.trim();
+
+      let accessibleLabel = `${action} la collection ${pathLabel}`.trim();
+      let tooltip = accessibleLabel;
+      const info = collectionById.get(collectionId);
+      const ancestors = Array.isArray(info?.ancestors) ? info.ancestors : [];
+      const blockingAncestorId = ancestors.find((ancestorId) => disabledSet.has(ancestorId));
+
+      const existingSr = button.querySelector('.a11ytb-sr-only');
+
+      if (blockingAncestorId) {
+        const blockingLabel = collectionById.get(blockingAncestorId)?.label
+          || moduleCollectionsById.get(blockingAncestorId)?.label
+          || blockingAncestorId;
+        const message = `Activez d’abord ${blockingLabel} pour modifier ${label}.`;
+        effectiveEnabled = false;
+        action = 'Activer';
+        text = `${action} ${label}`.trim();
+        accessibleLabel = `${action} la collection ${pathLabel}. ${message}`;
+        tooltip = message;
+        button.disabled = true;
+        if (existingSr) {
+          existingSr.textContent = message;
+        } else {
+          const sr = document.createElement('span');
+          sr.className = 'a11ytb-sr-only';
+          sr.textContent = message;
+          button.append(sr);
+        }
+      } else {
+        button.disabled = false;
+        if (existingSr) {
+          existingSr.remove();
+        }
+      }
+
       button.textContent = text;
-      const accessibleLabel = `${action} la collection ${label}`.trim();
+      button.setAttribute('aria-pressed', String(effectiveEnabled));
+      button.classList.toggle('is-active', effectiveEnabled);
       button.setAttribute('aria-label', accessibleLabel);
-      button.title = accessibleLabel;
+      button.title = tooltip;
     });
     if (collectionsSummary) {
       const total = collectionButtons.size;
@@ -5416,10 +5507,20 @@ export function mountUI({ root, state, config = {} }) {
       const card = document.createElement('article');
       card.className = 'a11ytb-config-card a11ytb-collection-card';
       card.dataset.collectionId = collection.id;
+      card.dataset.depth = String(collection.depth || 0);
+      if ((collection.depth || 0) > 0) {
+        card.style.marginInlineStart = `${(collection.depth || 0) * 1.25}rem`;
+      } else {
+        card.style.marginInlineStart = '';
+      }
 
       const title = document.createElement('h4');
       title.className = 'a11ytb-config-title';
-      title.textContent = collection.label || collection.id;
+      const indentPrefix = collection.depth > 0 ? `${' '.repeat(collection.depth * 2)}⤷ ` : '';
+      const visibleLabel = collection.label || collection.id;
+      title.textContent = `${indentPrefix}${visibleLabel}`;
+      const accessibleTitle = collection.pathLabel || visibleLabel;
+      title.setAttribute('aria-label', accessibleTitle);
       card.append(title);
 
       if (collection.description) {
@@ -5452,6 +5553,12 @@ export function mountUI({ root, state, config = {} }) {
       toggle.className = 'a11ytb-button a11ytb-collection-toggle';
       toggle.dataset.collectionId = collection.id;
       toggle.dataset.collectionLabel = collection.label || collection.id;
+      toggle.dataset.collectionPath = collection.pathLabel || collection.label || collection.id;
+      if (collection.parentId) {
+        toggle.dataset.parentId = collection.parentId;
+      } else {
+        delete toggle.dataset.parentId;
+      }
       toggle.setAttribute('aria-pressed', 'true');
       toggle.textContent = `Désactiver ${collection.label || collection.id}`;
       toggle.addEventListener('click', () => {
@@ -5469,9 +5576,13 @@ export function mountUI({ root, state, config = {} }) {
           setListIfChanged('ui.collections.disabled', next, disabledList);
           markProfileAsCustom();
           const actionLabel = isCurrentlyDisabled ? 'Collection activée' : 'Collection désactivée';
-          logActivity(`${actionLabel} : ${collection.label || collection.id}`, { tone: isCurrentlyDisabled ? 'confirm' : 'toggle', tags: ['organisation'] });
+          const collectionDisplay = collection.pathLabel || collection.label || collection.id;
+          logActivity(`${actionLabel} : ${collectionDisplay}`, {
+            tone: isCurrentlyDisabled ? 'confirm' : 'toggle',
+            tags: ['organisation']
+          });
           const modulesText = moduleLabels.length ? ` Modules concernés : ${moduleLabels.join(', ')}.` : '';
-          announceOrganize(`${actionLabel} : ${collection.label || collection.id}.${modulesText}`.trim());
+          announceOrganize(`${actionLabel} : ${collectionDisplay}.${modulesText}`.trim());
         }
       });
       controls.append(toggle);

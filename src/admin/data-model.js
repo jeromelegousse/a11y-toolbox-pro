@@ -1,12 +1,12 @@
 import { moduleCatalog } from '../module-catalog.js';
-import { moduleCollections } from '../module-collections.js';
+import { flattenedModuleCollections } from '../module-collections.js';
 import { NAMESPACE_TO_MODULE } from './constants.js';
 import { ensureArray } from './utils.js';
 
-export const collectionLookup = new Map(moduleCollections.map((collection) => [collection.id, collection]));
+export const collectionLookup = new Map(flattenedModuleCollections.map((collection) => [collection.id, collection]));
 
 const moduleToCollections = new Map();
-moduleCollections.forEach((collection) => {
+flattenedModuleCollections.forEach((collection) => {
   const members = ensureArray(collection.modules);
   members.forEach((moduleId) => {
     if (!moduleToCollections.has(moduleId)) {
