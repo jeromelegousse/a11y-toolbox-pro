@@ -12,6 +12,26 @@ const DEFAULT_BLOCK_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidd
 export function mountUI({ root, state, config = {} }) {
   const pluginConfig = config || {};
   const behaviorConfig = pluginConfig.behavior || {};
+  const integrationsConfig = pluginConfig.integrations || {};
+  const activityIntegration = integrationsConfig.activity || {};
+  const activityWebhookUrl = typeof activityIntegration.webhookUrl === 'string'
+    ? activityIntegration.webhookUrl.trim()
+    : '';
+  const activityAuthToken = typeof activityIntegration.authToken === 'string'
+    ? activityIntegration.authToken
+    : '';
+  const fetchFn = typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : null;
+  const WEBHOOK_INITIAL_RETRY_DELAY = 2000;
+  const WEBHOOK_MAX_RETRY_DELAY = 30000;
+  const webhookState = {
+    enabled: Boolean(activityWebhookUrl),
+    url: activityWebhookUrl,
+    authToken: activityAuthToken,
+    queue: [],
+    processing: false,
+    retryTimer: null,
+    missingFetchNotified: false
+  };
   const AUTO_OPEN_STORAGE_KEY = 'a11ytb/auto-opened';
   const categories = [
     { id: 'all', label: 'Tous' },
@@ -2212,6 +2232,7 @@ export function mountUI({ root, state, config = {} }) {
     <summary>Activité récente</summary>
     <div class="a11ytb-activity-actions" role="group" aria-label="Exports du journal">
       <button type="button" class="a11ytb-btn-link" data-action="activity-export-json">Copier JSON</button>
+      <button type="button" class="a11ytb-btn-link" data-action="activity-send-webhook">Envoyer au webhook</button>
       <button type="button" class="a11ytb-btn-link" data-action="activity-export-csv">Exporter CSV</button>
     </div>
     <ol class="a11ytb-activity-list" data-ref="activity-list"></ol>
@@ -2433,13 +2454,6 @@ export function mountUI({ root, state, config = {} }) {
     });
     return disabled;
   }
-
-  const moduleElements = new Map();
-  const adminItems = new Map();
-  const dependencyViews = new Map();
-  const adminToolbarCounts = { active: null, hidden: null, pinned: null };
-  const organizeFilterToggles = new Map();
-  const collectionButtons = new Map();
 
   function refreshDependencyViews(snapshot) {
     const runtimeModules = snapshot?.runtime?.modules || state.get('runtime.modules') || {};
@@ -5368,7 +5382,6 @@ export function mountUI({ root, state, config = {} }) {
         btn.removeAttribute('aria-current');
       }
     });
-    const activeElement = document.activeElement;
     const nextViewElement = viewElements.get(currentView);
     let shouldRefocus = false;
 
@@ -5669,8 +5682,212 @@ export function mountUI({ root, state, config = {} }) {
     });
   }
 
+  function cloneWebhookPayload(value) {
+    if (value === undefined || value === null) {
+      return null;
+    }
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch (error) {
+      return { type: 'text', value: String(value) };
+    }
+  }
+
+  function serializeActivityEntryForWebhook(entry) {
+    return {
+      id: entry.id,
+      message: entry.message,
+      timestamp: entry.timestamp,
+      module: entry.module || null,
+      severity: entry.severity || null,
+      tone: entry.tone || null,
+      tags: Array.isArray(entry.tags) ? [...entry.tags] : [],
+      payload: cloneWebhookPayload(entry.payload ?? null)
+    };
+  }
+
+  function appendWebhookFeedback(message, options = {}) {
+    if (!message) return;
+    const tags = Array.isArray(options.tags) ? options.tags.filter(Boolean) : [];
+    const uniqueTags = Array.from(new Set(['webhook', ...tags]));
+    logActivity(message, {
+      tone: options.tone || 'info',
+      module: 'activity',
+      tags: uniqueTags,
+      payload: options.payload ?? null,
+      skipWebhook: true
+    });
+  }
+
+  function enqueueWebhookEntry(entry) {
+    if (!webhookState.enabled) return;
+    if (!fetchFn) {
+      if (!webhookState.missingFetchNotified) {
+        appendWebhookFeedback('Envoi webhook indisponible : API fetch non supportée par ce navigateur.', { tone: 'warning' });
+        webhookState.missingFetchNotified = true;
+      }
+      return;
+    }
+    const sanitized = serializeActivityEntryForWebhook(entry);
+    webhookState.queue.push({ type: 'single', entry: sanitized, attempts: 0 });
+    processWebhookQueue();
+  }
+
+  function enqueueWebhookBatch(entries) {
+    if (!webhookState.enabled) return;
+    if (!fetchFn) {
+      if (!webhookState.missingFetchNotified) {
+        appendWebhookFeedback('Envoi webhook indisponible : API fetch non supportée par ce navigateur.', { tone: 'warning' });
+        webhookState.missingFetchNotified = true;
+      }
+      return;
+    }
+    const sanitized = entries.map(serializeActivityEntryForWebhook).filter(Boolean);
+    if (!sanitized.length) return;
+    webhookState.queue.push({ type: 'bulk', entries: sanitized, attempts: 0 });
+  }
+
+  function scheduleWebhookRetry(delay) {
+    if (webhookState.retryTimer) {
+      clearTimeout(webhookState.retryTimer);
+    }
+    webhookState.retryTimer = setTimeout(() => {
+      webhookState.retryTimer = null;
+      processWebhookQueue();
+    }, delay);
+  }
+
+  async function dispatchWebhookJob(job) {
+    if (!fetchFn || !webhookState.enabled) {
+      return;
+    }
+
+    const headers = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json'
+    };
+
+    if (webhookState.authToken) {
+      headers.Authorization = `Bearer ${webhookState.authToken}`;
+    }
+
+    const page = typeof window !== 'undefined' && window?.location?.href ? window.location.href : undefined;
+    const basePayload = {
+      source: 'a11y-toolbox-pro',
+      sentAt: new Date().toISOString()
+    };
+
+    if (page) {
+      basePayload.page = page;
+    }
+
+    const body = job.type === 'bulk'
+      ? { ...basePayload, event: 'a11ytb.activity.bulk', entries: job.entries }
+      : { ...basePayload, event: 'a11ytb.activity.entry', entry: job.entry };
+
+    const response = await fetchFn(webhookState.url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body)
+    });
+
+    if (!response || response.ok !== true) {
+      let reason = 'Réponse invalide';
+
+      if (response) {
+        reason = `HTTP ${response.status}`;
+        if (typeof response.text === 'function') {
+          try {
+            const text = await response.text();
+            if (text) {
+              reason += ` – ${text.slice(0, 200)}`;
+            }
+          } catch (error) {
+            // ignore text parsing errors
+          }
+        }
+      }
+
+      const error = new Error(reason);
+      error.response = response;
+      throw error;
+    }
+  }
+
+  async function processWebhookQueue(force = false) {
+    if (!webhookState.enabled || !fetchFn) {
+      return;
+    }
+
+    if (webhookState.processing) {
+      return;
+    }
+
+    if (!webhookState.queue.length) {
+      return;
+    }
+
+    webhookState.processing = true;
+
+    try {
+      while (webhookState.queue.length) {
+        const job = webhookState.queue[0];
+
+        if (!force && typeof job.nextAttempt === 'number' && job.nextAttempt > Date.now()) {
+          scheduleWebhookRetry(Math.max(0, job.nextAttempt - Date.now()));
+          break;
+        }
+
+        try {
+          await dispatchWebhookJob(job);
+          webhookState.queue.shift();
+          delete job.nextAttempt;
+          job.attempts = 0;
+
+          if (!webhookState.queue.length && webhookState.retryTimer) {
+            clearTimeout(webhookState.retryTimer);
+            webhookState.retryTimer = null;
+          }
+
+          if (job.type === 'bulk') {
+            appendWebhookFeedback(`Webhook synchronisé (${job.entries.length} entrée(s)).`, {
+              tone: 'confirm',
+              tags: ['export'],
+              payload: {
+                type: 'webhook-delivery',
+                status: 'ok',
+                mode: 'manual',
+                count: job.entries.length
+              }
+            });
+          }
+        } catch (error) {
+          job.attempts = (job.attempts || 0) + 1;
+          const delay = Math.min(WEBHOOK_MAX_RETRY_DELAY, WEBHOOK_INITIAL_RETRY_DELAY * job.attempts);
+          job.nextAttempt = Date.now() + delay;
+          appendWebhookFeedback(`Échec d’envoi au webhook, nouvelle tentative dans ${Math.round(delay / 1000)}s.`, {
+            tone: 'warning',
+            payload: {
+              type: 'webhook-delivery',
+              status: 'error',
+              jobType: job.type,
+              retryInMs: delay,
+              attempts: job.attempts,
+              error: error?.message || 'Erreur réseau'
+            }
+          });
+          scheduleWebhookRetry(delay);
+          break;
+        }
+      }
+    } finally {
+      webhookState.processing = false;
+    }
+  }
+
   function logActivity(message, options = {}) {
     if (!message) return;
+    const skipWebhook = options.skipWebhook === true;
     const current = getActivityEntries();
     const now = Date.now();
     const moduleId = options.module || options.moduleId || null;
@@ -5715,6 +5932,10 @@ export function mountUI({ root, state, config = {} }) {
       presetToPlay = tone;
     }
 
+    if (!skipWebhook) {
+      enqueueWebhookEntry(entry);
+    }
+
     if (shouldPlayEarcon && typeof presetToPlay === 'string' && presetToPlay) {
       window.a11ytb?.feedback?.play(presetToPlay);
     } else if (!hasEventsObject && tone) {
@@ -5757,6 +5978,47 @@ export function mountUI({ root, state, config = {} }) {
       entry.payload ? JSON.stringify(entry.payload) : ''
     ]);
     return [header.join(','), ...rows.map(row => row.map(escapeCsvValue).join(','))].join('\n');
+  }
+
+  function triggerManualWebhookSend() {
+    if (!webhookState.enabled) {
+      appendWebhookFeedback('Aucun webhook configuré. Ajoutez une URL pour activer les envois.', {
+        tone: 'warning',
+        tags: ['export']
+      });
+      return;
+    }
+
+    const entries = getActivityEntries();
+
+    if (!entries.length) {
+      appendWebhookFeedback('Aucune activité à envoyer pour le moment.', {
+        tone: 'info',
+        tags: ['export']
+      });
+      return;
+    }
+
+    const previousQueueSize = webhookState.queue.length;
+
+    enqueueWebhookBatch(entries);
+
+    if (webhookState.queue.length === previousQueueSize) {
+      return;
+    }
+
+    appendWebhookFeedback(`Envoi manuel de ${entries.length} entrée(s) au webhook`, {
+      tone: 'info',
+      tags: ['export'],
+      payload: {
+        type: 'webhook-delivery',
+        status: 'queued',
+        mode: 'manual',
+        count: entries.length
+      }
+    });
+
+    processWebhookQueue(true);
   }
 
   function downloadText(filename, text, mime = 'text/plain') {
@@ -5975,6 +6237,8 @@ export function mountUI({ root, state, config = {} }) {
       const payload = serializeActivityToCSV(entries);
       downloadText('a11ytb-activity.csv', payload, 'text/csv');
       logActivity('Journal exporté (CSV)', { tone: 'confirm', module: 'activity', tags: ['export', 'csv'] });
+    } else if (action.dataset.action === 'activity-send-webhook') {
+      triggerManualWebhookSend();
     } else if (action.dataset.action === 'activity-open-audit') {
       toggle(true);
       state.set('ui.view', 'modules');
@@ -6075,8 +6339,14 @@ export function mountUI({ root, state, config = {} }) {
     logActivity('Sortie braille effacée', { tone: 'toggle' });
   };
 
-  Object.defineProperty(window, 'sttStatus', { get() { return state.get('stt.status'); } });
-  Object.defineProperty(window, 'brailleOut', { get() { return state.get('braille.output'); } });
+  Object.defineProperty(window, 'sttStatus', {
+    configurable: true,
+    get() { return state.get('stt.status'); }
+  });
+  Object.defineProperty(window, 'brailleOut', {
+    configurable: true,
+    get() { return state.get('braille.output'); }
+  });
 
   state.on((snapshot) => {
     syncCollectionStructures(snapshot);
