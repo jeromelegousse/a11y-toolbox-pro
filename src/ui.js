@@ -2434,13 +2434,6 @@ export function mountUI({ root, state, config = {} }) {
     return disabled;
   }
 
-  const moduleElements = new Map();
-  const adminItems = new Map();
-  const dependencyViews = new Map();
-  const adminToolbarCounts = { active: null, hidden: null, pinned: null };
-  const organizeFilterToggles = new Map();
-  const collectionButtons = new Map();
-
   function refreshDependencyViews(snapshot) {
     const runtimeModules = snapshot?.runtime?.modules || state.get('runtime.modules') || {};
     dependencyViews.forEach((views, moduleId) => {
@@ -5370,7 +5363,13 @@ export function mountUI({ root, state, config = {} }) {
     });
     const activeElement = document.activeElement;
     const nextViewElement = viewElements.get(currentView);
-    let shouldRefocus = false;
+    const previousViewElement = activeViewId ? viewElements.get(activeViewId) : null;
+    let shouldRefocus = Boolean(
+      activeElement
+      && previousViewElement
+      && previousViewElement !== nextViewElement
+      && previousViewElement.contains(activeElement)
+    );
 
     viewElements.forEach((element, id) => {
       const isActive = id === currentView;
