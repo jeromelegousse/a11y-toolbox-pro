@@ -2434,13 +2434,6 @@ export function mountUI({ root, state, config = {} }) {
     return disabled;
   }
 
-  const moduleElements = new Map();
-  const adminItems = new Map();
-  const dependencyViews = new Map();
-  const adminToolbarCounts = { active: null, hidden: null, pinned: null };
-  const organizeFilterToggles = new Map();
-  const collectionButtons = new Map();
-
   function refreshDependencyViews(snapshot) {
     const runtimeModules = snapshot?.runtime?.modules || state.get('runtime.modules') || {};
     dependencyViews.forEach((views, moduleId) => {
@@ -5384,6 +5377,9 @@ export function mountUI({ root, state, config = {} }) {
         element.style.visibility = 'hidden';
         element.setAttribute('hidden', '');
         element.setAttribute('aria-hidden', 'true');
+        if (!shouldRefocus && element && activeElement && element.contains(activeElement)) {
+          shouldRefocus = true;
+        }
       }
     });
 
