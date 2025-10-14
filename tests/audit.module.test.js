@@ -55,39 +55,71 @@ describe('audit module — axe loader fallback', () => {
     expect(axe).toBe(axeMock);
   });
 
-  it('bascule sur le CDN si l\'import échoue', async () => {
+  it('charge axe-core depuis le script local vendorié par défaut', async () => {
     const scripts = [];
     document.createElement = vi.fn((tag) => {
       if (tag !== 'script') throw new Error('Expected script tag');
       return createScriptStub(scripts);
     });
     document.head.appendChild = vi.fn((node) => {
+      expect(node.src).toBe(testing.LOCAL_AXE_CORE_SRC);
       window.axe = { run: vi.fn() };
       node.onload?.();
     });
 
-    const importModule = vi.fn().mockRejectedValue(new Error('dynamic import failed'));
+    const axe = await testing.loadAxeCore();
 
-    const axe = await testing.loadAxeCore({ importModule });
-
-    expect(importModule).toHaveBeenCalledTimes(1);
     expect(document.createElement).toHaveBeenCalledWith('script');
     expect(document.head.appendChild).toHaveBeenCalledTimes(1);
-    expect(scripts[0].src).toBe(testing.CDN_AXE_CORE_SRC);
+    expect(scripts[0].src).toBe(testing.LOCAL_AXE_CORE_SRC);
     expect(axe).toBe(window.axe);
   });
 
-  it('réinitialise les loaders si le CDN échoue', async () => {
-    const importModule = vi.fn().mockRejectedValue(new Error('dynamic import failed'));
+  it('bascule sur le CDN si le chargement local échoue', async () => {
+    const scripts = [];
     document.createElement = vi.fn((tag) => {
       if (tag !== 'script') throw new Error('Expected script tag');
-      return createScriptStub([]);
+      return createScriptStub(scripts);
     });
     document.head.appendChild = vi.fn((node) => {
+      if (scripts.length === 1) {
+        expect(node.src).toBe(testing.LOCAL_AXE_CORE_SRC);
+        node.onerror?.(new Error('local failed'));
+        return;
+      }
+      expect(node.src).toBe(testing.CDN_AXE_CORE_SRC);
+      expect(node.integrity).toBe(testing.CDN_AXE_CORE_INTEGRITY);
+      expect(node.crossOrigin).toBe('anonymous');
+      window.axe = { run: vi.fn() };
+      node.onload?.();
+    });
+
+    const axe = await testing.loadAxeCore();
+
+    expect(document.createElement).toHaveBeenCalledWith('script');
+    expect(document.head.appendChild).toHaveBeenCalledTimes(2);
+    expect(scripts[0].src).toBe(testing.LOCAL_AXE_CORE_SRC);
+    expect(scripts[1].src).toBe(testing.CDN_AXE_CORE_SRC);
+    expect(scripts[1].integrity).toBe(testing.CDN_AXE_CORE_INTEGRITY);
+    expect(scripts[1].crossOrigin).toBe('anonymous');
+    expect(axe).toBe(window.axe);
+  });
+
+  it('réinitialise les loaders si le CDN échoue après l’actif local', async () => {
+    const scripts = [];
+    document.createElement = vi.fn((tag) => {
+      if (tag !== 'script') throw new Error('Expected script tag');
+      return createScriptStub(scripts);
+    });
+    document.head.appendChild = vi.fn((node) => {
+      if (scripts.length === 1) {
+        node.onerror?.(new Error('local failed'));
+        return;
+      }
       node.onerror?.(new Error('cdn failed'));
     });
 
-    await expect(testing.loadAxeCore({ importModule })).rejects.toThrow('axe-core indisponible');
+    await expect(testing.loadAxeCore()).rejects.toThrow('axe-core indisponible');
 
     const axeMock = { run: vi.fn() };
     const importSuccess = vi.fn().mockResolvedValue({ default: axeMock });

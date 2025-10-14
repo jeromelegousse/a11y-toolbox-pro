@@ -18,6 +18,177 @@ if (!defined('ABSPATH')) {
 const A11YTB_PLUGIN_VERSION = '1.0.0';
 
 /**
+ * Retourne la clé de chiffrement dérivée des salts WordPress.
+ */
+function a11ytb_get_secret_encryption_key(): string
+{
+    static $derived = null;
+
+    if (is_string($derived)) {
+        return $derived;
+    }
+
+    $salt = wp_salt('a11ytb_gemini_api_key');
+
+    if (function_exists('sodium_crypto_generichash') && defined('SODIUM_CRYPTO_SECRETBOX_KEYBYTES')) {
+        $derived = sodium_crypto_generichash($salt, '', SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
+    } else {
+        $derived = hash('sha256', $salt, true);
+    }
+
+    return $derived;
+}
+
+/**
+ * Chiffre un secret en utilisant Sodium ou OpenSSL selon disponibilité.
+ */
+function a11ytb_encrypt_secret(string $secret): ?string
+{
+    if ($secret === '') {
+        return '';
+    }
+
+    $key = a11ytb_get_secret_encryption_key();
+
+    if (
+        function_exists('sodium_crypto_secretbox')
+        && defined('SODIUM_CRYPTO_SECRETBOX_NONCEBYTES')
+        && defined('SODIUM_CRYPTO_SECRETBOX_KEYBYTES')
+    ) {
+        try {
+            $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+        } catch (Exception $exception) {
+            $nonce = false;
+        }
+
+        if ($nonce !== false) {
+            $ciphertext = sodium_crypto_secretbox($secret, $nonce, $key);
+
+            return 's:' . base64_encode($nonce . $ciphertext);
+        }
+    }
+
+    if (function_exists('openssl_encrypt')) {
+        try {
+            $iv = random_bytes(12);
+        } catch (Exception $exception) {
+            $iv = false;
+        }
+
+        if ($iv !== false) {
+            $tag = '';
+            $ciphertext = openssl_encrypt($secret, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag);
+
+            if ($ciphertext !== false && is_string($tag)) {
+                return 'o1:' . base64_encode($iv . $tag . $ciphertext);
+            }
+        }
+
+        try {
+            $iv = random_bytes(16);
+        } catch (Exception $exception) {
+            $iv = false;
+        }
+
+        if ($iv !== false) {
+            $ciphertext = openssl_encrypt($secret, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+
+            if ($ciphertext !== false) {
+                $mac = hash_hmac('sha256', $ciphertext, $key, true);
+
+                return 'o2:' . base64_encode($iv . $mac . $ciphertext);
+            }
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Déchiffre un secret précédemment chiffré.
+ */
+function a11ytb_decrypt_secret($value): ?string
+{
+    if (!is_string($value) || $value === '') {
+        return '';
+    }
+
+    $prefix = substr($value, 0, 3);
+    $payload = substr($value, 3);
+
+    if (strpos($value, 's:') === 0) {
+        if (
+            !function_exists('sodium_crypto_secretbox_open')
+            || !defined('SODIUM_CRYPTO_SECRETBOX_NONCEBYTES')
+        ) {
+            return null;
+        }
+
+        $encoded = substr($value, 2);
+        $decoded = base64_decode($encoded, true);
+
+        if ($decoded === false || strlen($decoded) <= SODIUM_CRYPTO_SECRETBOX_NONCEBYTES) {
+            return null;
+        }
+
+        $nonce = substr($decoded, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+        $ciphertext = substr($decoded, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+        $key = a11ytb_get_secret_encryption_key();
+        $plaintext = sodium_crypto_secretbox_open($ciphertext, $nonce, $key);
+
+        return $plaintext === false ? null : $plaintext;
+    }
+
+    if ($prefix === 'o1:') {
+        if (!function_exists('openssl_decrypt')) {
+            return null;
+        }
+
+        $decoded = base64_decode($payload, true);
+
+        if ($decoded === false || strlen($decoded) <= 28) {
+            return null;
+        }
+
+        $iv = substr($decoded, 0, 12);
+        $tag = substr($decoded, 12, 16);
+        $ciphertext = substr($decoded, 28);
+        $key = a11ytb_get_secret_encryption_key();
+        $plaintext = openssl_decrypt($ciphertext, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag);
+
+        return $plaintext === false ? null : $plaintext;
+    }
+
+    if ($prefix === 'o2:') {
+        if (!function_exists('openssl_decrypt')) {
+            return null;
+        }
+
+        $decoded = base64_decode($payload, true);
+
+        if ($decoded === false || strlen($decoded) <= 48) {
+            return null;
+        }
+
+        $iv = substr($decoded, 0, 16);
+        $mac = substr($decoded, 16, 32);
+        $ciphertext = substr($decoded, 48);
+        $key = a11ytb_get_secret_encryption_key();
+        $calculated_mac = hash_hmac('sha256', $ciphertext, $key, true);
+
+        if (!hash_equals($mac, $calculated_mac)) {
+            return null;
+        }
+
+        $plaintext = openssl_decrypt($ciphertext, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+
+        return $plaintext === false ? null : $plaintext;
+    }
+
+    return $value;
+}
+
+/**
  * Enregistre les ressources communes utilisées par le plugin.
  */
 function a11ytb_register_assets(): void
@@ -147,9 +318,28 @@ function a11ytb_sanitize_secret($value): string
         return '';
     }
 
-    $normalized = trim($value);
+    $normalized = sanitize_text_field(trim($value));
 
-    return sanitize_text_field($normalized);
+    if ($normalized === '') {
+        return '';
+    }
+
+    $encrypted = a11ytb_encrypt_secret($normalized);
+
+    if (is_string($encrypted)) {
+        return $encrypted;
+    }
+
+    add_settings_error(
+        'a11ytb_options',
+        'a11ytb_options_encryption_error',
+        esc_html__('Impossible de chiffrer la clé fournie. La valeur précédente a été conservée.', 'a11ytb'),
+        'error'
+    );
+
+    $previous = get_option('a11ytb_gemini_api_key', '');
+
+    return is_string($previous) ? $previous : '';
 }
 
 /**
@@ -389,12 +579,15 @@ function a11ytb_render_auto_open_field(): void
  */
 function a11ytb_render_gemini_key_field(): void
 {
-    $value = get_option('a11ytb_gemini_api_key', '');
+    $stored = get_option('a11ytb_gemini_api_key', '');
+    $decrypted = a11ytb_decrypt_secret($stored);
+    $decryption_failed = ($stored !== '' && $decrypted === null);
+    $value = ($decrypted === null) ? '' : (string) $decrypted;
     ?>
     <input type="password" id="a11ytb_gemini_api_key" name="a11ytb_gemini_api_key" value="<?php echo esc_attr($value); ?>" autocomplete="off" class="regular-text" />
     <p class="description">
         <?php
-        if ($value) {
+        if ($value !== '') {
             printf(
                 /* translators: %s: masked api key */
                 esc_html__('Clé actuelle : %s', 'a11ytb'),
@@ -402,7 +595,11 @@ function a11ytb_render_gemini_key_field(): void
             );
             echo '<br />';
         }
-        esc_html_e('La clé est stockée chiffrée dans la base WordPress et uniquement visible des administrateurs.', 'a11ytb');
+        if ($decryption_failed) {
+            esc_html_e('La clé enregistrée n’a pas pu être déchiffrée. Veuillez vérifier vos salts WordPress ou saisir une nouvelle valeur.', 'a11ytb');
+            echo '<br />';
+        }
+        esc_html_e('Les clés sont chiffrées via les salts WordPress avant d’être stockées en base de données.', 'a11ytb');
         ?>
     </p>
     <?php
@@ -617,7 +814,10 @@ function a11ytb_render_admin_page(): void
 {
     $is_enabled = a11ytb_is_enabled();
     $preview_url = plugins_url('index.html', __FILE__);
-    $gemini_api_key = get_option('a11ytb_gemini_api_key', '');
+    $stored_gemini_api_key = get_option('a11ytb_gemini_api_key', '');
+    $decrypted_gemini_api_key = a11ytb_decrypt_secret($stored_gemini_api_key);
+    $gemini_key_error = ($stored_gemini_api_key !== '' && $decrypted_gemini_api_key === null);
+    $gemini_api_key = ($decrypted_gemini_api_key === null) ? '' : (string) $decrypted_gemini_api_key;
     $gemini_quota = (int) get_option('a11ytb_gemini_quota', 15);
     ?>
     <div class="wrap a11ytb-admin-page">
@@ -664,6 +864,23 @@ function a11ytb_render_admin_page(): void
                     class="regular-text"
                     autocomplete="off"
                 />
+                <p class="description">
+                    <?php
+                    if ($gemini_api_key !== '') {
+                        printf(
+                            /* translators: %s: masked api key */
+                            esc_html__('Clé actuelle : %s', 'a11ytb'),
+                            esc_html(a11ytb_mask_secret($gemini_api_key))
+                        );
+                        echo '<br />';
+                    }
+                    if ($gemini_key_error) {
+                        esc_html_e('La clé enregistrée n’a pas pu être déchiffrée. Veuillez vérifier vos salts WordPress ou saisir une nouvelle valeur.', 'a11ytb');
+                        echo '<br />';
+                    }
+                    esc_html_e('Les clés sont chiffrées via les salts WordPress avant d’être stockées en base de données.', 'a11ytb');
+                    ?>
+                </p>
             </div>
 
             <div class="a11ytb-admin-field">

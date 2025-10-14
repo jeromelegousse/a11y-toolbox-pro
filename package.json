@@ -5,13 +5,15 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
+    "lint:axe": "node scripts/check-axe-core.mjs",
     "lint:js": "eslint src --max-warnings=0",
     "lint:css": "stylelint \"src/**/*.css\"",
-    "lint": "npm run lint:js && npm run lint:css",
+    "lint": "npm run lint:axe && npm run lint:js && npm run lint:css",
     "test:unit": "vitest run",
     "test:visual": "playwright test",
     "test": "npm run lint && npm run test:unit && npm run test:visual",
-    "demo:stt": "node scripts/integrations/demo-stt.js"
+    "demo:stt": "node scripts/integrations/demo-stt.js",
+    "sync:axe": "node scripts/sync-axe-core.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.42.1",
