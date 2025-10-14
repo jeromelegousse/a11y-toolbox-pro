@@ -652,6 +652,13 @@
   color: var(--a11ytb-admin-muted);
 }
 
+.a11ytb-admin-gemini {
+  margin: 0;
+  font-size: 12px;
+  color: var(--a11ytb-admin-muted);
+  flex-basis: 100%;
+}
+
 .a11ytb-sr-only {
   position: absolute;
   width: 1px;
