@@ -83,6 +83,8 @@ const profilePresets = {
   }
 };
 
+const initialCollectionId = moduleCollections[0]?.id ?? null;
+
 const normalizedManifests = [
   registerModuleManifest(audioManifest, audioManifest.id),
   ...moduleCatalog.map(({ id, manifest }) => registerModuleManifest(manifest, id))
@@ -93,6 +95,8 @@ const baseInitial = {
     dock: 'right',
     category: 'all',
     search: '',
+    moduleLayout: 'double-column',
+    moduleFlyoutOpen: false,
     fullscreen: false,
     pinned: [],
     hidden: [],
@@ -115,7 +119,12 @@ const baseInitial = {
       cursors: {}
     },
     collections: {
-      disabled: []
+      disabled: [],
+      presets: {},
+      builder: {
+        activeCollectionId: initialCollectionId,
+        drafts: {}
+      }
     },
     shortcuts: {
       overrides: {},
@@ -235,6 +244,8 @@ window.a11ytb.feedback = feedback;
 const ensureDefaults = [
   ['ui.category', initial.ui.category],
   ['ui.search', initial.ui.search],
+  ['ui.moduleLayout', initial.ui.moduleLayout],
+  ['ui.moduleFlyoutOpen', initial.ui.moduleFlyoutOpen],
   ['ui.fullscreen', initial.ui.fullscreen],
   ['ui.pinned', initial.ui.pinned],
   ['ui.hidden', initial.ui.hidden],
