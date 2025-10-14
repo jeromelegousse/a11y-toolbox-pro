@@ -1,4 +1,4 @@
-import { AUDIO_SEVERITIES, DEFAULT_AUDIO_VOLUME, normalizeAudioEvents } from './audio-config.js';
+import { AUDIO_SEVERITIES, DEFAULT_AUDIO_THEME, DEFAULT_AUDIO_VOLUME, normalizeAudioEvents } from './audio-config.js';
 
 function clampVolume(value, fallback = DEFAULT_AUDIO_VOLUME) {
   const numeric = Number(value);
@@ -18,6 +18,9 @@ export function setupAudioFeedback({ state, feedback }) {
     const eventsConfig = normalizeAudioEvents(audio.events);
     const payload = {
       volume: clampVolume(audio.volume, DEFAULT_AUDIO_VOLUME),
+      theme: typeof audio.theme === 'string' && audio.theme.trim()
+        ? audio.theme.trim()
+        : DEFAULT_AUDIO_THEME,
       events: {}
     };
     AUDIO_SEVERITIES.forEach((severity) => {
