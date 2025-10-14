@@ -5383,6 +5383,9 @@ export function mountUI({ root, state, config = {} }) {
         element.style.visibility = 'hidden';
         element.setAttribute('hidden', '');
         element.setAttribute('aria-hidden', 'true');
+        if (!shouldRefocus && element && activeElement && element.contains(activeElement)) {
+          shouldRefocus = true;
+        }
       }
     });
 
