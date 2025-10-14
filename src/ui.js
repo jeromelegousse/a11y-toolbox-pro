@@ -5439,6 +5439,7 @@ export function mountUI({ root, state, config = {} }) {
   function syncView() {
     const prefs = getPreferences();
     const currentView = prefs.view || 'modules';
+    const activeElement = typeof document !== 'undefined' ? document.activeElement : null;
     viewButtons.forEach((btn, id) => {
       const active = id === currentView;
       btn.classList.toggle('is-active', active);
