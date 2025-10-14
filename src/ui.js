@@ -5363,7 +5363,13 @@ export function mountUI({ root, state, config = {} }) {
     });
     const activeElement = document.activeElement;
     const nextViewElement = viewElements.get(currentView);
-    let shouldRefocus = false;
+    const previousViewElement = activeViewId ? viewElements.get(activeViewId) : null;
+    let shouldRefocus = Boolean(
+      activeElement
+      && previousViewElement
+      && previousViewElement !== nextViewElement
+      && previousViewElement.contains(activeElement)
+    );
 
     viewElements.forEach((element, id) => {
       const isActive = id === currentView;
