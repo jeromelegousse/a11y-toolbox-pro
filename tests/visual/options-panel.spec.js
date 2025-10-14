@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { readFile, writeFile } from 'node:fs/promises';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -21,57 +21,11 @@ const extractBaselinePayload = (svg) => {
   return match[1];
 };
 
-function getPngDimensions(buffer) {
-  return {
-    width: buffer.readUInt32BE(16),
-    height: buffer.readUInt32BE(20)
-  };
-}
+const BASELINE_SCREENSHOT = shouldUpdateBaseline || !existsSync(BASELINE_PATH)
+  ? null
+  : extractBaselinePayload(readFileSync(BASELINE_PATH, 'utf8'));
 
-function computeScreenshotHash(buffer) {
-  return createHash('sha256').update(buffer).digest('hex');
-}
-
-let baselineDataPromise;
-
-async function readBaselineData() {
-  if (shouldUpdateBaseline) {
-    throw new Error(
-      'La lecture de la capture de référence est désactivée lorsque ' +
-        'UPDATE_VISUAL_BASELINE=1.'
-    );
-  }
-
-  if (!baselineDataPromise) {
-    baselineDataPromise = (async () => {
-      let svg;
-      try {
-        svg = await readFile(BASELINE_PATH, 'utf8');
-      } catch (error) {
-        if (error && error.code === 'ENOENT') {
-          throw new Error(
-            `Aucune capture de référence disponible pour ${BASELINE_PATH}. ` +
-              'Définissez UPDATE_VISUAL_BASELINE=1 pour générer une nouvelle base.'
-          );
-        }
-        throw error;
-      }
-
-      const base64Payload = extractBaselinePayload(svg);
-      const buffer = Buffer.from(base64Payload, 'base64');
-      const { width, height } = getPngDimensions(buffer);
-
-      return {
-        width,
-        height,
-        sha256: computeScreenshotHash(buffer),
-        buffer
-      };
-    })();
-  }
-
-  return baselineDataPromise;
-}
+const BASELINE_DATA = shouldUpdateBaseline ? null : readBaselineData();
 
 const focusableSelectors = [
   'a[href]',
