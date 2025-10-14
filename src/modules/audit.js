@@ -5,9 +5,12 @@ import { normalizeAxeReport, summarizeReport } from './audit-report.js';
 export { manifest };
 
 const AXE_CORE_VERSION = '4.11.0';
+const LOCAL_AXE_CORE_SRC = new URL('../../assets/vendor/axe-core/axe.min.js', import.meta.url).href;
 const CDN_AXE_CORE_SRC = `https://cdn.jsdelivr.net/npm/axe-core@${AXE_CORE_VERSION}/axe.min.js`;
+const CDN_AXE_CORE_INTEGRITY = 'sha384-C9AUAqw5Tb7bgiS/Z+U3EGEzD+qn2oE0sJOC4kp0Xu8DcQMLKECMpbVsuWxF+rdh';
 
 let axeLoader = null;
+let axeLocalLoader = null;
 let axeCdnLoader = null;
 
 function resolveAxe(module) {
@@ -16,6 +19,56 @@ function resolveAxe(module) {
     throw new Error('axe-core indisponible');
   }
   return axe;
+}
+
+function loadAxeFromLocal() {
+  if (window.axe && typeof window.axe.run === 'function') {
+    return Promise.resolve(window.axe);
+  }
+  if (!axeLocalLoader) {
+    axeLocalLoader = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = LOCAL_AXE_CORE_SRC;
+      script.async = true;
+      script.onload = () => {
+        if (window.axe && typeof window.axe.run === 'function') {
+          resolve(window.axe);
+        } else {
+          reject(new Error('axe-core indisponible'));
+        }
+      };
+      script.onerror = () => {
+        reject(new Error('axe-core indisponible'));
+      };
+      document.head.appendChild(script);
+    }).catch((error) => {
+      axeLocalLoader = null;
+      throw error;
+    });
+  }
+  return axeLocalLoader;
+}
+
+function loadAxeCore({ importModule } = {}) {
+  if (!axeLoader) {
+    const load = importModule || loadAxeFromLocal;
+    axeLoader = Promise.resolve()
+      .then(() => load())
+      .then(resolveAxe)
+      .catch((error) => {
+        if (load !== loadAxeFromLocal) {
+          throw error;
+        }
+        // Fallback réseau conservé pour compatibilité, vérifier la provenance avant activation hors réseau de confiance.
+        console.warn('a11ytb: chargement local axe-core échoué, tentative via CDN.', error);
+        return loadAxeFromCdn().then(resolveAxe);
+      })
+      .catch((error) => {
+        axeLoader = null;
+        throw error;
+      });
+  }
+  return axeLoader;
 }
 
 function loadAxeFromCdn() {
@@ -27,6 +80,8 @@ function loadAxeFromCdn() {
       const script = document.createElement('script');
       script.src = CDN_AXE_CORE_SRC;
       script.async = true;
+      script.integrity = CDN_AXE_CORE_INTEGRITY;
+      script.crossOrigin = 'anonymous';
       script.onload = () => {
         if (window.axe && typeof window.axe.run === 'function') {
           resolve(window.axe);
@@ -46,25 +101,9 @@ function loadAxeFromCdn() {
   return axeCdnLoader;
 }
 
-function loadAxeCore({ importModule } = {}) {
-  if (!axeLoader) {
-    const load = importModule || (() => import('axe-core'));
-    axeLoader = load()
-      .then(resolveAxe)
-      .catch((error) => {
-        console.warn('a11ytb: import axe-core échoué, tentative via CDN.', error);
-        return loadAxeFromCdn();
-      })
-      .catch((error) => {
-        axeLoader = null;
-        throw error;
-      });
-  }
-  return axeLoader;
-}
-
 function resetAxeLoaders() {
   axeLoader = null;
+  axeLocalLoader = null;
   axeCdnLoader = null;
 }
 
@@ -156,7 +195,10 @@ registerModule(auditModule);
 
 export const __testing = {
   CDN_AXE_CORE_SRC,
+  CDN_AXE_CORE_INTEGRITY,
+  LOCAL_AXE_CORE_SRC,
   resolveAxe,
+  loadAxeFromLocal,
   loadAxeFromCdn,
   loadAxeCore,
   resetAxeLoaders
