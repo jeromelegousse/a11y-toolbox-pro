@@ -5430,7 +5430,13 @@ export function mountUI({ root, state, config = {} }) {
     });
     const activeElement = document.activeElement;
     const nextViewElement = viewElements.get(currentView);
-    let shouldRefocus = false;
+    const previousViewElement = activeViewId ? viewElements.get(activeViewId) : null;
+    let shouldRefocus = Boolean(
+      activeElement
+      && previousViewElement
+      && previousViewElement !== nextViewElement
+      && previousViewElement.contains(activeElement)
+    );
 
     viewElements.forEach((element, id) => {
       const isActive = id === currentView;
@@ -5444,6 +5450,9 @@ export function mountUI({ root, state, config = {} }) {
         element.style.visibility = 'hidden';
         element.setAttribute('hidden', '');
         element.setAttribute('aria-hidden', 'true');
+        if (!shouldRefocus && element && activeElement && element.contains(activeElement)) {
+          shouldRefocus = true;
+        }
       }
     });
 
