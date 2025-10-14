@@ -7,9 +7,13 @@ vi.mock('../src/registry.js', () => {
     { id: 'beta-block', moduleId: 'beta' },
     { id: 'gamma-block', moduleId: 'gamma' }
   ];
+  let manifests = [];
+  let manifestHistory = [];
   return {
     getModule: (id) => modules.get(id),
     listBlocks: () => blocks,
+    listModuleManifests: () => manifests,
+    listModuleManifestHistory: () => manifestHistory,
     __setMockModule(id, mod) {
       modules.set(id, mod);
     },
@@ -18,12 +22,23 @@ vi.mock('../src/registry.js', () => {
     },
     __setMockBlocks(next) {
       blocks = next;
+    },
+    __setMockManifests(next) {
+      manifests = next;
+    },
+    __setMockManifestHistory(next) {
+      manifestHistory = next;
     }
   };
 });
 
 import { setupModuleRuntime } from '../src/module-runtime.js';
-import { __setMockModule, __resetMockModules } from '../src/registry.js';
+import {
+  __setMockModule,
+  __resetMockModules,
+  __setMockManifests,
+  __setMockManifestHistory
+} from '../src/registry.js';
 
 function createStateMock(initial = {}) {
   let data = structuredClone(initial);
@@ -62,6 +77,8 @@ describe('setupModuleRuntime — dépendances', () => {
     __setMockModule('alpha', { init: vi.fn() });
     __setMockModule('beta', { init: vi.fn() });
     __setMockModule('gamma', { init: vi.fn() });
+    __setMockManifests([]);
+    __setMockManifestHistory([]);
   });
 
   it('résout les dépendances et les versions disponibles', () => {
@@ -90,6 +107,7 @@ describe('setupModuleRuntime — dépendances', () => {
       }
     ];
 
+    __setMockManifests(catalog.map((entry) => ({ ...entry.manifest })));
     setupModuleRuntime({ state, catalog });
 
     const alphaRuntime = state.get('runtime.modules.alpha');
@@ -137,6 +155,7 @@ describe('setupModuleRuntime — dépendances', () => {
       }
     ];
 
+    __setMockManifests(catalog.map((entry) => ({ ...entry.manifest })));
     setupModuleRuntime({ state, catalog });
 
     const gammaRuntime = state.get('runtime.modules.gamma');
@@ -173,6 +192,7 @@ describe('setupModuleRuntime — dépendances', () => {
       }
     ];
 
+    __setMockManifests(catalog.map((entry) => ({ ...entry.manifest })));
     setupModuleRuntime({ state, catalog });
 
     expect(window.a11ytb.logActivity).toHaveBeenCalledWith(

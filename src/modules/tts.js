@@ -8,6 +8,8 @@ let store = null;
 let voicesListener = null;
 let voicesInterval = null;
 let voicesIntervalTimeout = null;
+let preferredLangUnsubscribe = null;
+let lastPreferredLang = '';
 
 function clearVoicesWatchers() {
   if (voicesListener && 'speechSynthesis' in window && typeof window.speechSynthesis.removeEventListener === 'function') {
@@ -22,6 +24,26 @@ function clearVoicesWatchers() {
     clearTimeout(voicesIntervalTimeout);
     voicesIntervalTimeout = null;
   }
+}
+
+function detachPreferredLangWatcher() {
+  if (typeof preferredLangUnsubscribe === 'function') {
+    preferredLangUnsubscribe();
+  }
+  preferredLangUnsubscribe = null;
+}
+
+function attachPreferredLangWatcher() {
+  if (!store || typeof store.on !== 'function') return;
+  detachPreferredLangWatcher();
+  lastPreferredLang = store.get('tts.preferredLang') || '';
+  preferredLangUnsubscribe = store.on((snapshot) => {
+    const nextPreferred = snapshot?.tts?.preferredLang ?? '';
+    if (nextPreferred !== lastPreferredLang) {
+      lastPreferredLang = nextPreferred;
+      updateVoices();
+    }
+  });
 }
 
 function getSelectionText() {
@@ -112,17 +134,46 @@ function updateVoices() {
   if (!voicesEqual(current, mapped)) {
     store.set('tts.availableVoices', mapped);
   }
-  const selected = store.get('tts.voice');
-  if (!selected || !mapped.some((voice) => voice.voiceURI === selected)) {
-    const docLang = (document.documentElement.lang || '').toLowerCase();
-    const langPrefix = docLang.split('-')[0];
-    const preferredByLang = mapped.find((voice) => voice.lang?.toLowerCase().startsWith(docLang))
-      || mapped.find((voice) => voice.lang?.toLowerCase().startsWith(langPrefix));
-    const fallback = mapped.find((voice) => voice.default) || mapped[0];
-    const nextVoice = preferredByLang || fallback;
-    if (nextVoice) {
-      store.set('tts.voice', nextVoice.voiceURI);
+  const selectedId = store.get('tts.voice');
+  const preferredLang = (store.get('tts.preferredLang') || '').toLowerCase();
+  const selectedVoice = mapped.find((voice) => voice.voiceURI === selectedId) || null;
+  const docLang = (document.documentElement.lang || '').toLowerCase();
+  const docLangPrefix = docLang.split('-')[0];
+  const navigatorLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
+  const navigatorLangPrefix = navigatorLang.split('-')[0];
+  const preferences = [];
+  const addPreference = (value) => {
+    const normalized = (value || '').toLowerCase();
+    if (!normalized) return;
+    if (!preferences.includes(normalized)) preferences.push(normalized);
+  };
+  addPreference(preferredLang);
+  addPreference(docLang);
+  addPreference(docLangPrefix);
+  addPreference(navigatorLang);
+  addPreference(navigatorLangPrefix);
+  const matchPreference = () => {
+    for (const pref of preferences) {
+      const match = mapped.find((voice) => voice.lang?.toLowerCase().startsWith(pref));
+      if (match) return match;
     }
+    return null;
+  };
+  const fallback = mapped.find((voice) => voice.default) || mapped[0] || null;
+  let nextVoice = null;
+  if (!selectedVoice) {
+    nextVoice = matchPreference() || fallback;
+  } else if (preferredLang && !selectedVoice.lang?.toLowerCase().startsWith(preferredLang)) {
+    nextVoice = matchPreference() || selectedVoice;
+  }
+  if (!nextVoice && selectedVoice) {
+    nextVoice = selectedVoice;
+  }
+  if (!nextVoice) {
+    nextVoice = fallback;
+  }
+  if (nextVoice && nextVoice.voiceURI !== selectedId) {
+    store.set('tts.voice', nextVoice.voiceURI);
   }
 }
 
@@ -149,6 +200,7 @@ const tts = {
   manifest,
   init({ state }) {
     store = state;
+    attachPreferredLangWatcher();
     const api = {
       speakSelection() {
         const t = getSelectionText() || document.activeElement?.value || '';
@@ -183,6 +235,7 @@ const tts = {
   },
   unmount() {
     clearVoicesWatchers();
+    detachPreferredLangWatcher();
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }

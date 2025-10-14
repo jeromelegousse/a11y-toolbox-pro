@@ -92,3 +92,20 @@ export function updateFilterOptions(select, options, currentValue) {
     select.value = options[0].value;
   }
 }
+
+export function getGeminiConfig() {
+  const globalData = globalThis?.a11ytbAdminData;
+  if (globalData && typeof globalData === 'object' && globalData !== null) {
+    const config = globalData.gemini;
+    if (config && typeof config === 'object') {
+      return config;
+    }
+  }
+
+  const legacyConfig = globalThis?.a11ytbGeminiConfig;
+  if (legacyConfig && typeof legacyConfig === 'object') {
+    return legacyConfig;
+  }
+
+  return null;
+}

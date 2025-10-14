@@ -1,4 +1,9 @@
-import { getModule, listBlocks } from './registry.js';
+import {
+  getModule,
+  listBlocks,
+  listModuleManifests,
+  listModuleManifestHistory
+} from './registry.js';
 import { compareSemver } from './utils/semver.js';
 
 const DEPENDENCY_STATUS_LABELS = {
@@ -27,6 +32,23 @@ function createEmptyCompat() {
     status: 'none',
     score: 'AAA'
   };
+}
+
+function safeClone(value) {
+  const scope = typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : undefined);
+  if (scope?.structuredClone) {
+    try {
+      return scope.structuredClone(value);
+    } catch (error) {
+      console.warn('a11ytb: structuredClone a échoué pour une valeur runtime.', error);
+    }
+  }
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (error) {
+    console.warn('a11ytb: clonage JSON échoué pour une valeur runtime.', error);
+  }
+  return value;
 }
 
 function resolveFeatureAvailability(feature) {
@@ -519,6 +541,39 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
     }
   }
 
+  function snapshotManifestGovernance() {
+    const normalizedManifests = listModuleManifests();
+    if (Array.isArray(normalizedManifests)) {
+      normalizedManifests.forEach((manifest) => {
+        if (manifest?.id) {
+          manifests.set(manifest.id, manifest);
+        }
+      });
+    }
+
+    const historyList = listModuleManifestHistory();
+    const historyBuckets = Array.isArray(historyList)
+      ? historyList.map((bucket) => ({
+        id: bucket.id,
+        history: Array.isArray(bucket.history) ? bucket.history.slice() : []
+      }))
+      : [];
+
+    const bucketsById = new Map(historyBuckets.map((bucket) => [bucket.id, bucket]));
+    catalog.forEach((entry) => {
+      if (!entry?.id) return;
+      if (!bucketsById.has(entry.id)) {
+        bucketsById.set(entry.id, { id: entry.id, history: [] });
+      }
+    });
+
+    const manifestTotal = Math.max(bucketsById.size, manifests.size, catalog.length);
+    state.set('runtime.manifestTotal', manifestTotal);
+    state.set('runtime.manifestHistory', safeClone(Array.from(bucketsById.values())));
+  }
+
+  snapshotManifestGovernance();
+
   function updateModuleRuntime(moduleId, patch) {
     const current = state.get(`runtime.modules.${moduleId}`) || {};
     const next = { ...current, ...patch };
@@ -620,6 +675,18 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
   const initialCollections = state.get('ui.collections.disabled');
   let lastDisabledCollections = new Set(Array.isArray(initialCollections) ? initialCollections : []);
 
+  function refreshManifestGovernance() {
+    snapshotManifestGovernance();
+    const knownModuleIds = new Set([
+      ...moduleToBlocks.keys(),
+      ...catalog.map((entry) => entry.id)
+    ]);
+    knownModuleIds.forEach((moduleId) => {
+      if (!moduleId) return;
+      applyModuleMetadata(moduleId);
+    });
+  }
+
   moduleToBlocks.forEach((blockIds, moduleId) => {
     const enabled = isModuleEnabled(blockIds, lastDisabled, lastDisabledCollections, moduleId);
     applyModuleMetadata(moduleId);
@@ -681,6 +748,7 @@ export function setupModuleRuntime({ state, catalog, collections = [] }) {
   if (!window.a11ytb) window.a11ytb = {};
   if (!window.a11ytb.runtime) window.a11ytb.runtime = {};
   window.a11ytb.runtime.loadModule = loadModule;
+  window.a11ytb.runtime.refreshManifestGovernance = refreshManifestGovernance;
   window.a11ytb.runtime.registerBlockElement = (blockId, element) => {
     if (!blockId || !element) return;
     const moduleId = blockToModule.get(blockId);

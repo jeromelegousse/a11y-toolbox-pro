@@ -1262,23 +1262,32 @@ export function mountUI({ root, state, config = {} }) {
     ['shortcuts', shortcutsView]
   ]);
 
+  const layoutPresets = [
+    {
+      id: 'double-column',
+      label: 'Double colonne',
+      description: 'Catégories à gauche, modules détaillés à droite.',
+      tone: 'confirm'
+    },
+    {
+      id: 'mosaic',
+      label: 'Mosaïque filtrable',
+      description: 'Groupes expansibles en grille responsive pour comparer rapidement.',
+      tone: 'info'
+    },
+    {
+      id: 'compact-flyout',
+      label: 'Barre compacte + panneau',
+      description: 'Barre iconique minimaliste avec panneau flottant temporaire.',
+      tone: 'focus'
+    }
+  ];
+  const layoutPresetMap = new Map(layoutPresets.map((preset) => [preset.id, preset]));
+  const layoutControls = new Map();
+
   const filters = document.createElement('div');
   filters.className = 'a11ytb-filters';
-
-  const categoryBar = document.createElement('div');
-  categoryBar.className = 'a11ytb-category-bar';
-  categories.forEach(cat => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'a11ytb-chip';
-    btn.dataset.category = cat.id;
-    btn.textContent = cat.label;
-    btn.setAttribute('aria-pressed', 'false');
-    btn.addEventListener('click', () => {
-      state.set('ui.category', cat.id);
-    });
-    categoryBar.append(btn);
-  });
+  filters.classList.add('a11ytb-modules-toolbar');
 
   const search = document.createElement('input');
   search.type = 'search';
@@ -1335,14 +1344,188 @@ export function mountUI({ root, state, config = {} }) {
     state.set('ui.showHidden', !showHidden);
   });
 
-  filters.append(categoryBar, search, profileWrapper, hiddenToggle);
+  filters.append(search, profileWrapper, hiddenToggle);
 
   const modulesContainer = document.createElement('div');
   modulesContainer.className = 'a11ytb-modules';
 
-  modulesView.append(modulesContainer);
+  const modulesLayout = document.createElement('div');
+  modulesLayout.className = 'a11ytb-modules-layout';
 
-  shellNav.append(statusCenter, viewToggle, filters);
+  const modulesSidebar = document.createElement('aside');
+  modulesSidebar.className = 'a11ytb-modules-sidebar';
+  modulesSidebar.setAttribute('aria-label', 'Catégories et dispositions de modules');
+
+  const sidebarInner = document.createElement('div');
+  sidebarInner.className = 'a11ytb-modules-sidebar-scroll';
+
+  const categoryPanel = document.createElement('section');
+  categoryPanel.className = 'a11ytb-category-panel';
+  const categoryTitle = document.createElement('h3');
+  categoryTitle.className = 'a11ytb-panel-title';
+  categoryTitle.textContent = 'Catégories';
+  categoryPanel.append(categoryTitle);
+
+  const categoryList = document.createElement('ul');
+  categoryList.className = 'a11ytb-category-list';
+  categoryList.setAttribute('role', 'list');
+  const categoryButtons = new Map();
+  const categoryCountRefs = new Map();
+  categories.forEach((cat) => {
+    const item = document.createElement('li');
+    item.className = 'a11ytb-category-item';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'a11ytb-category-chip';
+    button.dataset.category = cat.id;
+    button.setAttribute('aria-pressed', 'false');
+    const label = document.createElement('span');
+    label.className = 'a11ytb-category-label';
+    label.textContent = cat.label;
+    const count = document.createElement('span');
+    count.className = 'a11ytb-category-count';
+    count.textContent = '0';
+    count.setAttribute('aria-hidden', 'true');
+    button.append(label, count);
+    button.addEventListener('click', () => {
+      state.set('ui.category', cat.id);
+    });
+    categoryButtons.set(cat.id, button);
+    categoryCountRefs.set(cat.id, count);
+    item.append(button);
+    categoryList.append(item);
+  });
+  categoryPanel.append(categoryList);
+
+  const layoutPanel = document.createElement('section');
+  layoutPanel.className = 'a11ytb-layout-panel';
+  const layoutTitle = document.createElement('h3');
+  layoutTitle.className = 'a11ytb-panel-title';
+  layoutTitle.textContent = 'Affichage';
+  layoutPanel.append(layoutTitle);
+  const layoutHint = document.createElement('p');
+  layoutHint.className = 'a11ytb-panel-description';
+  layoutHint.textContent = 'Choisissez un préréglage visuel adapté à votre mode de navigation.';
+  layoutPanel.append(layoutHint);
+
+  const layoutList = document.createElement('div');
+  layoutList.className = 'a11ytb-layout-presets';
+  layoutPanel.append(layoutList);
+
+  layoutPresets.forEach((preset) => {
+    const option = document.createElement('label');
+    option.className = 'a11ytb-layout-option';
+    option.dataset.layoutId = preset.id;
+    if (preset.tone) {
+      option.dataset.tone = preset.tone;
+    }
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'a11ytb-layout-preset';
+    input.value = preset.id;
+    input.className = 'a11ytb-layout-radio';
+    layoutControls.set(preset.id, input);
+    const body = document.createElement('div');
+    body.className = 'a11ytb-layout-body';
+    const title = document.createElement('span');
+    title.className = 'a11ytb-layout-label';
+    title.textContent = preset.label;
+    const desc = document.createElement('span');
+    desc.className = 'a11ytb-layout-description';
+    desc.textContent = preset.description;
+    body.append(title, desc);
+    option.append(input, body);
+    layoutList.append(option);
+    input.addEventListener('change', () => {
+      if (input.checked) {
+        state.set('ui.moduleLayout', preset.id);
+        logActivity(`Affichage modules : ${preset.label}`, { tone: preset.tone || 'info', tags: ['navigation'] });
+      }
+    });
+  });
+
+  sidebarInner.append(categoryPanel, layoutPanel);
+  modulesSidebar.append(sidebarInner);
+
+  const modulesMain = document.createElement('div');
+  modulesMain.className = 'a11ytb-modules-main';
+
+  const helperBanner = document.createElement('div');
+  helperBanner.className = 'a11ytb-modules-helper';
+  const helperTitle = document.createElement('h2');
+  helperTitle.className = 'a11ytb-helper-title';
+  helperTitle.textContent = 'Comment choisir ?';
+  const helperText = document.createElement('p');
+  helperText.className = 'a11ytb-helper-text';
+  helperText.textContent = 'Comparez les préréglages selon votre besoin (vision, lecture ou interaction).';
+  helperBanner.append(helperTitle, helperText);
+
+  modulesMain.append(helperBanner, filters, modulesContainer);
+
+  modulesLayout.append(modulesSidebar, modulesMain);
+
+  const modulesInline = document.createElement('div');
+  modulesInline.className = 'a11ytb-modules-inline';
+  modulesInline.append(modulesLayout);
+
+  const flyoutLauncher = document.createElement('button');
+  flyoutLauncher.type = 'button';
+  flyoutLauncher.className = 'a11ytb-flyout-launcher';
+  flyoutLauncher.innerHTML = '<span aria-hidden="true">☰</span><span>Ouvrir la bibliothèque</span>';
+  flyoutLauncher.hidden = true;
+  flyoutLauncher.setAttribute('aria-expanded', 'false');
+  flyoutLauncher.addEventListener('click', () => {
+    state.set('ui.moduleFlyoutOpen', true);
+  });
+
+  const flyoutOverlay = document.createElement('div');
+  flyoutOverlay.className = 'a11ytb-modules-flyout';
+  flyoutOverlay.setAttribute('role', 'dialog');
+  flyoutOverlay.setAttribute('aria-modal', 'true');
+  flyoutOverlay.setAttribute('aria-label', 'Gestion des modules');
+  flyoutOverlay.hidden = true;
+  flyoutOverlay.setAttribute('aria-labelledby', 'a11ytb-flyout-title');
+  flyoutOverlay.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      state.set('ui.moduleFlyoutOpen', false);
+    }
+  });
+
+  const flyoutHeader = document.createElement('div');
+  flyoutHeader.className = 'a11ytb-flyout-header';
+  const flyoutTitle = document.createElement('h2');
+  flyoutTitle.textContent = 'Bibliothèque de modules';
+  flyoutTitle.id = 'a11ytb-flyout-title';
+  flyoutHeader.append(flyoutTitle);
+
+  const flyoutClose = document.createElement('button');
+  flyoutClose.type = 'button';
+  flyoutClose.className = 'a11ytb-flyout-close';
+  flyoutClose.textContent = 'Fermer';
+  flyoutClose.addEventListener('click', () => {
+    state.set('ui.moduleFlyoutOpen', false);
+  });
+  flyoutHeader.append(flyoutClose);
+
+  const flyoutBody = document.createElement('div');
+  flyoutBody.className = 'a11ytb-flyout-body';
+
+  flyoutOverlay.append(flyoutHeader, flyoutBody);
+
+  const flyoutScrim = document.createElement('div');
+  flyoutScrim.className = 'a11ytb-flyout-scrim';
+  flyoutScrim.hidden = true;
+  flyoutScrim.addEventListener('click', () => {
+    state.set('ui.moduleFlyoutOpen', false);
+  });
+
+  modulesView.append(flyoutLauncher, modulesInline, flyoutOverlay, flyoutScrim);
+
+  let releaseFlyoutInert = null;
+  let lastFlyoutFocus = null;
+
+  shellNav.append(statusCenter, viewToggle);
   shellMain.append(viewContainer);
   shell.append(shellNav, shellMain);
   body.append(shell);
@@ -2061,21 +2244,131 @@ export function mountUI({ root, state, config = {} }) {
     ...manifestByModuleId.keys()
   ]));
 
-  const collectionDefinitions = moduleCollections.filter((entry) => entry && entry.id && Array.isArray(entry.modules) && entry.modules.length);
-  const collectionById = new Map(collectionDefinitions.map((collection) => [collection.id, collection]));
-  const moduleCollectionsIndex = new Map();
-  const collectionBlockIds = new Map();
+  const baseCollectionDefinitions = moduleCollections
+    .filter((entry) => entry && entry.id && Array.isArray(entry.modules))
+    .map((entry) => ({
+      id: entry.id,
+      label: entry.label || entry.id,
+      description: entry.description || '',
+      modules: Array.from(new Set((entry.modules || []).filter(Boolean)))
+    }))
+    .filter((entry) => entry.modules.length);
 
-  collectionDefinitions.forEach((collection) => {
-    const members = Array.from(new Set(collection.modules.filter(Boolean)));
-    collectionBlockIds.set(collection.id, members.flatMap((moduleId) => moduleToBlockIds.get(moduleId) ?? []));
-    members.forEach((moduleId) => {
-      if (!moduleCollectionsIndex.has(moduleId)) {
-        moduleCollectionsIndex.set(moduleId, new Set());
-      }
-      moduleCollectionsIndex.get(moduleId).add(collection.id);
+  function buildCollectionStructures(snapshot) {
+    const overrides = snapshot?.ui?.collections?.presets || {};
+    const resolved = [];
+    const seen = new Set();
+
+    baseCollectionDefinitions.forEach((entry) => {
+      const override = overrides?.[entry.id];
+      const overrideModules = Array.isArray(override?.modules)
+        ? Array.from(new Set(override.modules.filter(Boolean)))
+        : null;
+      const definition = {
+        id: entry.id,
+        label: override?.label || entry.label,
+        description: override?.description ?? entry.description ?? '',
+        modules: overrideModules && overrideModules.length ? overrideModules : entry.modules.slice()
+      };
+      resolved.push(definition);
+      seen.add(entry.id);
     });
-  });
+
+    if (overrides && typeof overrides === 'object') {
+      Object.entries(overrides).forEach(([id, override]) => {
+        if (seen.has(id)) return;
+        const modules = Array.isArray(override?.modules)
+          ? Array.from(new Set(override.modules.filter(Boolean)))
+          : [];
+        if (!modules.length) return;
+        resolved.push({
+          id,
+          label: override?.label || id,
+          description: override?.description || '',
+          modules
+        });
+        seen.add(id);
+      });
+    }
+
+    const byId = new Map();
+    const moduleIndex = new Map();
+    const blockIds = new Map();
+    const normalized = resolved.map((definition) => {
+      const members = definition.modules.filter((moduleId) => moduleToBlockIds.has(moduleId));
+      const next = {
+        id: definition.id,
+        label: definition.label,
+        description: definition.description,
+        modules: members
+      };
+      byId.set(next.id, next);
+      blockIds.set(next.id, members.flatMap((moduleId) => moduleToBlockIds.get(moduleId) ?? []));
+      members.forEach((moduleId) => {
+        if (!moduleIndex.has(moduleId)) {
+          moduleIndex.set(moduleId, new Set());
+        }
+        moduleIndex.get(moduleId).add(next.id);
+      });
+      return next;
+    });
+
+    return {
+      definitions: normalized,
+      byId,
+      moduleIndex,
+      blockIds
+    };
+  }
+
+  let collectionDefinitions = [];
+  let collectionById = new Map();
+  let moduleCollectionsIndex = new Map();
+  let collectionBlockIds = new Map();
+
+  function syncCollectionStructures(snapshot = state.get()) {
+    const structures = buildCollectionStructures(snapshot);
+    collectionDefinitions = structures.definitions;
+    collectionById = structures.byId;
+    moduleCollectionsIndex = structures.moduleIndex;
+    collectionBlockIds = structures.blockIds;
+    rebuildCollectionsPanel();
+    updateCollectionFilterOptions();
+  }
+
+  const moduleElements = new Map();
+  const adminItems = new Map();
+  const dependencyViews = new Map();
+  const adminToolbarCounts = { active: null, hidden: null, pinned: null };
+  const organizeFilterToggles = new Map();
+  const collectionButtons = new Map();
+  const availableFilterSelects = {};
+  let collectionsPanel = null;
+  let collectionsSummary = null;
+  let collectionsListRoot = null;
+  const builderElements = {
+    section: null,
+    select: null,
+    createButton: null,
+    labelInput: null,
+    descriptionInput: null,
+    catalogList: null,
+    selectionList: null,
+    previewList: null,
+    saveButton: null,
+    resetButton: null,
+    emptyNotice: null,
+    helper: null
+  };
+  const builderState = {
+    activeId: '',
+    workingModules: [],
+    label: '',
+    description: ''
+  };
+  let builderDragState = null;
+
+  syncCollectionStructures(state.get());
 
   const namespaceToModule = new Map([
     ['contrast', 'contrast'],
@@ -2199,8 +2492,6 @@ export function mountUI({ root, state, config = {} }) {
   const availableFiltersBar = document.createElement('div');
   availableFiltersBar.className = 'a11ytb-available-filters';
 
-  const availableFilterSelects = {};
-
   function createFilterControl(key, id, labelText, options) {
     const select = document.createElement('select');
     select.className = 'a11ytb-available-filter-select';
@@ -2221,6 +2512,24 @@ export function mountUI({ root, state, config = {} }) {
     select.setAttribute('aria-labelledby', label.id);
     container.append(label, select);
     return container;
+  }
+
+  function updateCollectionFilterOptions() {
+    const select = availableFilterSelects.collection;
+    if (!select) return;
+    const current = select.value;
+    select.innerHTML = '';
+    const options = [
+      { value: 'all', label: 'Toutes les collections' },
+      ...collectionDefinitions.map((collection) => ({ value: collection.id, label: collection.label || collection.id }))
+    ];
+    options.forEach((option) => {
+      const opt = document.createElement('option');
+      opt.value = option.value;
+      opt.textContent = option.label;
+      select.append(opt);
+    });
+    ensureSelectValue(select, current);
   }
 
   const profileFilterChoices = [
@@ -2246,6 +2555,7 @@ export function mountUI({ root, state, config = {} }) {
   const compatibilityFilterField = createFilterControl('compatibility', 'a11ytb-available-filter-compat', 'Compatibilité', compatibilityFilterChoices);
 
   availableFiltersBar.append(profileFilterField, collectionFilterField, compatibilityFilterField);
+  updateCollectionFilterOptions();
 
   [['profile', availableFilterSelects.profile], ['collection', availableFilterSelects.collection], ['compatibility', availableFilterSelects.compatibility]].forEach(([key, select]) => {
     if (!select) return;
@@ -2282,9 +2592,6 @@ export function mountUI({ root, state, config = {} }) {
   organizePointerHint.id = 'a11ytb-organize-pointer';
   organizePointerHint.textContent = 'À la souris ou au tactile : maintenez la carte enfoncée pour la déplacer, relâchez pour déposer.';
 
-  let collectionsPanel = null;
-  let collectionsSummary = null;
-
   if (collectionDefinitions.length) {
     collectionsPanel = document.createElement('details');
     collectionsPanel.className = 'a11ytb-collections-panel';
@@ -2304,85 +2611,192 @@ export function mountUI({ root, state, config = {} }) {
 
     const list = document.createElement('div');
     list.className = 'a11ytb-collections-list';
-
-    collectionDefinitions.forEach((collection) => {
-      const card = document.createElement('article');
-      card.className = 'a11ytb-config-card a11ytb-collection-card';
-      card.dataset.collectionId = collection.id;
-
-      const title = document.createElement('h4');
-      title.className = 'a11ytb-config-title';
-      title.textContent = collection.label || collection.id;
-
-      const description = document.createElement('p');
-      description.className = 'a11ytb-config-description';
-      description.textContent = collection.description || '';
-
-      const members = document.createElement('ul');
-      members.className = 'a11ytb-collection-members';
-      const moduleLabels = (collection.modules || []).map((moduleId) => {
-        const manifest = manifestByModuleId.get(moduleId);
-        if (manifest?.name) return manifest.name;
-        const blockId = moduleToBlockIds.get(moduleId)?.[0];
-        const block = blockId ? blockInfo.get(blockId) : null;
-        return block?.title || moduleId;
-      }).filter(Boolean);
-      moduleLabels.forEach((label) => {
-        const item = document.createElement('li');
-        item.textContent = label;
-        members.append(item);
-      });
-      if (!moduleLabels.length) {
-        const emptyItem = document.createElement('li');
-        emptyItem.textContent = 'Aucun module associé';
-        members.append(emptyItem);
-      }
-
-      const controls = document.createElement('div');
-      controls.className = 'a11ytb-collection-actions';
-
-      const toggle = document.createElement('button');
-      toggle.type = 'button';
-      toggle.className = 'a11ytb-button a11ytb-collection-toggle';
-      toggle.dataset.collectionId = collection.id;
-      toggle.dataset.collectionLabel = collection.label || collection.id;
-      toggle.setAttribute('aria-pressed', 'true');
-      toggle.textContent = `Désactiver ${collection.label || collection.id}`;
-
-      toggle.addEventListener('click', () => {
-        const prefs = getPreferences();
-        const disabledList = Array.isArray(prefs.collections?.disabled) ? prefs.collections.disabled : [];
-        const disabledSet = new Set(disabledList);
-        const isCurrentlyDisabled = disabledSet.has(collection.id);
-        if (isCurrentlyDisabled) {
-          disabledSet.delete(collection.id);
-        } else {
-          disabledSet.add(collection.id);
-        }
-        const next = Array.from(disabledSet);
-        if (!arraysEqual(next, disabledList)) {
-          setListIfChanged('ui.collections.disabled', next, disabledList);
-          markProfileAsCustom();
-          const actionLabel = isCurrentlyDisabled ? 'Collection activée' : 'Collection désactivée';
-          logActivity(`${actionLabel} : ${collection.label || collection.id}`, { tone: isCurrentlyDisabled ? 'confirm' : 'toggle', tags: ['organisation'] });
-          const modulesText = moduleLabels.length ? ` Modules concernés : ${moduleLabels.join(', ')}.` : '';
-          announceOrganize(`${actionLabel} : ${collection.label || collection.id}.${modulesText}`.trim());
-        }
-      });
-
-      controls.append(toggle);
-      collectionButtons.set(collection.id, toggle);
-
-      card.append(title);
-      if (collection.description) {
-        card.append(description);
-      }
-      card.append(members, controls);
-      list.append(card);
-    });
+    collectionsListRoot = list;
 
     collectionsPanel.append(list);
+    rebuildCollectionsPanel();
   }
+
+  const builderSection = document.createElement('section');
+  builderSection.className = 'a11ytb-options-section a11ytb-options-section--builder';
+  const builderHeader = document.createElement('div');
+  builderHeader.className = 'a11ytb-section-header';
+  const builderTitle = document.createElement('h3');
+  builderTitle.className = 'a11ytb-section-title';
+  builderTitle.textContent = 'Composer des collections';
+  const builderDescription = document.createElement('p');
+  builderDescription.className = 'a11ytb-section-description';
+  builderDescription.textContent = 'Glissez-déposez les modules pour organiser des packs adaptés à vos profils utilisateurs. Utilisez les boutons pour ajouter ou réordonner au clavier.';
+  builderHeader.append(builderTitle, builderDescription);
+
+  const builderControls = document.createElement('div');
+  builderControls.className = 'a11ytb-builder-controls';
+
+  const builderSelectLabel = document.createElement('label');
+  builderSelectLabel.className = 'a11ytb-builder-label';
+  builderSelectLabel.setAttribute('for', 'a11ytb-builder-select');
+  builderSelectLabel.textContent = 'Collection en cours';
+
+  const builderSelect = document.createElement('select');
+  builderSelect.className = 'a11ytb-builder-select';
+  builderSelect.id = 'a11ytb-builder-select';
+  builderSelect.setAttribute('aria-describedby', 'a11ytb-builder-helper');
+  builderControls.append(builderSelectLabel, builderSelect);
+
+  const builderHelper = document.createElement('p');
+  builderHelper.className = 'a11ytb-admin-help';
+  builderHelper.id = 'a11ytb-builder-helper';
+  builderHelper.textContent = 'Sélectionnez une collection existante ou créez-en une nouvelle pour préparer un préréglage.';
+
+  const builderActions = document.createElement('div');
+  builderActions.className = 'a11ytb-builder-action-bar';
+
+  const builderCreateButton = document.createElement('button');
+  builderCreateButton.type = 'button';
+  builderCreateButton.className = 'a11ytb-button a11ytb-button--ghost';
+  builderCreateButton.textContent = 'Nouvelle collection';
+  builderCreateButton.dataset.builderAction = 'new';
+
+  builderActions.append(builderCreateButton);
+
+  const builderMeta = document.createElement('div');
+  builderMeta.className = 'a11ytb-builder-meta';
+
+  const nameField = document.createElement('div');
+  nameField.className = 'a11ytb-builder-field';
+  const nameLabel = document.createElement('label');
+  nameLabel.className = 'a11ytb-builder-field-label';
+  nameLabel.setAttribute('for', 'a11ytb-builder-name');
+  nameLabel.textContent = 'Nom public';
+  const nameInput = document.createElement('input');
+  nameInput.id = 'a11ytb-builder-name';
+  nameInput.className = 'a11ytb-builder-input';
+  nameInput.type = 'text';
+  nameInput.placeholder = 'Ex. Profil vision + audio';
+  nameField.append(nameLabel, nameInput);
+
+  const descField = document.createElement('div');
+  descField.className = 'a11ytb-builder-field';
+  const descLabel = document.createElement('label');
+  descLabel.className = 'a11ytb-builder-field-label';
+  descLabel.setAttribute('for', 'a11ytb-builder-description');
+  descLabel.textContent = 'Description';
+  const descTextarea = document.createElement('textarea');
+  descTextarea.id = 'a11ytb-builder-description';
+  descTextarea.className = 'a11ytb-builder-textarea';
+  descTextarea.rows = 2;
+  descTextarea.placeholder = 'Précisez pour quels besoins cette collection est idéale.';
+  descField.append(descLabel, descTextarea);
+
+  builderMeta.append(nameField, descField);
+
+  const builderGrid = document.createElement('div');
+  builderGrid.className = 'a11ytb-builder-grid';
+
+  const catalogColumn = document.createElement('section');
+  catalogColumn.className = 'a11ytb-builder-column a11ytb-builder-column--catalog';
+  const catalogTitle = document.createElement('h4');
+  catalogTitle.className = 'a11ytb-builder-column-title';
+  catalogTitle.textContent = 'Modules disponibles';
+  const catalogHint = document.createElement('p');
+  catalogHint.className = 'a11ytb-builder-hint';
+  catalogHint.textContent = 'Glissez un module vers la colonne centrale ou utilisez Ajouter.';
+  const catalogList = document.createElement('ul');
+  catalogList.className = 'a11ytb-builder-list';
+  catalogList.dataset.builderList = 'catalog';
+  catalogColumn.append(catalogTitle, catalogHint, catalogList);
+
+  const selectionColumn = document.createElement('section');
+  selectionColumn.className = 'a11ytb-builder-column a11ytb-builder-column--selection';
+  const selectionTitle = document.createElement('h4');
+  selectionTitle.className = 'a11ytb-builder-column-title';
+  selectionTitle.textContent = 'Modules de la collection';
+  const selectionHint = document.createElement('p');
+  selectionHint.className = 'a11ytb-builder-hint';
+  selectionHint.textContent = 'Réordonnez ou supprimez les modules selon la priorité d’activation.';
+  const selectionList = document.createElement('ul');
+  selectionList.className = 'a11ytb-builder-list';
+  selectionList.dataset.builderList = 'selection';
+  selectionColumn.append(selectionTitle, selectionHint, selectionList);
+
+  const previewColumn = document.createElement('section');
+  previewColumn.className = 'a11ytb-builder-column a11ytb-builder-column--preview';
+  const previewTitle = document.createElement('h4');
+  previewTitle.className = 'a11ytb-builder-column-title';
+  previewTitle.textContent = 'Aperçu rapide';
+  const previewList = document.createElement('ul');
+  previewList.className = 'a11ytb-builder-preview';
+  previewColumn.append(previewTitle, previewList);
+
+  builderGrid.append(catalogColumn, selectionColumn, previewColumn);
+
+  const builderFooter = document.createElement('div');
+  builderFooter.className = 'a11ytb-builder-footer';
+  const builderSave = document.createElement('button');
+  builderSave.type = 'button';
+  builderSave.className = 'a11ytb-button';
+  builderSave.dataset.builderAction = 'save';
+  builderSave.textContent = 'Enregistrer la collection';
+  const builderReset = document.createElement('button');
+  builderReset.type = 'button';
+  builderReset.className = 'a11ytb-button a11ytb-button--ghost';
+  builderReset.dataset.builderAction = 'reset';
+  builderReset.textContent = 'Réinitialiser';
+  builderFooter.append(builderSave, builderReset);
+
+  const builderEmpty = document.createElement('p');
+  builderEmpty.className = 'a11ytb-builder-empty';
+  builderEmpty.textContent = 'Aucune collection disponible pour le moment. Créez-en une pour commencer.';
+  builderEmpty.hidden = true;
+
+  builderSection.append(
+    builderHeader,
+    builderControls,
+    builderHelper,
+    builderActions,
+    builderMeta,
+    builderGrid,
+    builderFooter,
+    builderEmpty
+  );
+
+  builderElements.section = builderSection;
+  builderElements.select = builderSelect;
+  builderElements.createButton = builderCreateButton;
+  builderElements.labelInput = nameInput;
+  builderElements.descriptionInput = descTextarea;
+  builderElements.catalogList = catalogList;
+  builderElements.selectionList = selectionList;
+  builderElements.previewList = previewList;
+  builderElements.saveButton = builderSave;
+  builderElements.resetButton = builderReset;
+  builderElements.emptyNotice = builderEmpty;
+  builderElements.helper = builderHelper;
+
+  builderSelect.addEventListener('change', () => {
+    loadBuilderState(builderSelect.value);
+    renderBuilder();
+  });
+
+  builderCreateButton.addEventListener('click', createNewBuilderCollection);
+  nameInput.addEventListener('input', () => {
+    builderState.label = nameInput.value;
+    storeBuilderDraft();
+  });
+  descTextarea.addEventListener('input', () => {
+    builderState.description = descTextarea.value;
+    storeBuilderDraft();
+  });
+  builderSave.addEventListener('click', persistBuilderCollection);
+  builderReset.addEventListener('click', resetBuilderCollection);
+  catalogList.addEventListener('click', handleBuilderCatalogClick);
+  selectionList.addEventListener('click', handleBuilderSelectionClick);
+  catalogList.addEventListener('dragover', handleBuilderDragOver);
+  catalogList.addEventListener('dragleave', handleBuilderDragLeave);
+  catalogList.addEventListener('drop', handleBuilderDrop);
+  selectionList.addEventListener('dragover', handleBuilderDragOver);
+  selectionList.addEventListener('dragleave', handleBuilderDragLeave);
+  selectionList.addEventListener('drop', handleBuilderDrop);
 
   const organizeToolbar = document.createElement('div');
   organizeToolbar.className = 'a11ytb-admin-toolbar';
@@ -2460,6 +2874,9 @@ export function mountUI({ root, state, config = {} }) {
   const organizeChildren = [organizeHeader, organizeKeyboardHint, organizePointerHint];
   if (collectionsPanel) {
     organizeChildren.push(collectionsPanel);
+  }
+  if (builderElements.section) {
+    organizeChildren.push(builderElements.section);
   }
   organizeChildren.push(organizeToolbar, adminList);
   organizeSection.append(...organizeChildren);
@@ -3609,6 +4026,7 @@ export function mountUI({ root, state, config = {} }) {
     const moduleId = li.dataset.moduleId;
     if (moduleId) {
       const view = {
+        moduleId,
         wrapper: dependenciesSection,
         list: dependenciesList,
         summary: dependenciesSummary,
@@ -3622,7 +4040,7 @@ export function mountUI({ root, state, config = {} }) {
       }
       const runtimeInfo = state.get(`runtime.modules.${moduleId}`) || {};
       const dependencies = Array.isArray(runtimeInfo.dependencies) ? runtimeInfo.dependencies : [];
-      updateDependencyDisplay(view, dependencies, { moduleName: runtimeInfo.manifestName || block.title || moduleId });
+      updateDependencyDisplay(view, dependencies, { moduleName: runtimeInfo.manifestName || view.moduleName });
     }
 
     prioritySelect.addEventListener('change', () => {
@@ -3888,6 +4306,22 @@ export function mountUI({ root, state, config = {} }) {
     updateAdminPositions();
   }
 
+  function syncDependencyViews(snapshot = state.get()) {
+    const runtimeModules = snapshot?.runtime?.modules || {};
+    dependencyViews.forEach((views, moduleId) => {
+      const runtimeInfo = runtimeModules[moduleId] || {};
+      const dependencies = Array.isArray(runtimeInfo.dependencies) ? runtimeInfo.dependencies : [];
+      const manifestName = runtimeInfo.manifestName || runtimeInfo.name || '';
+      views.forEach((view) => {
+        if (!view) return;
+        if (manifestName) {
+          view.moduleName = manifestName;
+        }
+        updateDependencyDisplay(view, dependencies, { moduleName: view.moduleName || moduleId });
+      });
+    });
+  }
+
   function syncCollectionPanel() {
     if (!collectionButtons.size) return;
     const prefs = getPreferences();
@@ -3998,8 +4432,8 @@ export function mountUI({ root, state, config = {} }) {
 
   function syncFilters() {
     const prefs = getPreferences();
-    categoryBar.querySelectorAll('button[data-category]').forEach(btn => {
-      const active = btn.dataset.category === prefs.category;
+    categoryButtons.forEach((btn, categoryId) => {
+      const active = categoryId === prefs.category;
       btn.classList.toggle('is-active', active);
       btn.setAttribute('aria-pressed', String(active));
     });
@@ -4016,6 +4450,679 @@ export function mountUI({ root, state, config = {} }) {
     profileDescription.textContent = profile?.description || '';
   }
 
+  function moveModulesTo(container) {
+    if (!modulesLayout || !container) return;
+    if (modulesLayout.parentElement === container) return;
+    container.append(modulesLayout);
+  }
+
+  function syncModuleLayoutPreference(snapshot) {
+    const prefs = snapshot?.ui || {};
+    const requested = typeof prefs.moduleLayout === 'string' ? prefs.moduleLayout : 'double-column';
+    const layout = layoutPresetMap.has(requested) ? requested : 'double-column';
+    modulesView.dataset.layout = layout;
+    modulesLayout.dataset.layout = layout;
+
+    layoutControls.forEach((input, id) => {
+      const active = id === layout;
+      input.checked = active;
+      if (input.parentElement) {
+        input.parentElement.classList.toggle('is-active', active);
+      }
+    });
+
+    const isFlyout = layout === 'compact-flyout';
+    if (isFlyout) {
+      moveModulesTo(flyoutBody);
+      modulesInline.hidden = true;
+      flyoutLauncher.hidden = false;
+      const open = !!prefs.moduleFlyoutOpen;
+      if (open) {
+        flyoutOverlay.hidden = false;
+        flyoutScrim.hidden = false;
+        flyoutLauncher.setAttribute('aria-expanded', 'true');
+        if (releaseFlyoutInert) {
+          releaseFlyoutInert();
+        }
+        releaseFlyoutInert = applyInertToSiblings(flyoutOverlay, { exclusions: [flyoutOverlay, flyoutScrim] });
+        if (!flyoutOverlay.contains(document.activeElement)) {
+          lastFlyoutFocus = document.activeElement instanceof HTMLElement ? document.activeElement : flyoutLauncher;
+          const focusables = collectFocusable(flyoutOverlay);
+          const target = focusables[0] || flyoutClose;
+          if (target && typeof target.focus === 'function') {
+            requestAnimationFrame(() => {
+              try {
+                target.focus({ preventScroll: true });
+              } catch (error) {
+                target.focus();
+              }
+            });
+          }
+        }
+      } else {
+        flyoutOverlay.hidden = true;
+        flyoutScrim.hidden = true;
+        flyoutLauncher.setAttribute('aria-expanded', 'false');
+        if (releaseFlyoutInert) {
+          releaseFlyoutInert();
+          releaseFlyoutInert = null;
+        }
+        const returnTarget = lastFlyoutFocus instanceof HTMLElement ? lastFlyoutFocus : flyoutLauncher;
+        lastFlyoutFocus = null;
+        if (returnTarget && typeof returnTarget.focus === 'function') {
+          requestAnimationFrame(() => {
+            try {
+              returnTarget.focus({ preventScroll: true });
+            } catch (error) {
+              returnTarget.focus();
+            }
+          });
+        }
+      }
+    } else {
+      moveModulesTo(modulesInline);
+      modulesInline.hidden = false;
+      flyoutLauncher.hidden = true;
+      flyoutOverlay.hidden = true;
+      flyoutScrim.hidden = true;
+      flyoutLauncher.setAttribute('aria-expanded', 'false');
+      if (releaseFlyoutInert) {
+        releaseFlyoutInert();
+        releaseFlyoutInert = null;
+      }
+      if (prefs.moduleFlyoutOpen) {
+        state.set('ui.moduleFlyoutOpen', false);
+      }
+    }
+  }
+
+  function getBuilderPrefs() {
+    const prefs = state.get('ui.collections.builder') || {};
+    const drafts = prefs.drafts && typeof prefs.drafts === 'object' ? prefs.drafts : {};
+    return {
+      activeCollectionId: prefs.activeCollectionId || '',
+      drafts
+    };
+  }
+
+  function saveBuilderPrefs(updates = {}) {
+    const current = getBuilderPrefs();
+    const next = {
+      activeCollectionId: updates.activeCollectionId !== undefined ? updates.activeCollectionId : current.activeCollectionId,
+      drafts: updates.drafts !== undefined ? updates.drafts : current.drafts
+    };
+    if (JSON.stringify(current) !== JSON.stringify(next)) {
+      state.set('ui.collections.builder', next);
+    }
+    return next;
+  }
+
+  function ensureBuilderActiveId(preferredId) {
+    const prefs = getBuilderPrefs();
+    const drafts = prefs.drafts || {};
+    if (preferredId && (collectionById.has(preferredId) || drafts[preferredId])) {
+      return preferredId;
+    }
+    if (builderState.activeId && (collectionById.has(builderState.activeId) || drafts[builderState.activeId])) {
+      return builderState.activeId;
+    }
+    if (prefs.activeCollectionId && (collectionById.has(prefs.activeCollectionId) || drafts[prefs.activeCollectionId])) {
+      return prefs.activeCollectionId;
+    }
+    if (collectionDefinitions.length) {
+      return collectionDefinitions[0].id;
+    }
+    const draftKeys = Object.keys(drafts);
+    if (draftKeys.length) {
+      return draftKeys[0];
+    }
+    return '';
+  }
+
+  function loadBuilderState(collectionId) {
+    const prefs = getBuilderPrefs();
+    const id = ensureBuilderActiveId(collectionId);
+    builderState.activeId = id;
+    if (!id) {
+      builderState.workingModules = [];
+      builderState.label = '';
+      builderState.description = '';
+      saveBuilderPrefs({ activeCollectionId: '' });
+      return;
+    }
+    const drafts = prefs.drafts || {};
+    const draft = drafts[id];
+    const definition = collectionById.get(id);
+    const modules = Array.isArray(draft?.modules) ? draft.modules : (definition?.modules || []);
+    builderState.workingModules = Array.from(new Set(modules.filter(Boolean)));
+    builderState.label = typeof draft?.label === 'string' && draft.label ? draft.label : (definition?.label || id);
+    builderState.description = typeof draft?.description === 'string' ? draft.description : (definition?.description || '');
+    if (prefs.activeCollectionId !== id) {
+      saveBuilderPrefs({ activeCollectionId: id, drafts });
+    }
+  }
+
+  function storeBuilderDraft() {
+    if (!builderState.activeId) return;
+    const prefs = getBuilderPrefs();
+    const drafts = { ...prefs.drafts };
+    drafts[builderState.activeId] = {
+      modules: builderState.workingModules.slice(),
+      label: builderState.label,
+      description: builderState.description
+    };
+    saveBuilderPrefs({ activeCollectionId: builderState.activeId, drafts });
+  }
+
+  function deleteBuilderDraft(id) {
+    const prefs = getBuilderPrefs();
+    const drafts = { ...prefs.drafts };
+    if (drafts[id]) {
+      delete drafts[id];
+      saveBuilderPrefs({ activeCollectionId: prefs.activeCollectionId === id ? '' : prefs.activeCollectionId, drafts });
+    }
+  }
+
+  function getModuleLabel(moduleId) {
+    const blockId = moduleToBlockIds.get(moduleId)?.[0];
+    const block = blockId ? blockInfo.get(blockId) : null;
+    const manifest = manifestByModuleId.get(moduleId);
+    if (block?.title) return block.title;
+    if (manifest?.name) return manifest.name;
+    const catalogEntry = moduleCatalog.find((entry) => entry.id === moduleId);
+    if (catalogEntry?.manifest?.name) return catalogEntry.manifest.name;
+    return moduleId;
+  }
+
+  function getModuleDescription(moduleId) {
+    const manifest = manifestByModuleId.get(moduleId);
+    if (manifest?.summary) return manifest.summary;
+    if (manifest?.description) return manifest.description;
+    const catalogEntry = moduleCatalog.find((entry) => entry.id === moduleId);
+    if (catalogEntry?.manifest?.description) return catalogEntry.manifest.description;
+    return '';
+  }
+
+  function computeBuilderOptions() {
+    const prefs = getBuilderPrefs();
+    const drafts = prefs.drafts || {};
+    const options = [];
+    const seen = new Set();
+    collectionDefinitions.forEach((definition) => {
+      options.push({
+        id: definition.id,
+        label: definition.label || definition.id,
+        description: definition.description || ''
+      });
+      seen.add(definition.id);
+    });
+    Object.entries(drafts).forEach(([id, draft]) => {
+      if (seen.has(id)) return;
+      options.push({
+        id,
+        label: draft?.label || id,
+        description: draft?.description || ''
+      });
+      seen.add(id);
+    });
+    return options;
+  }
+
+  function addModuleToSelection(moduleId, beforeId = null) {
+    if (!moduleId) return;
+    const modules = builderState.workingModules.filter((id) => id !== moduleId);
+    let insertIndex = modules.length;
+    if (beforeId) {
+      const index = modules.indexOf(beforeId);
+      if (index !== -1) {
+        insertIndex = index;
+      }
+    }
+    modules.splice(insertIndex, 0, moduleId);
+    builderState.workingModules = modules;
+    storeBuilderDraft();
+    renderBuilder();
+  }
+
+  function removeModuleFromSelection(moduleId) {
+    if (!moduleId) return;
+    const modules = builderState.workingModules.filter((id) => id !== moduleId);
+    builderState.workingModules = modules;
+    storeBuilderDraft();
+    renderBuilder();
+  }
+
+  function moveModuleInSelection(moduleId, offset) {
+    if (!moduleId || !offset) return;
+    const modules = builderState.workingModules.slice();
+    const index = modules.indexOf(moduleId);
+    if (index === -1) return;
+    const target = Math.max(0, Math.min(modules.length - 1, index + offset));
+    if (target === index) return;
+    modules.splice(index, 1);
+    modules.splice(target, 0, moduleId);
+    builderState.workingModules = modules;
+    storeBuilderDraft();
+    renderBuilder();
+  }
+
+  function handleBuilderCatalogClick(event) {
+    const button = event.target.closest('[data-builder-action]');
+    if (!button) return;
+    const moduleId = button.dataset.builderModule;
+    if (!moduleId) return;
+    if (button.dataset.builderAction === 'add') {
+      addModuleToSelection(moduleId);
+    }
+  }
+
+  function handleBuilderSelectionClick(event) {
+    const button = event.target.closest('[data-builder-action]');
+    if (!button) return;
+    const moduleId = button.dataset.builderModule;
+    if (!moduleId) return;
+    const action = button.dataset.builderAction;
+    if (action === 'remove') {
+      removeModuleFromSelection(moduleId);
+    } else if (action === 'up') {
+      moveModuleInSelection(moduleId, -1);
+    } else if (action === 'down') {
+      moveModuleInSelection(moduleId, 1);
+    }
+  }
+
+  function handleBuilderDragStart(event) {
+    const item = event.target.closest('[data-builder-module]');
+    if (!item) return;
+    const list = item.closest('[data-builder-list]');
+    if (!list) return;
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', item.dataset.builderModule);
+    }
+    builderDragState = {
+      moduleId: item.dataset.builderModule,
+      source: list.dataset.builderList
+    };
+    item.classList.add('is-dragging');
+  }
+
+  function clearBuilderDropIndicators() {
+    if (!builderElements.selectionList) return;
+    builderElements.selectionList.querySelectorAll('.is-drop-target').forEach((node) => node.classList.remove('is-drop-target'));
+    if (builderElements.catalogList) {
+      builderElements.catalogList.querySelectorAll('.is-drop-target').forEach((node) => node.classList.remove('is-drop-target'));
+    }
+  }
+
+  function handleBuilderDragEnd(event) {
+    const item = event.target.closest('[data-builder-module]');
+    if (item) {
+      item.classList.remove('is-dragging');
+    }
+    builderDragState = null;
+    clearBuilderDropIndicators();
+  }
+
+  function handleBuilderDragOver(event) {
+    event.preventDefault();
+    const list = event.currentTarget;
+    if (!list || !list.dataset.builderList) return;
+    const items = Array.from(list.querySelectorAll('[data-builder-module]'));
+    const after = items.find((item) => {
+      const rect = item.getBoundingClientRect();
+      return event.clientY < rect.top + rect.height / 2;
+    });
+    clearBuilderDropIndicators();
+    if (after) {
+      after.classList.add('is-drop-target');
+    }
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move';
+    }
+  }
+
+  function handleBuilderDragLeave() {
+    clearBuilderDropIndicators();
+  }
+
+  function handleBuilderDrop(event) {
+    event.preventDefault();
+    const list = event.currentTarget;
+    if (!list || !list.dataset.builderList) return;
+    const moduleId = event.dataTransfer?.getData('text/plain') || builderDragState?.moduleId;
+    clearBuilderDropIndicators();
+    if (!moduleId) return;
+    if (list.dataset.builderList === 'selection') {
+      const target = list.querySelector('.is-drop-target');
+      const beforeId = target?.dataset.builderModule || null;
+      addModuleToSelection(moduleId, beforeId);
+    } else if (list.dataset.builderList === 'catalog') {
+      removeModuleFromSelection(moduleId);
+    }
+  }
+
+  function renderBuilderPreview() {
+    if (!builderElements.previewList) return;
+    builderElements.previewList.innerHTML = '';
+    if (!builderState.workingModules.length) {
+      const empty = document.createElement('li');
+      empty.className = 'a11ytb-builder-preview-empty';
+      empty.textContent = 'Aucun module sélectionné pour cette collection.';
+      builderElements.previewList.append(empty);
+      return;
+    }
+    builderState.workingModules.forEach((moduleId, index) => {
+      const item = document.createElement('li');
+      item.className = 'a11ytb-builder-preview-item';
+      item.textContent = `${index + 1}. ${getModuleLabel(moduleId)}`;
+      const blockId = moduleToBlockIds.get(moduleId)?.[0];
+      const block = blockId ? blockInfo.get(blockId) : null;
+      if (block?.category) {
+        const badge = document.createElement('span');
+        badge.className = 'a11ytb-builder-preview-tag';
+        badge.textContent = categories.find((cat) => cat.id === block.category)?.label || block.category;
+        item.append(badge);
+      }
+      builderElements.previewList.append(item);
+    });
+  }
+
+  function renderBuilderLists() {
+    if (!builderElements.catalogList || !builderElements.selectionList) return;
+    builderElements.catalogList.innerHTML = '';
+    builderElements.selectionList.innerHTML = '';
+    const selectionSet = new Set(builderState.workingModules);
+    const knownModules = new Set([
+      ...catalogModuleIds,
+      ...Array.from(selectionSet),
+      ...collectionDefinitions.flatMap((definition) => definition.modules || [])
+    ]);
+    const available = Array.from(knownModules)
+      .filter((moduleId) => !selectionSet.has(moduleId))
+      .sort((a, b) => getModuleLabel(a).localeCompare(getModuleLabel(b)));
+
+    available.forEach((moduleId) => {
+      const item = document.createElement('li');
+      item.className = 'a11ytb-builder-item';
+      item.draggable = true;
+      item.dataset.builderModule = moduleId;
+      const title = document.createElement('div');
+      title.className = 'a11ytb-builder-item-title';
+      title.textContent = getModuleLabel(moduleId);
+      const description = getModuleDescription(moduleId);
+      if (description) {
+        const detail = document.createElement('p');
+        detail.className = 'a11ytb-builder-item-description';
+        detail.textContent = description;
+        item.append(title, detail);
+      } else {
+        item.append(title);
+      }
+      const actions = document.createElement('div');
+      actions.className = 'a11ytb-builder-item-actions';
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'a11ytb-builder-mini';
+      addBtn.dataset.builderAction = 'add';
+      addBtn.dataset.builderModule = moduleId;
+      addBtn.textContent = 'Ajouter';
+      actions.append(addBtn);
+      item.append(actions);
+      item.addEventListener('dragstart', handleBuilderDragStart);
+      item.addEventListener('dragend', handleBuilderDragEnd);
+      builderElements.catalogList.append(item);
+    });
+
+    builderState.workingModules.forEach((moduleId) => {
+      const item = document.createElement('li');
+      item.className = 'a11ytb-builder-item';
+      item.draggable = true;
+      item.dataset.builderModule = moduleId;
+      const head = document.createElement('div');
+      head.className = 'a11ytb-builder-item-title';
+      head.textContent = getModuleLabel(moduleId);
+      item.append(head);
+      const actions = document.createElement('div');
+      actions.className = 'a11ytb-builder-item-actions';
+      const upBtn = document.createElement('button');
+      upBtn.type = 'button';
+      upBtn.className = 'a11ytb-builder-mini';
+      upBtn.dataset.builderAction = 'up';
+      upBtn.dataset.builderModule = moduleId;
+      upBtn.setAttribute('aria-label', `Monter ${getModuleLabel(moduleId)}`);
+      upBtn.textContent = '↑';
+      const downBtn = document.createElement('button');
+      downBtn.type = 'button';
+      downBtn.className = 'a11ytb-builder-mini';
+      downBtn.dataset.builderAction = 'down';
+      downBtn.dataset.builderModule = moduleId;
+      downBtn.setAttribute('aria-label', `Descendre ${getModuleLabel(moduleId)}`);
+      downBtn.textContent = '↓';
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'a11ytb-builder-mini';
+      removeBtn.dataset.builderAction = 'remove';
+      removeBtn.dataset.builderModule = moduleId;
+      removeBtn.textContent = 'Retirer';
+      actions.append(upBtn, downBtn, removeBtn);
+      item.append(actions);
+      item.addEventListener('dragstart', handleBuilderDragStart);
+      item.addEventListener('dragend', handleBuilderDragEnd);
+      builderElements.selectionList.append(item);
+    });
+
+    renderBuilderPreview();
+  }
+
+  function renderBuilder() {
+    if (!builderElements.section || !builderElements.catalogList || !builderElements.selectionList || !builderElements.previewList) {
+      return;
+    }
+    const options = computeBuilderOptions();
+    const hasOptions = options.length > 0;
+    builderElements.emptyNotice.hidden = hasOptions;
+    builderElements.helper.hidden = !hasOptions;
+    builderElements.select.innerHTML = '';
+    if (!hasOptions) {
+      builderElements.select.disabled = true;
+      builderElements.labelInput.value = '';
+      builderElements.descriptionInput.value = '';
+      builderElements.labelInput.disabled = true;
+      builderElements.descriptionInput.disabled = true;
+      builderElements.saveButton.disabled = true;
+      builderElements.resetButton.disabled = true;
+      builderElements.catalogList.innerHTML = '';
+      builderElements.selectionList.innerHTML = '';
+      builderElements.previewList.innerHTML = '';
+      return;
+    }
+    builderElements.select.disabled = false;
+    builderElements.labelInput.disabled = false;
+    builderElements.descriptionInput.disabled = false;
+    builderElements.saveButton.disabled = false;
+    builderElements.resetButton.disabled = false;
+    options.forEach((option) => {
+      const opt = document.createElement('option');
+      opt.value = option.id;
+      opt.textContent = option.label;
+      builderElements.select.append(opt);
+    });
+    if (!builderState.activeId || !options.some((option) => option.id === builderState.activeId)) {
+      loadBuilderState(options[0].id);
+    }
+    builderElements.select.value = builderState.activeId;
+    builderElements.labelInput.value = builderState.label;
+    builderElements.descriptionInput.value = builderState.description;
+    renderBuilderLists();
+  }
+
+  function rebuildCollectionsPanel() {
+    if (!collectionsPanel || !collectionsListRoot) return;
+    collectionsListRoot.innerHTML = '';
+    collectionButtons.clear();
+    if (!collectionDefinitions.length) {
+      const empty = document.createElement('p');
+      empty.className = 'a11ytb-admin-help';
+      empty.textContent = 'Aucune collection n’est encore configurée.';
+      collectionsListRoot.append(empty);
+      return;
+    }
+
+    collectionDefinitions.forEach((collection) => {
+      const card = document.createElement('article');
+      card.className = 'a11ytb-config-card a11ytb-collection-card';
+      card.dataset.collectionId = collection.id;
+
+      const title = document.createElement('h4');
+      title.className = 'a11ytb-config-title';
+      title.textContent = collection.label || collection.id;
+      card.append(title);
+
+      if (collection.description) {
+        const description = document.createElement('p');
+        description.className = 'a11ytb-config-description';
+        description.textContent = collection.description;
+        card.append(description);
+      }
+
+      const members = document.createElement('ul');
+      members.className = 'a11ytb-collection-members';
+      const moduleLabels = (collection.modules || []).map((moduleId) => getModuleLabel(moduleId)).filter(Boolean);
+      if (moduleLabels.length) {
+        moduleLabels.forEach((label) => {
+          const li = document.createElement('li');
+          li.textContent = label;
+          members.append(li);
+        });
+      } else {
+        const emptyMember = document.createElement('li');
+        emptyMember.textContent = 'Aucun module associé';
+        members.append(emptyMember);
+      }
+      card.append(members);
+
+      const controls = document.createElement('div');
+      controls.className = 'a11ytb-collection-actions';
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'a11ytb-button a11ytb-collection-toggle';
+      toggle.dataset.collectionId = collection.id;
+      toggle.dataset.collectionLabel = collection.label || collection.id;
+      toggle.setAttribute('aria-pressed', 'true');
+      toggle.textContent = `Désactiver ${collection.label || collection.id}`;
+      toggle.addEventListener('click', () => {
+        const prefs = getPreferences();
+        const disabledList = Array.isArray(prefs.collections?.disabled) ? prefs.collections.disabled : [];
+        const disabledSet = new Set(disabledList);
+        const isCurrentlyDisabled = disabledSet.has(collection.id);
+        if (isCurrentlyDisabled) {
+          disabledSet.delete(collection.id);
+        } else {
+          disabledSet.add(collection.id);
+        }
+        const next = Array.from(disabledSet);
+        if (!arraysEqual(next, disabledList)) {
+          setListIfChanged('ui.collections.disabled', next, disabledList);
+          markProfileAsCustom();
+          const actionLabel = isCurrentlyDisabled ? 'Collection activée' : 'Collection désactivée';
+          logActivity(`${actionLabel} : ${collection.label || collection.id}`, { tone: isCurrentlyDisabled ? 'confirm' : 'toggle', tags: ['organisation'] });
+          const modulesText = moduleLabels.length ? ` Modules concernés : ${moduleLabels.join(', ')}.` : '';
+          announceOrganize(`${actionLabel} : ${collection.label || collection.id}.${modulesText}`.trim());
+        }
+      });
+      controls.append(toggle);
+      collectionButtons.set(collection.id, toggle);
+      card.append(controls);
+
+      collectionsListRoot.append(card);
+    });
+  }
+
+  function persistBuilderCollection() {
+    if (!builderState.activeId) return;
+    const presets = state.get('ui.collections.presets') || {};
+    const next = { ...presets };
+    next[builderState.activeId] = {
+      modules: builderState.workingModules.slice(),
+      label: builderState.label,
+      description: builderState.description
+    };
+    state.set('ui.collections.presets', next);
+    logActivity(`Collection enregistrée : ${builderState.label}`, { tone: 'confirm', tags: ['collections'] });
+    deleteBuilderDraft(builderState.activeId);
+    loadBuilderState(builderState.activeId);
+    renderBuilder();
+  }
+
+  function resetBuilderCollection() {
+    if (!builderState.activeId) return;
+    const presets = state.get('ui.collections.presets') || {};
+    const next = { ...presets };
+    let changed = false;
+    if (next[builderState.activeId]) {
+      delete next[builderState.activeId];
+      changed = true;
+    }
+    deleteBuilderDraft(builderState.activeId);
+    if (changed) {
+      state.set('ui.collections.presets', next);
+      logActivity(`Collection réinitialisée : ${builderState.label}`, { tone: 'info', tags: ['collections'] });
+    } else {
+      loadBuilderState(builderState.activeId);
+      renderBuilder();
+    }
+  }
+
+  function createNewBuilderCollection() {
+    const baseLabel = 'Nouvelle collection';
+    const baseId = slugifyProfileId(baseLabel) || 'collection';
+    const prefs = getBuilderPrefs();
+    const taken = new Set([
+      ...collectionDefinitions.map((definition) => definition.id),
+      ...Object.keys(prefs.drafts || {})
+    ]);
+    let candidate = baseId;
+    let counter = 1;
+    while (taken.has(candidate)) {
+      counter += 1;
+      candidate = `${baseId}-${counter}`;
+    }
+    const drafts = { ...prefs.drafts };
+    drafts[candidate] = {
+      modules: [],
+      label: counter === 1 ? baseLabel : `${baseLabel} ${counter}`,
+      description: ''
+    };
+    saveBuilderPrefs({ activeCollectionId: candidate, drafts });
+    loadBuilderState(candidate);
+    renderBuilder();
+    if (builderElements.labelInput) {
+      requestAnimationFrame(() => {
+        try {
+          builderElements.labelInput.focus({ preventScroll: true });
+        } catch (error) {
+          builderElements.labelInput.focus();
+        }
+      });
+    }
+    announceOrganize('Nouvelle collection préparée. Renseignez le nom puis ajoutez des modules.');
+  }
+
+  function moveFocusOutOfModule(moduleElement) {
+    if (!moduleElement) return;
+    const active = document.activeElement;
+    if (!active || !moduleElement.contains(active)) return;
+    const focusables = getFocusableElements()
+      .filter((el) => el !== active && !moduleElement.contains(el));
+    const fallback = focusables[0];
+    if (fallback && typeof fallback.focus === 'function') {
+      fallback.focus();
+    } else if (panel && typeof panel.focus === 'function') {
+      panel.focus();
+    }
+  }
+
   function applyModuleLayout() {
     const prefs = getPreferences();
     const searchTerm = (prefs.search || '').trim().toLowerCase();
@@ -4024,6 +5131,7 @@ export function mountUI({ root, state, config = {} }) {
     const disabledSet = new Set(prefs.disabled);
     const disabledCollectionsSet = new Set(prefs.collections.disabled);
     const disabledByCollection = getBlocksDisabledByCollections(disabledCollectionsSet);
+    const categoryCounts = new Map(categories.map((cat) => [cat.id, 0]));
 
     const validPriorities = {};
     Object.entries(prefs.priorities || {}).forEach(([id, priority]) => {
@@ -4084,10 +5192,23 @@ export function mountUI({ root, state, config = {} }) {
       const isDisabledByCollection = disabledByCollection.has(id);
       const isDisabled = disabledSet.has(id) || isDisabledByCollection;
       const shouldShow = matchesCategory && matchesSearch && (!isHidden && !isDisabled || prefs.showHidden);
+      const isActiveForCount = !isHidden && !isDisabled;
+      if (isActiveForCount) {
+        const targetCategory = categories.some((cat) => cat.id === el.dataset.category)
+          ? el.dataset.category
+          : null;
+        if (targetCategory && categoryCounts.has(targetCategory)) {
+          categoryCounts.set(targetCategory, categoryCounts.get(targetCategory) + 1);
+        }
+        if (categoryCounts.has('all')) {
+          categoryCounts.set('all', categoryCounts.get('all') + 1);
+        }
+      }
       if (shouldShow) {
         el.removeAttribute('hidden');
         el.setAttribute('aria-hidden', 'false');
       } else {
+        moveFocusOutOfModule(el);
         el.setAttribute('hidden', '');
         el.setAttribute('aria-hidden', 'true');
       }
@@ -4129,6 +5250,17 @@ export function mountUI({ root, state, config = {} }) {
       }
       if (content) {
         content.setAttribute('aria-hidden', String(isDisabled));
+      }
+    });
+
+    categoryCountRefs.forEach((node, categoryId) => {
+      if (!node) return;
+      const value = categoryCounts.get(categoryId) ?? 0;
+      node.textContent = String(value);
+      const button = categoryButtons.get(categoryId);
+      if (button) {
+        const labelText = button.querySelector('.a11ytb-category-label')?.textContent || categoryId;
+        button.setAttribute('aria-label', `${labelText} (${value} modules actifs)`);
       }
     });
   }
@@ -4236,6 +5368,10 @@ export function mountUI({ root, state, config = {} }) {
         btn.removeAttribute('aria-current');
       }
     });
+    const activeElement = document.activeElement;
+    const nextViewElement = viewElements.get(currentView);
+    let shouldRefocus = false;
+
     viewElements.forEach((element, id) => {
       const isActive = id === currentView;
       if (isActive) {
@@ -4250,6 +5386,20 @@ export function mountUI({ root, state, config = {} }) {
         element.setAttribute('aria-hidden', 'true');
       }
     });
+
+    if (shouldRefocus && nextViewElement) {
+      requestAnimationFrame(() => {
+        const focusables = collectFocusable(nextViewElement);
+        const target = focusables[0] || nextViewElement || panel;
+        if (typeof target?.focus === 'function') {
+          try {
+            target.focus({ preventScroll: true });
+          } catch (error) {
+            target.focus();
+          }
+        }
+      });
+    }
     if (currentView === 'options') {
       if (activeViewId !== 'options') {
         setupOptionsFocusTrap();
@@ -4929,7 +6079,10 @@ export function mountUI({ root, state, config = {} }) {
   Object.defineProperty(window, 'brailleOut', { get() { return state.get('braille.output'); } });
 
   state.on((snapshot) => {
+    syncCollectionStructures(snapshot);
     syncFilters();
+    syncModuleLayoutPreference(snapshot);
+    renderBuilder();
     syncAdminList();
     syncCollectionPanel();
     applyModuleLayout();
@@ -4941,11 +6094,15 @@ export function mountUI({ root, state, config = {} }) {
     updateActiveShortcuts(snapshot);
     refreshShortcutDisplays(snapshot);
     footerTitle.textContent = buildShortcutSummary(snapshot);
+    syncDependencyViews(snapshot);
     optionBindings.forEach((binding) => binding(snapshot));
   });
 
   const initialSnapshot = state.get();
   syncFilters();
+  syncModuleLayoutPreference(initialSnapshot);
+  syncCollectionStructures(initialSnapshot);
+  renderBuilder();
   syncAdminList();
   syncCollectionPanel();
   applyModuleLayout();
@@ -4957,5 +6114,6 @@ export function mountUI({ root, state, config = {} }) {
   updateActiveShortcuts(initialSnapshot);
   refreshShortcutDisplays(initialSnapshot);
   footerTitle.textContent = buildShortcutSummary(initialSnapshot);
+  syncDependencyViews(initialSnapshot);
   optionBindings.forEach((binding) => binding(initialSnapshot));
 }

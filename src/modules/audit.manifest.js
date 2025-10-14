@@ -5,6 +5,17 @@ export const manifest = {
   description: 'Analyse la page courante avec axe-core et synthétise les violations détectées.',
   category: 'diagnostic',
   keywords: ['audit', 'accessibilite', 'axe-core'],
+  homepage: 'https://a11y-toolbox.test/modules/audit',
+  bugs: 'https://a11y-toolbox.test/support',
+  license: 'MIT',
+  authors: [
+    { name: 'Équipe Accessibilité', email: 'accessibilite@a11ytoolbox.test' },
+    { name: 'Samira Lefèvre', email: 's.lefevre@a11ytoolbox.test' }
+  ],
+  compat: {
+    browsers: ['chrome >= 102', 'edge >= 102', 'firefox >= 104'],
+    features: ['axe']
+  },
   guides: [
     {
       id: 'audit-fastpass',
@@ -111,9 +122,47 @@ export const manifest = {
           headline: 'Audit en attente',
           detail: ''
         },
-        error: null
+        error: null,
+        preferences: {
+          autoRunOnLoad: false,
+          includeBestPractices: true,
+          includeExperimental: false
+        }
       }
     }
+  },
+  config: {
+    group: 'Audit axe-core',
+    description: 'Définissez les paramètres par défaut utilisés lors du lancement des audits.',
+    fields: [
+      {
+        type: 'toggle',
+        path: 'audit.preferences.autoRunOnLoad',
+        label: 'Lancer un audit à l’ouverture',
+        description: 'Démarre automatiquement une analyse axe-core à chaque chargement de page.',
+        onChange: (value) => {
+          window.a11ytb?.logActivity?.(`Audit auto au chargement ${value ? 'activé' : 'désactivé'}`, { tags: ['audit'] });
+        }
+      },
+      {
+        type: 'toggle',
+        path: 'audit.preferences.includeBestPractices',
+        label: 'Inclure les bonnes pratiques',
+        description: 'Ajoute les règles de bonnes pratiques axe-core pour un diagnostic élargi.',
+        onChange: (value) => {
+          window.a11ytb?.logActivity?.(`Règles best practices ${value ? 'incluses' : 'exclues'}`, { tags: ['audit'] });
+        }
+      },
+      {
+        type: 'toggle',
+        path: 'audit.preferences.includeExperimental',
+        label: 'Tester les règles expérimentales',
+        description: 'Active les règles axe-core en version expérimentale pour détecter les risques émergents.',
+        onChange: (value) => {
+          window.a11ytb?.logActivity?.(`Règles expérimentales ${value ? 'activées' : 'désactivées'}`, { tags: ['audit'] });
+        }
+      }
+    ]
   }
 };
 

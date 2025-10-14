@@ -18,6 +18,177 @@ if (!defined('ABSPATH')) {
 const A11YTB_PLUGIN_VERSION = '1.0.0';
 
 /**
+ * Retourne la clé de chiffrement dérivée des salts WordPress.
+ */
+function a11ytb_get_secret_encryption_key(): string
+{
+    static $derived = null;
+
+    if (is_string($derived)) {
+        return $derived;
+    }
+
+    $salt = wp_salt('a11ytb_gemini_api_key');
+
+    if (function_exists('sodium_crypto_generichash') && defined('SODIUM_CRYPTO_SECRETBOX_KEYBYTES')) {
+        $derived = sodium_crypto_generichash($salt, '', SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
+    } else {
+        $derived = hash('sha256', $salt, true);
+    }
+
+    return $derived;
+}
+
+/**
+ * Chiffre un secret en utilisant Sodium ou OpenSSL selon disponibilité.
+ */
+function a11ytb_encrypt_secret(string $secret): ?string
+{
+    if ($secret === '') {
+        return '';
+    }
+
+    $key = a11ytb_get_secret_encryption_key();
+
+    if (
+        function_exists('sodium_crypto_secretbox')
+        && defined('SODIUM_CRYPTO_SECRETBOX_NONCEBYTES')
+        && defined('SODIUM_CRYPTO_SECRETBOX_KEYBYTES')
+    ) {
+        try {
+            $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+        } catch (Exception $exception) {
+            $nonce = false;
+        }
+
+        if ($nonce !== false) {
+            $ciphertext = sodium_crypto_secretbox($secret, $nonce, $key);
+
+            return 's:' . base64_encode($nonce . $ciphertext);
+        }
+    }
+
+    if (function_exists('openssl_encrypt')) {
+        try {
+            $iv = random_bytes(12);
+        } catch (Exception $exception) {
+            $iv = false;
+        }
+
+        if ($iv !== false) {
+            $tag = '';
+            $ciphertext = openssl_encrypt($secret, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag);
+
+            if ($ciphertext !== false && is_string($tag)) {
+                return 'o1:' . base64_encode($iv . $tag . $ciphertext);
+            }
+        }
+
+        try {
+            $iv = random_bytes(16);
+        } catch (Exception $exception) {
+            $iv = false;
+        }
+
+        if ($iv !== false) {
+            $ciphertext = openssl_encrypt($secret, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+
+            if ($ciphertext !== false) {
+                $mac = hash_hmac('sha256', $ciphertext, $key, true);
+
+                return 'o2:' . base64_encode($iv . $mac . $ciphertext);
+            }
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Déchiffre un secret précédemment chiffré.
+ */
+function a11ytb_decrypt_secret($value): ?string
+{
+    if (!is_string($value) || $value === '') {
+        return '';
+    }
+
+    $prefix = substr($value, 0, 3);
+    $payload = substr($value, 3);
+
+    if (strpos($value, 's:') === 0) {
+        if (
+            !function_exists('sodium_crypto_secretbox_open')
+            || !defined('SODIUM_CRYPTO_SECRETBOX_NONCEBYTES')
+        ) {
+            return null;
+        }
+
+        $encoded = substr($value, 2);
+        $decoded = base64_decode($encoded, true);
+
+        if ($decoded === false || strlen($decoded) <= SODIUM_CRYPTO_SECRETBOX_NONCEBYTES) {
+            return null;
+        }
+
+        $nonce = substr($decoded, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+        $ciphertext = substr($decoded, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+        $key = a11ytb_get_secret_encryption_key();
+        $plaintext = sodium_crypto_secretbox_open($ciphertext, $nonce, $key);
+
+        return $plaintext === false ? null : $plaintext;
+    }
+
+    if ($prefix === 'o1:') {
+        if (!function_exists('openssl_decrypt')) {
+            return null;
+        }
+
+        $decoded = base64_decode($payload, true);
+
+        if ($decoded === false || strlen($decoded) <= 28) {
+            return null;
+        }
+
+        $iv = substr($decoded, 0, 12);
+        $tag = substr($decoded, 12, 16);
+        $ciphertext = substr($decoded, 28);
+        $key = a11ytb_get_secret_encryption_key();
+        $plaintext = openssl_decrypt($ciphertext, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag);
+
+        return $plaintext === false ? null : $plaintext;
+    }
+
+    if ($prefix === 'o2:') {
+        if (!function_exists('openssl_decrypt')) {
+            return null;
+        }
+
+        $decoded = base64_decode($payload, true);
+
+        if ($decoded === false || strlen($decoded) <= 48) {
+            return null;
+        }
+
+        $iv = substr($decoded, 0, 16);
+        $mac = substr($decoded, 16, 32);
+        $ciphertext = substr($decoded, 48);
+        $key = a11ytb_get_secret_encryption_key();
+        $calculated_mac = hash_hmac('sha256', $ciphertext, $key, true);
+
+        if (!hash_equals($mac, $calculated_mac)) {
+            return null;
+        }
+
+        $plaintext = openssl_decrypt($ciphertext, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+
+        return $plaintext === false ? null : $plaintext;
+    }
+
+    return $value;
+}
+
+/**
  * Enregistre les ressources communes utilisées par le plugin.
  */
 function a11ytb_register_assets(): void
@@ -25,9 +196,16 @@ function a11ytb_register_assets(): void
     $plugin_url = plugin_dir_url(__FILE__);
 
     wp_register_style(
+        'a11ytb/design-tokens',
+        $plugin_url . 'src/css/design-tokens.css',
+        [],
+        A11YTB_PLUGIN_VERSION
+    );
+
+    wp_register_style(
         'a11ytb/styles',
         $plugin_url . 'src/css/styles.css',
-        [],
+        ['a11ytb/design-tokens'],
         A11YTB_PLUGIN_VERSION
     );
 
@@ -100,14 +278,6 @@ function a11ytb_enqueue_frontend_assets(): void
         'before'
     );
 
-    if (current_user_can('manage_options')) {
-        $admin_config = a11ytb_get_gemini_admin_config();
-        wp_add_inline_script(
-            'a11ytb/app',
-            'window.a11ytbGeminiConfig = ' . wp_json_encode($admin_config) . ';',
-            'before'
-        );
-    }
 }
 add_action('wp_enqueue_scripts', 'a11ytb_enqueue_frontend_assets');
 
@@ -148,9 +318,28 @@ function a11ytb_sanitize_secret($value): string
         return '';
     }
 
-    $normalized = trim($value);
+    $normalized = sanitize_text_field(trim($value));
 
-    return sanitize_text_field($normalized);
+    if ($normalized === '') {
+        return '';
+    }
+
+    $encrypted = a11ytb_encrypt_secret($normalized);
+
+    if (is_string($encrypted)) {
+        return $encrypted;
+    }
+
+    add_settings_error(
+        'a11ytb_options',
+        'a11ytb_options_encryption_error',
+        esc_html__('Impossible de chiffrer la clé fournie. La valeur précédente a été conservée.', 'a11ytb'),
+        'error'
+    );
+
+    $previous = get_option('a11ytb_gemini_api_key', '');
+
+    return is_string($previous) ? $previous : '';
 }
 
 /**
@@ -205,26 +394,6 @@ function a11ytb_register_settings(): void
             'type' => 'string',
             'default' => '0',
             'sanitize_callback' => 'a11ytb_sanitize_checkbox',
-        ]
-    );
-
-    register_setting(
-        'a11ytb_settings',
-        'a11ytb_gemini_api_key',
-        [
-            'type' => 'string',
-            'default' => '',
-            'sanitize_callback' => 'a11ytb_sanitize_secret',
-        ]
-    );
-
-    register_setting(
-        'a11ytb_settings',
-        'a11ytb_gemini_quota',
-        [
-            'type' => 'integer',
-            'default' => 15,
-            'sanitize_callback' => 'a11ytb_sanitize_quota',
         ]
     );
 
@@ -285,23 +454,6 @@ function a11ytb_register_settings(): void
         ['label_for' => 'a11ytb_auto_open_panel']
     );
 
-    add_settings_field(
-        'a11ytb_gemini_api_key',
-        __('Clé API Gemini', 'a11ytb'),
-        'a11ytb_render_gemini_key_field',
-        'a11ytb_settings_page',
-        'a11ytb_section_integrations',
-        ['label_for' => 'a11ytb_gemini_api_key']
-    );
-
-    add_settings_field(
-        'a11ytb_gemini_quota',
-        __('Quota gratuit suivi', 'a11ytb'),
-        'a11ytb_render_gemini_quota_field',
-        'a11ytb_settings_page',
-        'a11ytb_section_integrations',
-        ['label_for' => 'a11ytb_gemini_quota']
-    );
 }
 add_action('admin_init', 'a11ytb_register_settings');
 
@@ -427,12 +579,15 @@ function a11ytb_render_auto_open_field(): void
  */
 function a11ytb_render_gemini_key_field(): void
 {
-    $value = get_option('a11ytb_gemini_api_key', '');
+    $stored = get_option('a11ytb_gemini_api_key', '');
+    $decrypted = a11ytb_decrypt_secret($stored);
+    $decryption_failed = ($stored !== '' && $decrypted === null);
+    $value = ($decrypted === null) ? '' : (string) $decrypted;
     ?>
     <input type="password" id="a11ytb_gemini_api_key" name="a11ytb_gemini_api_key" value="<?php echo esc_attr($value); ?>" autocomplete="off" class="regular-text" />
     <p class="description">
         <?php
-        if ($value) {
+        if ($value !== '') {
             printf(
                 /* translators: %s: masked api key */
                 esc_html__('Clé actuelle : %s', 'a11ytb'),
@@ -440,7 +595,11 @@ function a11ytb_render_gemini_key_field(): void
             );
             echo '<br />';
         }
-        esc_html_e('La clé est stockée chiffrée dans la base WordPress et uniquement visible des administrateurs.', 'a11ytb');
+        if ($decryption_failed) {
+            esc_html_e('La clé enregistrée n’a pas pu être déchiffrée. Veuillez vérifier vos salts WordPress ou saisir une nouvelle valeur.', 'a11ytb');
+            echo '<br />';
+        }
+        esc_html_e('Les clés sont chiffrées via les salts WordPress avant d’être stockées en base de données.', 'a11ytb');
         ?>
     </p>
     <?php
@@ -498,12 +657,13 @@ function a11ytb_get_gemini_admin_config(): array
 {
     $config = [
         'quota' => (int) get_option('a11ytb_gemini_quota', 15),
+        'hasKey' => false,
     ];
 
     $api_key = get_option('a11ytb_gemini_api_key', '');
     if ($api_key) {
-        $config['apiKey'] = $api_key;
         $config['masked'] = a11ytb_mask_secret($api_key);
+        $config['hasKey'] = true;
     }
 
     return $config;
@@ -576,27 +736,21 @@ function a11ytb_enqueue_admin_assets(string $hook): void
         true
     );
 
-    if (function_exists('wp_script_add_data')) {
-        wp_script_add_data('a11ytb/admin-app', 'type', 'module');
+    wp_script_add_data('a11ytb/admin-app', 'type', 'module');
+
+    if (current_user_can('manage_options')) {
+        $admin_data = [
+            'gemini' => a11ytb_get_gemini_admin_config(),
+        ];
+
+        wp_add_inline_script(
+            'a11ytb/admin-app',
+            'window.a11ytbAdminData = Object.freeze(' . wp_json_encode($admin_data) . ');',
+            'before'
+        );
     }
 }
 add_action('admin_enqueue_scripts', 'a11ytb_enqueue_admin_assets');
-
-/**
- * Sanitize Gemini related settings before persistence.
- *
- * @param mixed $value Valeur à nettoyer.
- *
- * @return string
- */
-function a11ytb_sanitize_gemini_setting($value): string
-{
-    if (!is_string($value)) {
-        $value = (string) $value;
-    }
-
-    return sanitize_text_field(trim($value));
-}
 
 /**
  * Enregistre les options nécessaires au tableau de bord Gemini.
@@ -608,7 +762,7 @@ function a11ytb_register_admin_settings(): void
         'a11ytb_gemini_api_key',
         [
             'type' => 'string',
-            'sanitize_callback' => 'a11ytb_sanitize_gemini_setting',
+            'sanitize_callback' => 'a11ytb_sanitize_secret',
             'default' => '',
         ]
     );
@@ -617,13 +771,41 @@ function a11ytb_register_admin_settings(): void
         'a11ytb_options',
         'a11ytb_gemini_quota',
         [
-            'type' => 'string',
-            'sanitize_callback' => 'a11ytb_sanitize_gemini_setting',
-            'default' => '',
+            'type' => 'integer',
+            'sanitize_callback' => 'a11ytb_sanitize_quota',
+            'default' => 15,
         ]
     );
 }
 add_action('admin_init', 'a11ytb_register_admin_settings');
+
+/**
+ * Affiche les champs cachés requis par l’API Settings en évitant les ID dupliqués.
+ *
+ * @param string $option_group Groupe d’options ciblé.
+ * @param string $nonce_suffix Suffixe optionnel pour différencier l’ID du nonce.
+ */
+function a11ytb_render_settings_hidden_fields(string $option_group, string $nonce_suffix = ''): void
+{
+    $nonce_field = '_wpnonce';
+    $nonce_id = $nonce_field;
+
+    if ($nonce_suffix !== '') {
+        $nonce_id .= '_' . sanitize_key($nonce_suffix);
+    }
+
+    $nonce_markup = wp_nonce_field($option_group . '-options', $nonce_field, true, false);
+
+    if ($nonce_id !== $nonce_field) {
+        $escaped_id = esc_attr($nonce_id);
+        $nonce_markup = preg_replace('/id="_wpnonce"/', 'id="' . $escaped_id . '"', $nonce_markup, 1);
+    }
+
+    echo $nonce_markup; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+    echo wp_referer_field(false, false); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+    printf('<input type="hidden" name="option_page" value="%s" />', esc_attr($option_group));
+    echo '<input type="hidden" name="action" value="update" />';
+}
 
 /**
  * Affiche la page d'administration principale du plugin.
@@ -632,8 +814,11 @@ function a11ytb_render_admin_page(): void
 {
     $is_enabled = a11ytb_is_enabled();
     $preview_url = plugins_url('index.html', __FILE__);
-    $gemini_api_key = get_option('a11ytb_gemini_api_key', '');
-    $gemini_quota = get_option('a11ytb_gemini_quota', '');
+    $stored_gemini_api_key = get_option('a11ytb_gemini_api_key', '');
+    $decrypted_gemini_api_key = a11ytb_decrypt_secret($stored_gemini_api_key);
+    $gemini_key_error = ($stored_gemini_api_key !== '' && $decrypted_gemini_api_key === null);
+    $gemini_api_key = ($decrypted_gemini_api_key === null) ? '' : (string) $decrypted_gemini_api_key;
+    $gemini_quota = (int) get_option('a11ytb_gemini_quota', 15);
     ?>
     <div class="wrap a11ytb-admin-page">
         <h1><?php esc_html_e('A11y Toolbox Pro', 'a11ytb'); ?></h1>
@@ -646,7 +831,7 @@ function a11ytb_render_admin_page(): void
 
         <form method="post" action="options.php" class="a11ytb-settings-form">
             <?php
-            settings_fields('a11ytb_settings');
+            a11ytb_render_settings_hidden_fields('a11ytb_settings', 'general');
             do_settings_sections('a11ytb_settings_page');
             submit_button(__('Enregistrer les réglages', 'a11ytb'));
             ?>
@@ -660,10 +845,11 @@ function a11ytb_render_admin_page(): void
             </div>
         <?php endif; ?>
 
+        <?php settings_errors('a11ytb_options'); ?>
+
         <form method="post" action="options.php" class="a11ytb-admin-settings">
             <?php
-            settings_fields('a11ytb_options');
-            do_settings_sections('a11y-toolbox-pro');
+            a11ytb_render_settings_hidden_fields('a11ytb_options', 'gemini');
             ?>
 
             <div class="a11ytb-admin-field">
@@ -678,6 +864,23 @@ function a11ytb_render_admin_page(): void
                     class="regular-text"
                     autocomplete="off"
                 />
+                <p class="description">
+                    <?php
+                    if ($gemini_api_key !== '') {
+                        printf(
+                            /* translators: %s: masked api key */
+                            esc_html__('Clé actuelle : %s', 'a11ytb'),
+                            esc_html(a11ytb_mask_secret($gemini_api_key))
+                        );
+                        echo '<br />';
+                    }
+                    if ($gemini_key_error) {
+                        esc_html_e('La clé enregistrée n’a pas pu être déchiffrée. Veuillez vérifier vos salts WordPress ou saisir une nouvelle valeur.', 'a11ytb');
+                        echo '<br />';
+                    }
+                    esc_html_e('Les clés sont chiffrées via les salts WordPress avant d’être stockées en base de données.', 'a11ytb');
+                    ?>
+                </p>
             </div>
 
             <div class="a11ytb-admin-field">

@@ -671,6 +671,7 @@ function buildTtsSummary(snapshot = {}) {
       summary.detail = `Progression\u00A0: ${Number.isFinite(progress) ? progress : 0}\u00A0%`;
       summary.tone = STATUS_TONE_ACTIVE;
       summary.live = 'assertive';
+      summary.badge = 'Lecture active';
       break;
     }
     case 'unsupported':
@@ -683,6 +684,7 @@ function buildTtsSummary(snapshot = {}) {
       summary.value = 'Erreur de lecture';
       summary.detail = 'Une erreur est survenue pendant la lecture vocale.';
       summary.tone = STATUS_TONE_WARNING;
+      summary.badge = 'Lecture en échec';
       break;
     default: {
       const voices = Array.isArray(tts.availableVoices) ? tts.availableVoices : [];
