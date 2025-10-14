@@ -1,26 +1,77 @@
 import { test, expect } from '@playwright/test';
-import { readFile, writeFile } from 'node:fs/promises';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const BASELINE_PATH = resolve(__dirname, 'baselines/options-panel.png.base64');
+const BASELINE_SVG_PATH = resolve(__dirname, 'baselines/options-panel.svg');
 
 const shouldUpdateBaseline = process.env.UPDATE_VISUAL_BASELINE === '1';
 
-const FIXED_SCHEDULE_TIMESTAMP = Date.UTC(2024, 0, 8, 9, 0);
-
-test.use({ timezoneId: 'Europe/Paris' });
-
-const BASELINE_SCREENSHOT = shouldUpdateBaseline
-  ? null
-  : (await readFile(BASELINE_PATH, 'utf8')).replace(/\s+/g, '');
-
-const wrapBase64 = (payload) => {
-  const chunks = payload.match(/.{1,76}/g);
-  return (chunks ?? [payload]).join('\n');
+const readBaselineData = () => {
+  if (!existsSync(BASELINE_SVG_PATH)) {
+    throw new Error(
+      "La capture de référence est absente. Exécutez `UPDATE_VISUAL_BASELINE=1 npm run test:visual` pour la régénérer."
+    );
+  }
+  try {
+    const svg = readFileSync(BASELINE_SVG_PATH, 'utf8');
+    const dataMatch = svg.match(
+      /href=['"']data:image\/png;base64,([A-Za-z0-9+/=\s]+)['"']/
+    );
+    if (!dataMatch) {
+      throw new Error();
+    }
+    const pngBuffer = Buffer.from(dataMatch[1].replace(/\s+/g, ''), 'base64');
+    const { width, height } = getPngDimensions(pngBuffer);
+    return {
+      buffer: pngBuffer,
+      width,
+      height,
+      sha256: computeScreenshotHash(pngBuffer)
+    };
+  } catch (error) {
+    throw new Error(
+      'Le fichier de référence est illisible. Régénérez la baseline avec `UPDATE_VISUAL_BASELINE=1 npm run test:visual`.'
+    );
+  }
 };
+
+const getPngDimensions = (pngBuffer) => ({
+  width: pngBuffer.readUInt32BE(16),
+  height: pngBuffer.readUInt32BE(20)
+});
+
+const computeScreenshotHash = (pngBuffer) =>
+  createHash('sha256').update(pngBuffer).digest('hex');
+
+const renderBaselineSvg = ({ width, height, base64 }) => `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <title>Baseline visuelle Options &amp; Profils</title>
+  <desc>Image PNG encodée en Base64 utilisée comme référence pour le test Playwright.</desc>
+  <image width="${width}" height="${height}" href="data:image/png;base64,${base64}" />
+</svg>
+`;
+
+const writeBaselineSvg = (pngBuffer) => {
+  const { width, height } = getPngDimensions(pngBuffer);
+  const metadata = {
+    width,
+    height,
+    sha256: computeScreenshotHash(pngBuffer)
+  };
+  const base64 = pngBuffer.toString('base64');
+  writeFileSync(
+    BASELINE_SVG_PATH,
+    renderBaselineSvg({ width, height, base64 }),
+    'utf8'
+  );
+  return metadata;
+};
+
+const BASELINE_DATA = shouldUpdateBaseline ? null : readBaselineData();
 
 const focusableSelectors = [
   'a[href]',
@@ -138,16 +189,20 @@ test.describe('Panneau Options & Profils', () => {
       maskColor: '#000'
     });
 
-    const actual = screenshot.toString('base64');
-
     if (shouldUpdateBaseline) {
-      await writeFile(BASELINE_PATH, `${wrapBase64(actual)}\n`, 'utf8');
+      const metadata = writeBaselineSvg(screenshot);
       test.info().annotations.push({
         type: 'baseline',
-        description: 'options-panel baseline updated'
+        description: `options-panel baseline mise à jour (sha256: ${metadata.sha256})`
       });
     } else {
-      expect(actual).toBe(BASELINE_SCREENSHOT);
+      const { width, height, sha256, buffer } = BASELINE_DATA;
+      const { width: captureWidth, height: captureHeight } =
+        getPngDimensions(screenshot);
+      expect(captureWidth).toBe(width);
+      expect(captureHeight).toBe(height);
+      expect(computeScreenshotHash(screenshot)).toBe(sha256);
+      expect(buffer.equals(screenshot)).toBe(true);
     }
   });
 });
