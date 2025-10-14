@@ -22,7 +22,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 
 ## Écarts actuels
 
-- **Portée fonctionnelle** : la démo embarque maintenant un module d’audit axe-core complet (lancement manuel, synthèse, exports JSON/CSV) et un centre d’état corrélé, ce qui rapproche l’outil d’axe DevTools/Accessibility Insights. La planification récurrente (toutes les heures/quotidienne/hebdomadaire avec plage horaire) est accessible depuis Options & Profils avec journalisation automatique des exécutions, mais il manque encore les parcours FastPass et la corrélation avec des parcours utilisateurs.
+- **Portée fonctionnelle** : la démo embarque maintenant un module d’audit axe-core complet (lancement manuel, synthèse, exports JSON/CSV) et un centre d’état corrélé, ce qui rapproche l’outil d’axe DevTools/Accessibility Insights. La planification récurrente (toutes les heures/quotidienne/hebdomadaire avec plage horaire) est accessible depuis Options & Profils avec journalisation automatique des exécutions, et les parcours FastPass (Audit, Synthèse vocale, Dictée, Contraste, Braille, Espacements) sont disponibles dans la vue Guides. Reste à corréler ces parcours avec des scénarios utilisateurs pour compléter la boucle d’observation.
 - **Personnalisation** : les profils préconfigurés peuvent être combinés avec des réglages fins (voix TTS, vitesse, volume, paramètres audio, dictionnaire braille) directement issus des manifestes. La duplication, le partage/import de profils et le premier lot de raccourcis configurables sont disponibles ; il reste à enrichir l’édition collaborative et la gestion avancée des raccourcis pour atteindre la profondeur de Stark.
 - **Administration modulaire** : le builder réordonnable intègre désormais des collections activables en un clic, la désactivation conditionnelle et le lazy-loading des modules au runtime. Il reste à gérer les collections imbriquées, les vues d’ensemble par profil et le chargement différé côté réseau (préchargement progressif, stratégie cache).
 - **Collaboration** : le journal exportable (JSON/CSV) et les métriques runtime apportent une base de partage, mais il n’y a toujours pas d’espace multi-utilisateurs, de commentaires ni de synchronisation cloud comme dans les suites professionnelles.
@@ -55,17 +55,25 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 
 ## Manques face à la concurrence
 
-- **Audit automatisé continu** : l’analyse axe-core manuelle, ses exports et désormais une planification locale (heure, jour, semaine, fenêtre horaire) existent, mais il manque encore les parcours guidés FastPass et le suivi multi-pages proposé par Accessibility Insights.
-- **Guidage** : la vue Guides reste statique ; aucune checklist dynamique ni scénarisation interactive façon FastPass.
+- **Audit automatisé continu** : l’analyse axe-core manuelle, ses exports et désormais une planification locale (heure, jour, semaine, fenêtre horaire) existent, et les parcours guidés FastPass couvrent les vérifications critiques ; le suivi multi-pages proposé par Accessibility Insights reste cependant absent.
+- **Guidage** : la vue Guides propose désormais des checklists dynamiques inspirées des FastPass (prérequis, annonces `aria-live`, ressources). Il reste à scénariser des parcours utilisateurs complets et à ajouter des exports résumés.
 - **Personnalisation avancée** : pas de duplication/partage de profils, ni de raccourcis personnalisables ou d’automations, contrairement à Stark.
 - **Collaboration** : toujours aucune intégration Jira/Linear/Slack ni gestion multi-utilisateurs.
 - **Observabilité** : les métriques runtime sont locales, désormais agrégées dans un indice de conformité AA/AAA consolidé **et dans un suivi d’historique manifestes**. Il manque encore l’agrégation historique multi-instance et des tableaux de bord partageables comme sur les plateformes enterprise.
+
+> *Exemple* : le guide « Formulaire accessible » enchaîne désormais un précheck des prérequis (structure de formulaire, attributs ARIA requis), déclenche les tests automatiques (axe-core ciblé) puis propose des validations manuelles assistées (annonces clavier, revues visuelles). Cela le rapproche des FastPass, mais il manque encore la capture d'un scénario multi-pages et le co-tri des résultats avec un collègue dans l'interface.
 
 ## Webhooks d’activité & implications de sécurité
 
 - **Activation** : l’écran d’administration expose désormais deux champs dans la section intégrations — `Webhook activité (URL)` et `Webhook activité (jeton)` — pour router le journal (`window.a11ytb.logActivity`) vers un endpoint HTTPS externe (connecteur Slack, fonction serverless, etc.). Une fois l’URL enregistrée, chaque entrée est poussée en JSON et un bouton « Envoyer au webhook » permet de relancer manuellement l’ensemble du journal depuis la vue Export.
 - **Authentification** : le jeton optionnel est chiffré avec les salts WordPress côté base de données mais est ré-exposé côté frontal pour que le navigateur puisse insérer l’en-tête `Authorization: Bearer …`. Utiliser un secret dédié et révoquable, limiter l’IP source ou ajouter une validation côté serveur reste indispensable pour éviter qu’un visiteur ne détourne l’URL.
 - **Résilience** : les envois sont mis en file d’attente avec relance exponentielle (2s → 30s). Chaque échec ou synchronisation manuelle est journalisé dans l’activité pour assurer la traçabilité sans masquer l’historique initial.
+
+## Flux de synchronisation métriques (authentification & privacy)
+
+- **Collecte côté runtime** : `setupModuleRuntime` sérialise désormais chaque échantillon de métriques avec horodatage, latences (load/init/total), compatibilité et incidents structurés. Le hook `onMetricsUpdate` permet à n’importe quel service d’observer les points (ex. télémétrie interne) sans avoir à sonder le store.
+- **Service `createMetricsSyncService`** : l’agrégateur implémente des fenêtres temporelles (durée configurable) avec normalisation des scores (AAA/AA/…), consolidation par module et calcul des moyennes. Les paquets prêts à l’export sont publiés vers un backend via `fetch` (Bearer optionnel) ou stockés dans IndexedDB/localStorage en mode offline.
+- **Résilience & confidentialité** : les tentatives sont limitées par un timeout configurable et retentées au retour du réseau (`online`, `beforeunload`, `visibilitychange`). Seuls les identifiants de module, des agrégats numériques et des incidents sans contenu utilisateur sont synchronisés pour éviter toute fuite de données personnelles ; la file locale est purgée à la demande.
 
 ## Recommandations stratégiques
 
@@ -180,7 +188,7 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
 - Automatiser les **scans d’accessibilité** (planification, comparaison de rapports, budget qualité).
 - API plugin distants : installation de modules depuis un CDN signé avec sandbox et vérification des permissions.
 - Gestion multilingue (i18n) du panneau drag & drop et du centre d’état.
-- Parcours guidé **FastPass-like** avec checklist interactive, notation par critère et export résumé.
+- Parcours guidé **FastPass** étendu : notation par critère, export résumé et scénarios multi-pages.
 - Synchronisation des préférences utilisateurs via stockage cloud sécurisé (multi-appareils).
 - Lancement d'un **programme bêta** pour les modules tiers (audit sécurité, conformité RGPD, monitoring usage).
 

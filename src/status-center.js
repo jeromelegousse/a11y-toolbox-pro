@@ -30,6 +30,399 @@ function pickWorstScore(current, candidate) {
   return candidateRank > currentRank ? normalizedCandidate : normalizedCurrent;
 }
 
+const DEFAULT_WINDOW_DURATION = 5 * 60 * 1000;
+const DEFAULT_FLUSH_INTERVAL = 45 * 1000;
+const DEFAULT_TIMEOUT_MS = 8000;
+const DEFAULT_MAX_WINDOW_AGE = 60 * 60 * 1000;
+const AGGREGATED_INCIDENT_LIMIT = 50;
+const MAX_SYNC_QUEUE_SIZE = 50;
+
+function isNavigatorOnline() {
+  if (typeof navigator === 'undefined' || typeof navigator.onLine === 'undefined') {
+    return true;
+  }
+  return navigator.onLine !== false;
+}
+
+function computeBucketLatency(bucket) {
+  const loadAverage = bucket.latency.load.samples > 0
+    ? bucket.latency.load.total / bucket.latency.load.samples
+    : null;
+  const initAverage = bucket.latency.init.samples > 0
+    ? bucket.latency.init.total / bucket.latency.init.samples
+    : null;
+  const combinedAverage = (Number.isFinite(loadAverage) ? loadAverage : 0)
+    + (Number.isFinite(initAverage) ? initAverage : 0);
+  return {
+    load: {
+      average: Number.isFinite(loadAverage) ? loadAverage : null,
+      samples: bucket.latency.load.samples
+    },
+    init: {
+      average: Number.isFinite(initAverage) ? initAverage : null,
+      samples: bucket.latency.init.samples
+    },
+    combinedAverage: Number.isFinite(combinedAverage) && combinedAverage > 0 ? combinedAverage : null
+  };
+}
+
+function bucketToSnapshot(bucket, state, nowFn) {
+  const latency = computeBucketLatency(bucket);
+  const runtimeEntry = typeof state?.get === 'function'
+    ? state.get(`runtime.modules.${bucket.moduleId}`)
+    : null;
+  const moduleLabel = runtimeEntry?.manifestName || bucket.moduleId;
+  const collections = Array.isArray(runtimeEntry?.collections)
+    ? runtimeEntry.collections.slice()
+    : [];
+  const snapshotIncidents = bucket.incidents.slice(-AGGREGATED_INCIDENT_LIMIT).map((incident) => ({
+    type: incident.type || 'incident',
+    severity: incident.severity || (incident.type === 'warning' ? 'warning' : 'error'),
+    message: incident.message || '',
+    at: incident.at
+  }));
+  return {
+    moduleId: bucket.moduleId,
+    moduleLabel,
+    windowStart: bucket.windowStart,
+    windowEnd: bucket.windowEnd,
+    samples: bucket.samples,
+    attempts: bucket.attempts,
+    successes: bucket.successes,
+    failures: bucket.failures,
+    retryCount: bucket.retryCount,
+    score: bucket.score,
+    latency,
+    incidents: snapshotIncidents,
+    collections,
+    lastTimestamp: bucket.lastTimestamp,
+    lastIncidentAt: bucket.lastIncidentAt,
+    generatedAt: nowFn()
+  };
+}
+
+export function createMetricsSyncService({
+  state,
+  transport,
+  storage,
+  windowDuration = DEFAULT_WINDOW_DURATION,
+  flushInterval = DEFAULT_FLUSH_INTERVAL,
+  maxWindowAge = DEFAULT_MAX_WINDOW_AGE,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  now: nowFn = () => Date.now()
+} = {}) {
+  const effectiveWindow = Math.max(10, Number(windowDuration) || DEFAULT_WINDOW_DURATION);
+  const windows = new Map();
+  const counters = new Map();
+  let queue = [];
+  let timer = null;
+  let updateListener = null;
+
+  const ready = storage?.load
+    ? Promise.resolve()
+      .then(() => storage.load())
+      .then((stored) => {
+        if (Array.isArray(stored)) {
+          queue = stored.slice(0, MAX_SYNC_QUEUE_SIZE);
+        }
+      })
+      .catch((error) => {
+        console.warn('a11ytb: impossible de charger la file de synchronisation métriques.', error);
+      })
+    : Promise.resolve();
+
+  function emitUpdate() {
+    const snapshot = {
+      activeWindows: Array.from(windows.values()).map((bucket) => bucketToSnapshot(bucket, state, nowFn)),
+      pendingQueue: queue.map((payload) => ({
+        generatedAt: payload.generatedAt,
+        windows: payload.windows.length
+      })),
+      lastUpdatedAt: nowFn()
+    };
+    if (state?.set) {
+      state.set('runtime.metricsSync', snapshot);
+    }
+    if (typeof updateListener === 'function') {
+      updateListener(snapshot);
+    }
+  }
+
+  function persistQueue() {
+    if (!storage?.save) return Promise.resolve();
+    return Promise.resolve()
+      .then(() => storage.save(queue))
+      .catch((error) => {
+        console.warn('a11ytb: impossible de persister la file métriques.', error);
+      });
+  }
+
+  function ensureBucket(moduleId, windowStart) {
+    const key = `${moduleId}:${windowStart}`;
+    if (!windows.has(key)) {
+      windows.set(key, {
+        moduleId,
+        windowStart,
+        windowEnd: windowStart + effectiveWindow,
+        samples: 0,
+        attempts: 0,
+        successes: 0,
+        failures: 0,
+        retryCount: 0,
+        latency: {
+          load: { total: 0, samples: 0 },
+          init: { total: 0, samples: 0 }
+        },
+        incidents: [],
+        score: 'AAA',
+        lastTimestamp: windowStart,
+        lastIncidentAt: 0
+      });
+    }
+    return windows.get(key);
+  }
+
+  function cleanupBuckets(reference = nowFn()) {
+    const threshold = Math.max(effectiveWindow, Number(maxWindowAge) || DEFAULT_MAX_WINDOW_AGE);
+    windows.forEach((bucket, key) => {
+      if ((reference - bucket.windowStart) > threshold && bucket.samples === 0) {
+        windows.delete(key);
+      }
+    });
+  }
+
+  function enqueuePayload(payload) {
+    queue.push(payload);
+    if (queue.length > MAX_SYNC_QUEUE_SIZE) {
+      queue.splice(0, queue.length - MAX_SYNC_QUEUE_SIZE);
+    }
+  }
+
+  function recordLatencyDelta(bucket, previous, timings = {}) {
+    const loadTiming = timings.load || {};
+    const initTiming = timings.init || {};
+    const loadTotal = Number(loadTiming.total ?? 0);
+    const initTotal = Number(initTiming.total ?? 0);
+    const loadSamples = Number(loadTiming.samples ?? 0);
+    const initSamples = Number(initTiming.samples ?? 0);
+    const loadDelta = loadTotal - (previous.loadTotal ?? 0);
+    const initDelta = initTotal - (previous.initTotal ?? 0);
+    const loadSampleDelta = loadSamples - (previous.loadSamples ?? 0);
+    const initSampleDelta = initSamples - (previous.initSamples ?? 0);
+    if (loadDelta > 0 && loadSampleDelta > 0) {
+      bucket.latency.load.total += loadDelta;
+      bucket.latency.load.samples += loadSampleDelta;
+    }
+    if (initDelta > 0 && initSampleDelta > 0) {
+      bucket.latency.init.total += initDelta;
+      bucket.latency.init.samples += initSampleDelta;
+    }
+    previous.loadTotal = loadTotal;
+    previous.loadSamples = loadSamples;
+    previous.initTotal = initTotal;
+    previous.initSamples = initSamples;
+  }
+
+  function recordIncidents(bucket, previous, incidents = [], collectedAt) {
+    incidents.forEach((incident) => {
+      const at = Number.isFinite(incident?.at)
+        ? incident.at
+        : collectedAt;
+      if (at > (previous.lastIncidentAt ?? 0)) {
+        bucket.incidents.push({
+          type: incident?.type || 'incident',
+          severity: incident?.severity || (incident?.type === 'warning' ? 'warning' : 'error'),
+          message: incident?.message || '',
+          at
+        });
+        bucket.lastIncidentAt = Math.max(bucket.lastIncidentAt, at);
+        previous.lastIncidentAt = at;
+      }
+    });
+  }
+
+  function ingest(sample) {
+    if (!sample || !sample.moduleId) return;
+    const collectedAt = Number.isFinite(sample.collectedAt)
+      ? sample.collectedAt
+      : Number(sample.timestamps?.collectedAt) || nowFn();
+    const windowStart = Math.floor(collectedAt / effectiveWindow) * effectiveWindow;
+    cleanupBuckets(collectedAt);
+    const bucket = ensureBucket(sample.moduleId, windowStart);
+    const status = sample.status || {};
+    const attempts = Number(status.attempts ?? sample.attempts ?? 0);
+    const successes = Number(status.successes ?? sample.successes ?? 0);
+    const failures = Number(status.failures ?? sample.failures ?? 0);
+    const retryCount = Number(status.retryCount ?? Math.max(0, attempts - successes));
+    const previous = counters.get(sample.moduleId) || {
+      attempts: 0,
+      successes: 0,
+      failures: 0,
+      retryCount: 0,
+      loadTotal: 0,
+      loadSamples: 0,
+      initTotal: 0,
+      initSamples: 0,
+      lastIncidentAt: 0
+    };
+
+    const deltaAttempts = Math.max(0, attempts - (previous.attempts ?? 0));
+    const deltaSuccesses = Math.max(0, successes - (previous.successes ?? 0));
+    const deltaFailures = Math.max(0, failures - (previous.failures ?? 0));
+    const deltaRetry = Math.max(0, retryCount - (previous.retryCount ?? 0));
+
+    bucket.samples += 1;
+    bucket.attempts += deltaAttempts;
+    bucket.successes += deltaSuccesses;
+    bucket.failures += deltaFailures;
+    bucket.retryCount += deltaRetry;
+    bucket.lastTimestamp = Math.max(bucket.lastTimestamp, collectedAt);
+    bucket.score = pickWorstScore(bucket.score, sample.compat?.score || sample.score || 'AAA');
+
+    recordLatencyDelta(bucket, previous, sample.timings);
+    recordIncidents(bucket, previous, sample.incidents, collectedAt);
+
+    const sampleIncidentTimestamp = Number(sample.timestamps?.lastIncidentAt ?? 0);
+    if (sampleIncidentTimestamp > (previous.lastIncidentAt ?? 0)) {
+      previous.lastIncidentAt = sampleIncidentTimestamp;
+    }
+
+    counters.set(sample.moduleId, {
+      attempts,
+      successes,
+      failures,
+      retryCount,
+      loadTotal: previous.loadTotal,
+      loadSamples: previous.loadSamples,
+      initTotal: previous.initTotal,
+      initSamples: previous.initSamples,
+      lastIncidentAt: previous.lastIncidentAt
+    });
+
+    emitUpdate();
+  }
+
+  async function processPayload(payload) {
+    if (!transport) {
+      return false;
+    }
+    if (!isNavigatorOnline()) {
+      return false;
+    }
+    try {
+      const sendPromise = Promise.resolve().then(() => transport(payload));
+      if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
+        await Promise.race([
+          sendPromise,
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('timeout')), timeoutMs);
+          })
+        ]);
+      } else {
+        await sendPromise;
+      }
+      return true;
+    } catch (error) {
+      console.warn('a11ytb: synchronisation métriques échouée.', error);
+      return false;
+    }
+  }
+
+  async function processQueue() {
+    if (!queue.length) return 0;
+    const pending = queue.slice();
+    queue = [];
+    let sent = 0;
+    for (let index = 0; index < pending.length; index += 1) {
+      const payload = pending[index];
+      const delivered = await processPayload(payload);
+      if (!delivered) {
+        enqueuePayload(payload);
+        for (let nextIndex = index + 1; nextIndex < pending.length; nextIndex += 1) {
+          enqueuePayload(pending[nextIndex]);
+        }
+        break;
+      }
+      sent += payload.windows.length;
+    }
+    await persistQueue();
+    return sent;
+  }
+
+  async function flush({ force = false } = {}) {
+    await ready;
+    cleanupBuckets();
+    let sent = await processQueue();
+    const nowTs = nowFn();
+    const matured = [];
+    windows.forEach((bucket, key) => {
+      if (!bucket.samples) {
+        windows.delete(key);
+        return;
+      }
+      const expired = force
+        || nowTs >= bucket.windowEnd
+        || (nowTs - bucket.lastTimestamp) >= effectiveWindow;
+      if (expired) {
+        matured.push(bucketToSnapshot(bucket, state, nowFn));
+        windows.delete(key);
+      }
+    });
+    if (matured.length) {
+      const payload = { generatedAt: nowTs, windows: matured };
+      const delivered = await processPayload(payload);
+      if (!delivered) {
+        enqueuePayload(payload);
+        await persistQueue();
+      } else {
+        sent += payload.windows.length;
+      }
+    }
+    emitUpdate();
+    return { sent, queued: queue.length };
+  }
+
+  function start() {
+    if (timer) return;
+    timer = setInterval(() => {
+      flush().catch((error) => {
+        console.warn('a11ytb: flush métriques en arrière-plan impossible.', error);
+      });
+    }, Math.max(1000, Number(flushInterval) || DEFAULT_FLUSH_INTERVAL));
+  }
+
+  function stop() {
+    if (!timer) return;
+    clearInterval(timer);
+    timer = null;
+  }
+
+  function getActiveWindows() {
+    return Array.from(windows.values()).map((bucket) => bucketToSnapshot(bucket, state, nowFn));
+  }
+
+  function getQueueSnapshot() {
+    return queue.slice();
+  }
+
+  function setOnUpdate(listener) {
+    updateListener = typeof listener === 'function' ? listener : null;
+  }
+
+  ready.then(() => emitUpdate());
+
+  return {
+    ingest,
+    flush,
+    start,
+    stop,
+    getActiveWindows,
+    getQueue: getQueueSnapshot,
+    setOnUpdate,
+    isRunning: () => Boolean(timer)
+  };
+}
+
 function toneFromScore(score) {
   const rank = SCORE_PRIORITY.get(normalizeScore(score)) ?? 0;
   if (rank >= 3) return STATUS_TONE_ALERT;

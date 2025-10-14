@@ -1044,9 +1044,333 @@ export function mountUI({ root, state, config = {} }) {
   const statusGrid = document.createElement('div');
   statusGrid.className = 'a11ytb-status-grid';
 
-  statusCenter.append(statusHeader, statusGrid);
+  const aggregationSection = document.createElement('section');
+  aggregationSection.className = 'a11ytb-status-aggregations';
+  aggregationSection.setAttribute('role', 'region');
+  aggregationSection.setAttribute('aria-label', 'Synthèse agrégée des métriques');
+
+  const aggregationHeader = document.createElement('div');
+  aggregationHeader.className = 'a11ytb-status-header';
+  const aggregationTitle = document.createElement('h3');
+  aggregationTitle.className = 'a11ytb-status-title';
+  aggregationTitle.textContent = 'Tendances consolidées';
+  const aggregationDescription = document.createElement('p');
+  aggregationDescription.className = 'a11ytb-status-description';
+  aggregationDescription.textContent = 'Comparez les performances des modules par profil ou collection.';
+  aggregationHeader.append(aggregationTitle, aggregationDescription);
+
+  const aggregationFilters = document.createElement('div');
+  aggregationFilters.className = 'a11ytb-status-filters';
+
+  const profileFilterId = 'a11ytb-status-filter-profile';
+  const aggregationProfileLabel = document.createElement('label');
+  aggregationProfileLabel.setAttribute('for', profileFilterId);
+  aggregationProfileLabel.textContent = 'Profil';
+  const aggregationProfileSelect = document.createElement('select');
+  aggregationProfileSelect.id = profileFilterId;
+  aggregationProfileSelect.setAttribute('aria-label', 'Filtrer les métriques agrégées par profil');
+
+  const collectionFilterId = 'a11ytb-status-filter-collection';
+  const aggregationCollectionLabel = document.createElement('label');
+  aggregationCollectionLabel.setAttribute('for', collectionFilterId);
+  aggregationCollectionLabel.textContent = 'Collection';
+  const aggregationCollectionSelect = document.createElement('select');
+  aggregationCollectionSelect.id = collectionFilterId;
+  aggregationCollectionSelect.setAttribute('aria-label', 'Filtrer les métriques agrégées par collection');
+
+  aggregationFilters.append(
+    aggregationProfileLabel,
+    aggregationProfileSelect,
+    aggregationCollectionLabel,
+    aggregationCollectionSelect
+  );
+
+  const aggregationList = document.createElement('div');
+  aggregationList.className = 'a11ytb-aggregation-list';
+  aggregationList.setAttribute('role', 'list');
+
+  const aggregationLive = document.createElement('p');
+  aggregationLive.className = 'a11ytb-sr-only';
+  aggregationLive.setAttribute('aria-live', 'assertive');
+
+  aggregationSection.append(aggregationHeader, aggregationFilters, aggregationList, aggregationLive);
+
+  statusCenter.append(statusHeader, statusGrid, aggregationSection);
+
+  let collectionDefinitions = [];
+  let collectionById = new Map();
+  let moduleCollectionsIndex = new Map();
+  let collectionBlockIds = new Map();
 
   const statusCards = new Map();
+
+  const aggregationFilterState = { profile: 'all', collection: 'all' };
+  const aggregationTimeFormatter = typeof Intl?.DateTimeFormat === 'function'
+    ? new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    : null;
+  const aggregationDayFormatter = typeof Intl?.DateTimeFormat === 'function'
+    ? new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short' })
+    : null;
+
+  function setAggregationSelectOptions(select, options, preferredValue = 'all') {
+    const allowedValues = new Set(options.map((option) => option.value));
+    select.innerHTML = '';
+    options.forEach((option) => {
+      const opt = document.createElement('option');
+      opt.value = option.value;
+      opt.textContent = option.label;
+      select.append(opt);
+    });
+    const nextValue = allowedValues.has(preferredValue)
+      ? preferredValue
+      : (options[0]?.value || 'all');
+    select.value = nextValue;
+    return nextValue;
+  }
+
+  function formatAggregationWindow(start, end) {
+    if (!Number.isFinite(start) || !Number.isFinite(end)) {
+      return 'Fenêtre temporelle indisponible';
+    }
+    if (aggregationTimeFormatter && aggregationDayFormatter) {
+      const startDate = new Date(start);
+      const endDate = new Date(end);
+      const sameDay = startDate.toDateString() === endDate.toDateString();
+      const dayLabel = sameDay
+        ? aggregationDayFormatter.format(startDate)
+        : `${aggregationDayFormatter.format(startDate)} → ${aggregationDayFormatter.format(endDate)}`;
+      const timeLabel = `${aggregationTimeFormatter.format(startDate)} → ${aggregationTimeFormatter.format(endDate)}`;
+      return `${dayLabel} · ${timeLabel}`;
+    }
+    return `Fenêtre ${new Date(start).toLocaleString()} → ${new Date(end).toLocaleString()}`;
+  }
+
+  function toneFromAggregatedScore(score) {
+    const normalized = typeof score === 'string' ? score.trim().toUpperCase() : 'AAA';
+    if (normalized === 'C' || normalized === 'B') return 'alert';
+    if (normalized === 'A') return 'warning';
+    if (normalized === 'AA') return 'active';
+    return 'info';
+  }
+
+  function createAggregationChart(successes = 0, failures = 0) {
+    const total = Math.max(0, Number(successes) + Number(failures));
+    const successRatio = total > 0 ? Math.max(0, Math.min(100, (Number(successes) / total) * 100)) : 0;
+    const failureRatio = total > 0 ? Math.max(0, Math.min(100, (Number(failures) / total) * 100)) : 0;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 100 12');
+    svg.setAttribute('focusable', 'false');
+    svg.setAttribute('role', 'img');
+    const labelParts = [];
+    if (total > 0) {
+      labelParts.push(`${Math.round(successRatio)} % succès`);
+      labelParts.push(`${Math.round(failureRatio)} % échecs`);
+    } else {
+      labelParts.push('Aucun échantillon');
+    }
+    svg.setAttribute('aria-label', labelParts.join(' · '));
+    const successRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    successRect.setAttribute('x', '0');
+    successRect.setAttribute('y', '0');
+    successRect.setAttribute('height', '12');
+    successRect.setAttribute('width', String(successRatio));
+    successRect.setAttribute('fill', '#1b873f');
+    const failureRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    failureRect.setAttribute('x', String(successRatio));
+    failureRect.setAttribute('y', '0');
+    failureRect.setAttribute('height', '12');
+    failureRect.setAttribute('width', String(failureRatio));
+    failureRect.setAttribute('fill', '#d1345b');
+    svg.append(successRect, failureRect);
+    return svg;
+  }
+
+  function handleAggregationKeyNav(event) {
+    if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(event.key)) return;
+    const cards = Array.from(aggregationList.querySelectorAll('[data-aggregation-card="true"]'));
+    const currentIndex = cards.indexOf(event.currentTarget);
+    if (currentIndex === -1 || cards.length === 0) return;
+    event.preventDefault();
+    let nextIndex = currentIndex;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      nextIndex = (currentIndex + 1) % cards.length;
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      nextIndex = (currentIndex - 1 + cards.length) % cards.length;
+    }
+    cards[nextIndex]?.focus();
+  }
+
+  function createAggregationCard(windowData, runtimeEntry) {
+    const card = document.createElement('article');
+    card.className = 'a11ytb-status-card a11ytb-status-card--aggregation';
+    card.dataset.aggregationCard = 'true';
+    card.dataset.tone = toneFromAggregatedScore(windowData.score || 'AAA');
+    card.setAttribute('role', 'listitem');
+    card.tabIndex = 0;
+
+    const header = document.createElement('div');
+    header.className = 'a11ytb-status-card-header';
+    const label = document.createElement('span');
+    const labelId = `a11ytb-aggregation-label-${windowData.moduleId}`;
+    label.id = labelId;
+    label.className = 'a11ytb-status-label';
+    label.textContent = windowData.moduleLabel || runtimeEntry?.manifestName || windowData.moduleId;
+    header.append(label);
+
+    const scoreBadge = document.createElement('span');
+    scoreBadge.className = 'a11ytb-status-risk';
+    scoreBadge.dataset.score = windowData.score || 'AAA';
+    scoreBadge.textContent = windowData.score || 'AAA';
+    scoreBadge.setAttribute('aria-label', `Indice ${windowData.score || 'AAA'}`);
+    header.append(scoreBadge);
+
+    const chart = createAggregationChart(windowData.successes, windowData.failures);
+    chart.setAttribute('aria-labelledby', labelId);
+
+    const counters = document.createElement('p');
+    counters.className = 'a11ytb-status-detail';
+    const sampleCount = windowData.samples || 0;
+    const sampleLabel = sampleCount === 1 ? '1 échantillon' : `${sampleCount} échantillons`;
+    counters.textContent = `${windowData.successes || 0} succès · ${windowData.failures || 0} échecs · ${sampleLabel}`;
+
+    const timeframe = document.createElement('p');
+    timeframe.className = 'a11ytb-status-detail';
+    timeframe.textContent = formatAggregationWindow(windowData.windowStart, windowData.windowEnd);
+
+    const meta = document.createElement('dl');
+    meta.className = 'a11ytb-status-meta';
+    const latencyTerm = document.createElement('dt');
+    latencyTerm.textContent = 'Latence combinée';
+    const latencyValue = document.createElement('dd');
+    const combinedAverage = windowData.latency?.combinedAverage;
+    latencyValue.textContent = Number.isFinite(combinedAverage)
+      ? `${Math.round(combinedAverage)} ms`
+      : 'Non mesuré';
+    const retryTerm = document.createElement('dt');
+    retryTerm.textContent = 'Retentatives';
+    const retryValue = document.createElement('dd');
+    retryValue.textContent = String(windowData.retryCount ?? 0);
+    meta.append(latencyTerm, latencyValue, retryTerm, retryValue);
+
+    card.append(header, chart, counters, timeframe, meta);
+    card.addEventListener('keydown', handleAggregationKeyNav);
+    return card;
+  }
+
+  function updateAggregationPanel(snapshot = state.get()) {
+    const data = snapshot || state.get();
+    const filterPrefs = data?.ui?.statusFilters || {};
+    const preferredProfile = filterPrefs.profile || 'all';
+    const preferredCollection = filterPrefs.collection || 'all';
+
+    const profileOptions = [{ value: 'all', label: 'Tous les profils' }];
+    const moduleProfileIndex = new Map();
+    const profilesData = data?.profiles || {};
+    Object.entries(profilesData).forEach(([profileId, profile]) => {
+      const modules = extractModulesFromProfile(profile?.settings || {});
+      if (!modules.length) return;
+      profileOptions.push({ value: profileId, label: profile?.name || profileId });
+      modules.forEach((moduleId) => {
+        if (!moduleProfileIndex.has(moduleId)) {
+          moduleProfileIndex.set(moduleId, new Set());
+        }
+        moduleProfileIndex.get(moduleId).add(profileId);
+      });
+    });
+
+    const nextProfile = setAggregationSelectOptions(aggregationProfileSelect, profileOptions, preferredProfile);
+    aggregationFilterState.profile = nextProfile;
+    if (preferredProfile !== nextProfile) {
+      state.set('ui.statusFilters.profile', nextProfile);
+    }
+
+    const collectionOptions = [{ value: 'all', label: 'Toutes les collections' }];
+    collectionDefinitions.forEach((definition) => {
+      collectionOptions.push({ value: definition.id, label: definition.label || definition.id });
+    });
+    const nextCollection = setAggregationSelectOptions(aggregationCollectionSelect, collectionOptions, preferredCollection);
+    aggregationFilterState.collection = nextCollection;
+    if (preferredCollection !== nextCollection) {
+      state.set('ui.statusFilters.collection', nextCollection);
+    }
+
+    const metricsSyncState = data?.runtime?.metricsSync || {};
+    const windows = Array.isArray(metricsSyncState.activeWindows) ? metricsSyncState.activeWindows : [];
+    aggregationList.innerHTML = '';
+
+    if (!windows.length) {
+      const empty = document.createElement('p');
+      empty.className = 'a11ytb-empty-state';
+      empty.textContent = 'Aucune mesure agrégée pour les filtres sélectionnés.';
+      aggregationList.append(empty);
+      aggregationLive.textContent = 'Aucune alerte consolidée.';
+      return;
+    }
+
+    const runtimeModules = data?.runtime?.modules || {};
+    let criticalCount = 0;
+    let warningCount = 0;
+
+    const filteredWindows = windows.filter((windowData) => {
+      const moduleId = windowData.moduleId;
+      const profileSet = moduleProfileIndex.get(moduleId) || new Set();
+      const matchesProfile = aggregationFilterState.profile === 'all'
+        || profileSet.has(aggregationFilterState.profile);
+      if (!matchesProfile) return false;
+      const collectionCandidates = new Set(Array.isArray(windowData.collections) ? windowData.collections : []);
+      const indexedCollections = moduleCollectionsIndex.get(moduleId);
+      if (indexedCollections && typeof indexedCollections.forEach === 'function') {
+        indexedCollections.forEach((id) => collectionCandidates.add(id));
+      }
+      const matchesCollection = aggregationFilterState.collection === 'all'
+        || collectionCandidates.has(aggregationFilterState.collection);
+      return matchesCollection;
+    }).sort((a, b) => (b.lastTimestamp || 0) - (a.lastTimestamp || 0));
+
+    if (!filteredWindows.length) {
+      const empty = document.createElement('p');
+      empty.className = 'a11ytb-empty-state';
+      empty.textContent = 'Aucune mesure agrégée pour les filtres sélectionnés.';
+      aggregationList.append(empty);
+      aggregationLive.textContent = 'Aucune alerte consolidée.';
+      return;
+    }
+
+    filteredWindows.forEach((windowData) => {
+      const runtimeEntry = runtimeModules[windowData.moduleId] || {};
+      const card = createAggregationCard(windowData, runtimeEntry);
+      aggregationList.append(card);
+      const incidents = Array.isArray(windowData.incidents) ? windowData.incidents : [];
+      incidents.forEach((incident) => {
+        if (incident.severity === 'warning') {
+          warningCount += 1;
+        } else if (incident.severity === 'error') {
+          criticalCount += 1;
+        }
+      });
+    });
+
+    const alertParts = [];
+    if (criticalCount > 0) {
+      alertParts.push(`${criticalCount} alerte${criticalCount > 1 ? 's' : ''} critiques`);
+    }
+    if (warningCount > 0) {
+      alertParts.push(`${warningCount} avertissement${warningCount > 1 ? 's' : ''}`);
+    }
+    aggregationLive.textContent = alertParts.length
+      ? `Alertes consolidées : ${alertParts.join(' · ')}.`
+      : 'Aucune alerte consolidée.';
+  }
+
+  aggregationProfileSelect.addEventListener('change', () => {
+    aggregationFilterState.profile = aggregationProfileSelect.value || 'all';
+    state.set('ui.statusFilters.profile', aggregationFilterState.profile);
+  });
+
+  aggregationCollectionSelect.addEventListener('change', () => {
+    aggregationFilterState.collection = aggregationCollectionSelect.value || 'all';
+    state.set('ui.statusFilters.collection', aggregationFilterState.collection);
+  });
 
   function ensureStatusCard(summary) {
     let entry = statusCards.get(summary.id);
@@ -1173,7 +1497,9 @@ export function mountUI({ root, state, config = {} }) {
   }
 
   updateStatusCards(state.get());
+  updateAggregationPanel(state.get());
   state.on(updateStatusCards);
+  state.on(updateAggregationPanel);
 
   const viewToggle = document.createElement('div');
   viewToggle.className = 'a11ytb-view-toggle';
@@ -1830,6 +2156,8 @@ export function mountUI({ root, state, config = {} }) {
 
     const stepsList = document.createElement('ol');
     stepsList.className = 'a11ytb-guide-steps';
+    const stepsListId = `${scenario.id}-steps`;
+    stepsList.id = stepsListId;
     stepsList.setAttribute('aria-label', `Étapes pour ${scenario.title}`);
     scenario.steps.forEach((step, index) => {
       const item = document.createElement('li');
@@ -1838,6 +2166,8 @@ export function mountUI({ root, state, config = {} }) {
       item.dataset.mode = step.mode;
       item.dataset.active = index === currentGuideStepIndex ? 'true' : 'false';
       item.dataset.stepIndex = String(index);
+      item.setAttribute('aria-current', index === currentGuideStepIndex ? 'step' : 'false');
+      item.tabIndex = index === currentGuideStepIndex ? 0 : -1;
 
       const status = document.createElement('span');
       status.className = 'a11ytb-guide-step-status';
@@ -1847,15 +2177,25 @@ export function mountUI({ root, state, config = {} }) {
       const body = document.createElement('div');
       body.className = 'a11ytb-guide-step-body';
 
+      const srStatus = document.createElement('span');
+      srStatus.className = 'a11ytb-sr-only';
+      srStatus.textContent = step.completed
+        ? 'Statut : étape terminée.'
+        : `Statut : étape ${index + 1} sur ${scenario.steps.length}, à réaliser.`;
+      body.append(srStatus);
+
       const label = document.createElement('span');
       label.className = 'a11ytb-guide-step-label';
       label.textContent = step.label;
       body.append(label);
 
+      let detailId = '';
       if (step.detail) {
         const detail = document.createElement('p');
         detail.className = 'a11ytb-guide-step-detail';
         detail.textContent = step.detail;
+        detailId = `${scenario.id}-step-${step.id}-detail`;
+        detail.id = detailId;
         body.append(detail);
       }
 
@@ -1872,6 +2212,7 @@ export function mountUI({ root, state, config = {} }) {
         toggle.dataset.toggleComplete = step.toggleLabels.complete;
         toggle.dataset.toggleReset = step.toggleLabels.reset;
         toggle.setAttribute('aria-pressed', String(step.completed));
+        if (detailId) toggle.setAttribute('aria-describedby', detailId);
         toggle.textContent = step.completed ? step.toggleLabels.reset : step.toggleLabels.complete;
         item.append(toggle);
       } else if (step.tag) {
@@ -1911,9 +2252,22 @@ export function mountUI({ root, state, config = {} }) {
         `Étape ${currentGuideStepIndex + 1} sur ${scenario.steps.length} : ${activeStep.label}`
       ];
       if (activeStep.detail) messageParts.push(activeStep.detail);
-      guidesLiveRegion.textContent = activeStep.announcement || messageParts.join('. ');
+      const progressMessage = `Progression : ${scenario.completedCount}/${scenario.total} étape${scenario.total > 1 ? 's' : ''} complétée${scenario.completedCount > 1 ? 's' : ''}.`;
+      const announcement = activeStep.announcement || messageParts.join('. ');
+      guidesLiveRegion.textContent = `${announcement} ${progressMessage}`.trim();
     } else {
       guidesLiveRegion.textContent = '';
+    }
+
+    if (!focusDetail) {
+      const activeElement = stepsList.querySelector('[data-active="true"]');
+      if (activeElement && guideDetail.contains(document.activeElement)) {
+        try {
+          activeElement.focus({ preventScroll: true });
+        } catch (error) {
+          activeElement.focus();
+        }
+      }
     }
 
     if (focusDetail) {
@@ -2022,6 +2376,27 @@ export function mountUI({ root, state, config = {} }) {
       if (bounded !== currentGuideStepIndex) {
         state.set(`ui.guides.cursors.${scenario.id}`, bounded);
       }
+    }
+  });
+
+  guideDetail.addEventListener('keydown', (event) => {
+    const stepItem = event.target.closest('[data-step-index]');
+    if (!stepItem) return;
+    const scenario = currentGuideId ? currentGuideMap.get(currentGuideId) : null;
+    if (!scenario) return;
+    let nextIndex = null;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+      nextIndex = Math.min(scenario.steps.length - 1, currentGuideStepIndex + 1);
+    } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+      nextIndex = Math.max(0, currentGuideStepIndex - 1);
+    } else if (event.key === 'Home') {
+      nextIndex = 0;
+    } else if (event.key === 'End') {
+      nextIndex = scenario.steps.length - 1;
+    }
+    if (nextIndex !== null && nextIndex !== currentGuideStepIndex) {
+      event.preventDefault();
+      state.set(`ui.guides.cursors.${scenario.id}`, nextIndex);
     }
   });
 
@@ -2331,11 +2706,6 @@ export function mountUI({ root, state, config = {} }) {
       blockIds
     };
   }
-
-  let collectionDefinitions = [];
-  let collectionById = new Map();
-  let moduleCollectionsIndex = new Map();
-  let collectionBlockIds = new Map();
 
   function syncCollectionStructures(snapshot = state.get()) {
     const structures = buildCollectionStructures(snapshot);
@@ -5444,6 +5814,7 @@ export function mountUI({ root, state, config = {} }) {
     });
     const nextViewElement = viewElements.get(currentView);
     const previousViewElement = activeViewId ? viewElements.get(activeViewId) : null;
+    const currentActiveElement = typeof document !== 'undefined' ? document.activeElement : null;
     let shouldRefocus = Boolean(
       focusedElement
       && previousViewElement
