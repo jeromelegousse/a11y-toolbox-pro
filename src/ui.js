@@ -4,7 +4,7 @@ import { applyInertToSiblings } from './utils/inert.js';
 import { summarizeStatuses } from './status-center.js';
 import { buildGuidedChecklists, toggleManualChecklistStep } from './guided-checklists.js';
 import { normalizeAudioEvents } from './audio-config.js';
-import { moduleCollections, flattenedModuleCollections, moduleCollectionsById } from './module-collections.js';
+import { flattenedModuleCollections, moduleCollectionsById } from './module-collections.js';
 import { updateDependencyDisplay } from './utils/dependency-display.js';
 import { createActivityIntegration } from './integrations/activity.js';
 
