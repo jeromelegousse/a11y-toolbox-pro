@@ -21,33 +21,38 @@ test.describe('Organisation — dépendances', () => {
     await page.evaluate(() => {
       const state = window.a11ytb?.state;
       if (!state) return;
-      const runtime = state.get('runtime.modules.tts') || {};
-      state.set('runtime.modules.tts', {
-        ...runtime,
-        manifestVersion: runtime.manifestVersion || '0.1.0',
-        manifestName: runtime.manifestName || 'Synthèse vocale',
-        dependencies: [
-          {
-            id: 'voice-engine',
-            label: 'Moteur vocal',
-            status: 'missing',
-            statusLabel: 'Manquant',
-            message: 'Module requis introuvable.',
-            aria: 'Dépendance Moteur vocal manquante pour Synthèse vocale.'
-          },
-          {
-            id: 'audio-core',
-            label: 'Audio Core',
-            status: 'ok',
-            statusLabel: 'OK',
-            message: 'Module disponible.',
-            aria: 'Dépendance Audio Core disponible pour Synthèse vocale.'
-          }
-        ]
-      });
+      const manifestVersion = state.get('runtime.modules.tts.manifestVersion');
+      const manifestName = state.get('runtime.modules.tts.manifestName');
+      if (!manifestVersion) {
+        state.set('runtime.modules.tts.manifestVersion', '0.1.0');
+      }
+      if (!manifestName) {
+        state.set('runtime.modules.tts.manifestName', 'Synthèse vocale');
+      }
+      state.set('runtime.modules.tts.dependencies', [
+        {
+          id: 'voice-engine',
+          label: 'Moteur vocal',
+          status: 'missing',
+          statusLabel: 'Manquant',
+          message: 'Module requis introuvable.',
+          aria: 'Dépendance Moteur vocal manquante pour Synthèse vocale.'
+        },
+        {
+          id: 'audio-core',
+          label: 'Audio Core',
+          status: 'ok',
+          statusLabel: 'OK',
+          message: 'Module disponible.',
+          aria: 'Dépendance Audio Core disponible pour Synthèse vocale.'
+        }
+      ]);
     });
+    await page.waitForTimeout(50);
 
-    const dependencySection = page.locator('.a11ytb-admin-dependencies').first();
+    const dependencySection = page.locator(
+      '.a11ytb-admin-item[data-module-id="tts"] .a11ytb-admin-dependencies'
+    );
     await expect(dependencySection).toBeVisible();
     await expect(dependencySection.locator('.a11ytb-admin-dependency-badge', { hasText: 'Manquant' })).toBeVisible();
     await expect(dependencySection.locator('.a11ytb-admin-dependency-badge', { hasText: 'OK' })).toBeVisible();
