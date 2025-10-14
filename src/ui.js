@@ -1845,6 +1845,8 @@ export function mountUI({ root, state, config = {} }) {
 
     const stepsList = document.createElement('ol');
     stepsList.className = 'a11ytb-guide-steps';
+    const stepsListId = `${scenario.id}-steps`;
+    stepsList.id = stepsListId;
     stepsList.setAttribute('aria-label', `Étapes pour ${scenario.title}`);
     scenario.steps.forEach((step, index) => {
       const item = document.createElement('li');
@@ -1853,6 +1855,8 @@ export function mountUI({ root, state, config = {} }) {
       item.dataset.mode = step.mode;
       item.dataset.active = index === currentGuideStepIndex ? 'true' : 'false';
       item.dataset.stepIndex = String(index);
+      item.setAttribute('aria-current', index === currentGuideStepIndex ? 'step' : 'false');
+      item.tabIndex = index === currentGuideStepIndex ? 0 : -1;
 
       const status = document.createElement('span');
       status.className = 'a11ytb-guide-step-status';
@@ -1862,15 +1866,25 @@ export function mountUI({ root, state, config = {} }) {
       const body = document.createElement('div');
       body.className = 'a11ytb-guide-step-body';
 
+      const srStatus = document.createElement('span');
+      srStatus.className = 'a11ytb-sr-only';
+      srStatus.textContent = step.completed
+        ? 'Statut : étape terminée.'
+        : `Statut : étape ${index + 1} sur ${scenario.steps.length}, à réaliser.`;
+      body.append(srStatus);
+
       const label = document.createElement('span');
       label.className = 'a11ytb-guide-step-label';
       label.textContent = step.label;
       body.append(label);
 
+      let detailId = '';
       if (step.detail) {
         const detail = document.createElement('p');
         detail.className = 'a11ytb-guide-step-detail';
         detail.textContent = step.detail;
+        detailId = `${scenario.id}-step-${step.id}-detail`;
+        detail.id = detailId;
         body.append(detail);
       }
 
@@ -1887,6 +1901,7 @@ export function mountUI({ root, state, config = {} }) {
         toggle.dataset.toggleComplete = step.toggleLabels.complete;
         toggle.dataset.toggleReset = step.toggleLabels.reset;
         toggle.setAttribute('aria-pressed', String(step.completed));
+        if (detailId) toggle.setAttribute('aria-describedby', detailId);
         toggle.textContent = step.completed ? step.toggleLabels.reset : step.toggleLabels.complete;
         item.append(toggle);
       } else if (step.tag) {
@@ -1926,9 +1941,22 @@ export function mountUI({ root, state, config = {} }) {
         `Étape ${currentGuideStepIndex + 1} sur ${scenario.steps.length} : ${activeStep.label}`
       ];
       if (activeStep.detail) messageParts.push(activeStep.detail);
-      guidesLiveRegion.textContent = activeStep.announcement || messageParts.join('. ');
+      const progressMessage = `Progression : ${scenario.completedCount}/${scenario.total} étape${scenario.total > 1 ? 's' : ''} complétée${scenario.completedCount > 1 ? 's' : ''}.`;
+      const announcement = activeStep.announcement || messageParts.join('. ');
+      guidesLiveRegion.textContent = `${announcement} ${progressMessage}`.trim();
     } else {
       guidesLiveRegion.textContent = '';
+    }
+
+    if (!focusDetail) {
+      const activeElement = stepsList.querySelector('[data-active="true"]');
+      if (activeElement && guideDetail.contains(document.activeElement)) {
+        try {
+          activeElement.focus({ preventScroll: true });
+        } catch (error) {
+          activeElement.focus();
+        }
+      }
     }
 
     if (focusDetail) {
@@ -2037,6 +2065,27 @@ export function mountUI({ root, state, config = {} }) {
       if (bounded !== currentGuideStepIndex) {
         state.set(`ui.guides.cursors.${scenario.id}`, bounded);
       }
+    }
+  });
+
+  guideDetail.addEventListener('keydown', (event) => {
+    const stepItem = event.target.closest('[data-step-index]');
+    if (!stepItem) return;
+    const scenario = currentGuideId ? currentGuideMap.get(currentGuideId) : null;
+    if (!scenario) return;
+    let nextIndex = null;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+      nextIndex = Math.min(scenario.steps.length - 1, currentGuideStepIndex + 1);
+    } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+      nextIndex = Math.max(0, currentGuideStepIndex - 1);
+    } else if (event.key === 'Home') {
+      nextIndex = 0;
+    } else if (event.key === 'End') {
+      nextIndex = scenario.steps.length - 1;
+    }
+    if (nextIndex !== null && nextIndex !== currentGuideStepIndex) {
+      event.preventDefault();
+      state.set(`ui.guides.cursors.${scenario.id}`, nextIndex);
     }
   });
 
@@ -5451,11 +5500,12 @@ export function mountUI({ root, state, config = {} }) {
     });
     const nextViewElement = viewElements.get(currentView);
     const previousViewElement = activeViewId ? viewElements.get(activeViewId) : null;
+    const currentActiveElement = typeof document !== 'undefined' ? document.activeElement : null;
     let shouldRefocus = Boolean(
-      activeElement
+      currentActiveElement
       && previousViewElement
       && previousViewElement !== nextViewElement
-      && previousViewElement.contains(activeElement)
+      && previousViewElement.contains(currentActiveElement)
     );
 
     viewElements.forEach((element, id) => {
@@ -5470,7 +5520,7 @@ export function mountUI({ root, state, config = {} }) {
         element.style.visibility = 'hidden';
         element.setAttribute('hidden', '');
         element.setAttribute('aria-hidden', 'true');
-        if (!shouldRefocus && element && activeElement && element.contains(activeElement)) {
+        if (!shouldRefocus && element && currentActiveElement && element.contains(currentActiveElement)) {
           shouldRefocus = true;
         }
       }

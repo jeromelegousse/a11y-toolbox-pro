@@ -53,6 +53,81 @@ Les champs inconnus sont ignorés avec un avertissement console pour éviter les
 
 Ces conventions préparent l’introduction d’un fichier `module.json` par module tout en sécurisant l’intégration multi-équipe.
 
+## Guides FastPass et checklists
+
+Les manifestes exposent des parcours FastPass via `manifest.guides`. Chaque entrée décrit une checklist séquencée qui alimente la vue **Guides** et rapproche l’expérience des parcours proposés par Accessibility Insights.
+
+### Structure générale
+
+```jsonc
+{
+  "id": "audit-fastpass",                // identifiant unique du parcours
+  "title": "Audit axe-core express",     // titre lisible affiché dans l’UI
+  "description": "Préparer et partager un audit.",
+  "category": "diagnostic",              // regroupement logique (vision, audio…)
+  "order": 20,                            // position relative dans la vue Guides
+  "prerequisites": [                      // optionnel : modules ou vérifications nécessaires
+    { "type": "module", "id": "audit" },
+    { "type": "module", "id": "tts", "optional": true }
+  ],
+  "steps": [                              // séquence ordonnée d’étapes
+    {
+      "id": "audit-module-ready",
+      "label": "Vérifier la disponibilité du module Audit",
+      "mode": "auto",                    // "auto" = vérification runtime, "manual" = action utilisateur
+      "detail": "Audit prêt à lancer.",
+      "announce": "Module Audit opérationnel.",
+      "check": "({ runtime }) => runtime?.state === 'ready'" // fonction évaluée côté UI
+    },
+    {
+      "id": "audit-share",
+      "label": "Partager le rapport",
+      "mode": "manual",
+      "detail": "Export CSV/JSON et diffusion de la synthèse.",
+      "toggleLabels": {
+        "complete": "Marquer comme fait",
+        "reset": "Marquer à refaire"
+      }
+    }
+  ],
+  "assistance": {
+    "microcopy": "Planifiez un audit après chaque livraison majeure.",
+    "examples": [
+      { "id": "share-tip", "title": "Astuce", "description": "Diffuser le CSV aux squads produit." }
+    ],
+    "resources": [
+      {
+        "id": "axe-docs",
+        "href": "https://dequeuniversity.com/axe/devtools",
+        "label": "Documentation axe DevTools",
+        "external": true
+      }
+    ]
+  },
+  "tags": ["fastpass", "onboarding"]
+}
+```
+
+### Détails des champs
+
+| Champ | Type | Description |
+| --- | --- | --- |
+| `id` | `string` (obligatoire) | Identifiant unique du guide. Sert de clé pour l’état utilisateur. |
+| `title`, `description`, `category`, `order` | `string`, `number` | Métadonnées d’affichage. `order` peut être laissé vide (`100` par défaut). |
+| `prerequisites` | `Array<string \| object>` | Liste des prérequis. Une chaîne est interprétée comme `moduleId`. Un objet accepte `type` (`module`, `feature`, `custom`…), `id`, `optional`, `label`, `detail`, `check`. |
+| `steps` | `object[]` | Étapes ordonnées. Chaque étape doit définir `id`, `label` et `mode`. |
+| `steps[].mode` | `"auto" \| "manual"` | `auto` déclenche `check(context)` pour déterminer l’état ; `manual` utilise l’état stocké (`ui.guides.completedSteps`). |
+| `steps[].check` | `function(context)` | Fonction optionnelle évaluée côté client. Le `context` fournit `snapshot`, `runtime.modules`, `manifest`, `helpers`. |
+| `steps[].detail` / `steps[].announce` | `string \| function(context)` | Texte d’accompagnement. `announce` est diffusé dans une région `aria-live` pour guider l’utilisateur. |
+| `steps[].toggleLabels` | `{ complete, reset }` | Personnalisation des libellés « Marquer comme fait/à refaire » pour les étapes manuelles. |
+| `steps[].hints` | `string[]` | Micro-indications supplémentaires affichées sous l’étape. |
+| `assistance.microcopy` | `string \| function(context)` | Message pédagogique injecté avant la liste d’étapes. |
+| `assistance.examples` | `Array<{ id, title?, description? }>` | Cartes d’exemples ou bonnes pratiques. |
+| `assistance.resources` | `Array<{ id, href, label, external? }>` | Liens utiles (documentation FastPass, guides internes). |
+| `tags` | `string[]` | Facilite le filtrage/score de qualité. |
+
+> Les guides peuvent être définis directement dans le manifest ou référencer un flux prédéfini (`fastPassFlows`) pour harmoniser les parcours standards (audit, dictée, contraste…).
+
 ## Historique et visualisation
 
 Le centre d’état consomme `listModuleManifestHistory()` pour alimenter la carte **Historique manifestes**. Cette carte annonce :

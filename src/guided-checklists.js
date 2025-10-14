@@ -23,6 +23,478 @@ const CRITICAL_MODULES = [
 
 const DEFAULT_GUIDE_ORDER = 100;
 
+export const fastPassFlows = [
+  {
+    id: 'audit-fastpass',
+    moduleId: 'audit',
+    title: 'Audit axe-core express',
+    description: 'Préparez, lancez et diffusez un audit axe-core ciblé.',
+    category: 'diagnostic',
+    order: 20,
+    prerequisites: [
+      { type: 'module', id: 'audit' },
+      { type: 'module', id: 'tts', optional: true, label: 'Synthèse vocale (optionnel)' }
+    ],
+    assistance: {
+      microcopy: 'Planifiez un audit après chaque livraison majeure et consignez les rapports dans votre outil de suivi.',
+      examples: [
+        {
+          id: 'audit-fastpass-example-1',
+          title: 'Astuce',
+          description: 'Exportez le CSV pour partager rapidement les violations critiques avec les équipes produit.'
+        },
+        {
+          id: 'audit-fastpass-example-2',
+          title: 'Bonnes pratiques',
+          description: 'Relancez un audit après chaque correctif majeur pour confirmer la résolution.'
+        }
+      ],
+      resources: [
+        {
+          id: 'audit-fastpass-axe-doc',
+          href: 'https://dequeuniversity.com/axe/devtools',
+          label: 'Documentation axe DevTools',
+          external: true
+        },
+        {
+          id: 'audit-fastpass-fastpass',
+          href: 'https://accessibilityinsights.io/docs/en/web/fastpass/',
+          label: 'Référence FastPass Accessibility Insights',
+          external: true
+        }
+      ]
+    },
+    steps: [
+      {
+        id: 'audit-module-ready',
+        label: 'Vérifier la disponibilité du module Audit',
+        mode: 'auto',
+        detail: ({ moduleName, runtime }) => {
+          const name = moduleName || 'Audit';
+          if (!runtime?.enabled) return `${name} est désactivé dans la vue Organisation.`;
+          if (runtime?.state === 'error') return runtime?.error ? `Erreur signalée : ${runtime.error}` : `${name} est en erreur.`;
+          if (runtime?.state === 'loading') return `${name} se charge…`;
+          if (runtime?.state === 'ready') return `${name} est prêt à lancer une analyse.`;
+          return `${name} est en attente d’activation.`;
+        },
+        check: ({ runtime }) => !!runtime?.enabled && runtime.state === 'ready',
+        announce: 'Module Audit vérifié.'
+      },
+      {
+        id: 'audit-run',
+        label: 'Lancer un audit axe-core sur la page courante',
+        mode: 'auto',
+        detail: ({ snapshot, helpers }) => {
+          const lastRun = snapshot?.audit?.lastRun;
+          const summary = snapshot?.audit?.summary;
+          if (!lastRun) return 'Aucun audit enregistré sur cette page.';
+          const when = helpers.formatDateTime(lastRun);
+          const headline = summary?.headline || 'Audit terminé';
+          return when ? `${headline} (le ${when}).` : headline;
+        },
+        check: ({ snapshot }) => Boolean(snapshot?.audit?.lastRun),
+        announce: 'Audit axe-core exécuté.'
+      },
+      {
+        id: 'audit-critical',
+        label: 'Prioriser les violations critiques et majeures',
+        mode: 'auto',
+        detail: ({ snapshot }) => {
+          const totals = snapshot?.audit?.summary?.totals;
+          if (!totals) return 'Aucun résultat axe-core à interpréter.';
+          const critical = totals.critical ?? 0;
+          const serious = totals.serious ?? 0;
+          if (critical > 0) return `${critical} violation${critical > 1 ? 's' : ''} critique${critical > 1 ? 's' : ''} à corriger en priorité.`;
+          if (serious > 0) return `${serious} violation${serious > 1 ? 's' : ''} majeure${serious > 1 ? 's' : ''} restante${serious > 1 ? 's' : ''}.`;
+          return 'Aucune violation critique ou majeure détectée.';
+        },
+        check: ({ snapshot }) => {
+          const totals = snapshot?.audit?.summary?.totals;
+          if (!totals) return false;
+          return (totals.critical ?? 0) === 0 && (totals.serious ?? 0) === 0;
+        },
+        announce: 'Synthèse des violations critiques mise à jour.'
+      },
+      {
+        id: 'audit-share',
+        label: 'Partager le rapport et planifier les corrections',
+        mode: 'manual',
+        detail: 'Exportez le rapport (CSV ou JSON) et assignez les correctifs aux équipes concernées.',
+        toggleLabels: {
+          complete: 'Marquer comme partagé',
+          reset: 'Marquer à refaire'
+        }
+      }
+    ],
+    tags: ['fastpass', 'audit']
+  },
+  {
+    id: 'tts-onboarding',
+    moduleId: 'tts',
+    title: 'Lecture vocale opérationnelle',
+    description: 'Activez la synthèse vocale, vérifiez les voix et testez la lecture.',
+    category: 'services',
+    order: 30,
+    prerequisites: [{ type: 'module', id: 'tts' }],
+    assistance: {
+      microcopy: 'Proposez un test de lecture lors de l’onboarding et ajustez vitesse/timbre selon le profil utilisateur.',
+      examples: [
+        {
+          id: 'tts-onboarding-example-1',
+          title: 'Astuce',
+          description: 'Conservez une voix de secours (navigateur) si la voix personnalisée disparaît après une mise à jour.'
+        }
+      ],
+      resources: [
+        {
+          id: 'tts-fastpass-api',
+          href: 'https://developer.mozilla.org/docs/Web/API/SpeechSynthesis',
+          label: 'API SpeechSynthesis (MDN)',
+          external: true
+        }
+      ]
+    },
+    steps: [
+      {
+        id: 'tts-module-ready',
+        label: 'Vérifier que la synthèse vocale est activée',
+        mode: 'auto',
+        detail: ({ moduleName, runtime }) => {
+          const name = moduleName || 'Synthèse vocale';
+          if (!runtime?.enabled) return `${name} est désactivée dans la vue Organisation.`;
+          if (runtime?.state === 'error') return runtime?.error ? `Erreur signalée : ${runtime.error}` : `${name} est en erreur.`;
+          if (runtime?.state === 'loading') return `${name} se charge…`;
+          if (runtime?.state === 'ready') return `${name} est prête.`;
+          return `${name} est en attente d’activation.`;
+        },
+        check: ({ runtime }) => !!runtime?.enabled && runtime.state === 'ready',
+        announce: 'Synthèse vocale prête.'
+      },
+      {
+        id: 'tts-voices',
+        label: 'Recenser les voix disponibles',
+        mode: 'auto',
+        detail: ({ snapshot }) => {
+          const voices = snapshot?.tts?.availableVoices ?? [];
+          if (!voices.length) return 'Aucune voix détectée pour le moment.';
+          const selectedId = snapshot?.tts?.voice || '';
+          const selected = voices.find((voice) => voice.voiceURI === selectedId);
+          if (selected) {
+            return `${voices.length} voix détectées · ${selected.name} (${selected.lang}) sélectionnée.`;
+          }
+          return `${voices.length} voix détectées. Sélectionnez la plus claire pour l’utilisateur.`;
+        },
+        check: ({ snapshot }) => (snapshot?.tts?.availableVoices ?? []).length > 0,
+        announce: 'Voix disponibles vérifiées.'
+      },
+      {
+        id: 'tts-default-voice',
+        label: 'Définir la voix par défaut',
+        mode: 'auto',
+        detail: ({ snapshot }) => {
+          const voices = snapshot?.tts?.availableVoices ?? [];
+          const selectedId = snapshot?.tts?.voice;
+          if (!voices.length) return 'En attente de voix détectées.';
+          if (!selectedId) return 'Aucune voix sélectionnée : choisissez une option adaptée.';
+          const selected = voices.find((voice) => voice.voiceURI === selectedId);
+          if (selected) {
+            return `Voix active : ${selected.name} (${selected.lang}).`;
+          }
+          return 'Voix personnalisée sélectionnée.';
+        },
+        check: ({ snapshot }) => {
+          const voices = snapshot?.tts?.availableVoices ?? [];
+          const selected = snapshot?.tts?.voice;
+          if (!voices.length) return false;
+          return !!selected;
+        },
+        announce: 'Voix par défaut confirmée.'
+      },
+      {
+        id: 'tts-test',
+        label: 'Tester la lecture d’un extrait',
+        mode: 'manual',
+        detail: 'Lancez la lecture d’un paragraphe représentatif et vérifiez le confort d’écoute.',
+        toggleLabels: {
+          complete: 'Test effectué',
+          reset: 'Tester à nouveau'
+        }
+      }
+    ],
+    tags: ['fastpass', 'tts']
+  },
+  {
+    id: 'stt-onboarding',
+    moduleId: 'stt',
+    title: 'Configurer la dictée vocale',
+    description: 'Activez la reconnaissance vocale, validez la compatibilité et réalisez un test.',
+    category: 'interaction',
+    order: 50,
+    prerequisites: [{ type: 'module', id: 'stt' }],
+    assistance: {
+      microcopy: 'Informez l’utilisateur de la collecte audio et invitez-le à autoriser le micro avant la première dictée.',
+      resources: [
+        {
+          id: 'stt-fastpass-mdn',
+          href: 'https://developer.mozilla.org/docs/Web/API/SpeechRecognition',
+          label: 'API SpeechRecognition (MDN)',
+          external: true
+        }
+      ]
+    },
+    steps: [
+      {
+        id: 'stt-module-ready',
+        label: 'Vérifier que la dictée est activée',
+        mode: 'auto',
+        detail: ({ moduleName, runtime }) => {
+          const name = moduleName || 'Reconnaissance vocale';
+          if (!runtime?.enabled) return `${name} est désactivée.`;
+          if (runtime?.state === 'error') return runtime?.error ? `Erreur signalée : ${runtime.error}` : `${name} est en erreur.`;
+          if (runtime?.state === 'loading') return `${name} se charge…`;
+          if (runtime?.state === 'ready') return `${name} est prête.`;
+          return `${name} est en attente d’activation.`;
+        },
+        check: ({ runtime }) => !!runtime?.enabled && runtime.state === 'ready',
+        announce: 'Dictée vocale prête.'
+      },
+      {
+        id: 'stt-compatibility',
+        label: 'Contrôler la compatibilité navigateur',
+        mode: 'auto',
+        detail: ({ runtime }) => {
+          const compat = runtime?.metrics?.compat;
+          if (!compat) return 'Compatibilité non évaluée.';
+          if (compat.status === 'partial') {
+            const missing = compat.missing?.features?.[0] || 'Fonctionnalité manquante';
+            return `Compatibilité partielle (${missing}).`;
+          }
+          if (compat.status === 'full') return 'Compatibilité confirmée.';
+          if (compat.status === 'unknown') return 'Compatibilité à vérifier manuellement.';
+          return 'Compatibilité non déterminée.';
+        },
+        check: ({ runtime }) => {
+          const compat = runtime?.metrics?.compat;
+          if (!compat) return false;
+          return compat.status === 'full' || compat.status === 'unknown';
+        },
+        announce: 'Compatibilité dictée vérifiée.'
+      },
+      {
+        id: 'stt-test',
+        label: 'Effectuer un test de dictée',
+        mode: 'manual',
+        detail: ({ snapshot }) => {
+          const transcript = snapshot?.stt?.transcript || '';
+          if (!transcript) return 'Aucun texte dicté pour le moment. Lancez une courte phrase test.';
+          return `Dernière dictée : « ${transcript.slice(0, 60)}${transcript.length > 60 ? '…' : ''} ».`;
+        },
+        toggleLabels: {
+          complete: 'Dictée validée',
+          reset: 'Retester'
+        }
+      }
+    ],
+    tags: ['fastpass', 'stt']
+  },
+  {
+    id: 'braille-setup',
+    moduleId: 'braille',
+    title: 'Transcription braille prête',
+    description: 'Activez la transcription et validez un extrait braille.',
+    category: 'conversion',
+    order: 60,
+    prerequisites: [{ type: 'module', id: 'braille' }],
+    assistance: {
+      microcopy: 'Gardez un extrait récurrent (formulaire ou bouton) pour tester rapidement la transcription braille.',
+      resources: [
+        {
+          id: 'braille-fastpass-w3c',
+          href: 'https://www.w3.org/WAI/WCAG21/Techniques/general/G101',
+          label: 'WCAG G101 — Sortie braille cohérente',
+          external: true
+        }
+      ]
+    },
+    steps: [
+      {
+        id: 'braille-ready',
+        label: 'Vérifier l’activation de la transcription braille',
+        mode: 'auto',
+        detail: ({ moduleName, runtime }) => {
+          const name = moduleName || 'Transcription braille';
+          if (!runtime?.enabled) return `${name} est désactivée.`;
+          if (runtime?.state === 'error') return runtime?.error ? `Erreur signalée : ${runtime.error}` : `${name} est en erreur.`;
+          if (runtime?.state === 'loading') return `${name} se charge…`;
+          if (runtime?.state === 'ready') return `${name} est prête.`;
+          return `${name} est en attente d’activation.`;
+        },
+        check: ({ runtime }) => !!runtime?.enabled && runtime.state === 'ready',
+        announce: 'Module braille prêt.'
+      },
+      {
+        id: 'braille-output',
+        label: 'Générer un extrait braille',
+        mode: 'manual',
+        detail: ({ snapshot }) => {
+          const output = snapshot?.braille?.output || '';
+          if (!output) return 'Aucune transcription générée : testez avec un texte simple (ex. « Formulaire envoyé »).';
+          return `Dernière sortie : ${output.slice(0, 16)}${output.length > 16 ? '…' : ''}`;
+        },
+        toggleLabels: {
+          complete: 'Transcription validée',
+          reset: 'Re-tester'
+        }
+      }
+    ],
+    tags: ['fastpass', 'braille']
+  },
+  {
+    id: 'contrast-fastpass',
+    moduleId: 'contrast',
+    title: 'Thème haute visibilité vérifié',
+    description: 'Activez le thème renforcé, contrôlez la lisibilité et validez la restitution clavier.',
+    category: 'vision',
+    order: 25,
+    prerequisites: [{ type: 'module', id: 'contrast' }],
+    assistance: {
+      microcopy: 'Couplez le thème avec un profil Vision basse pour offrir un raccourci à vos testeurs et product owners.',
+      resources: [
+        {
+          id: 'contrast-fastpass-wcag',
+          href: 'https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum',
+          label: 'WCAG 1.4.3 — Contraste minimum',
+          external: true
+        }
+      ]
+    },
+    steps: [
+      {
+        id: 'contrast-enabled-check',
+        label: 'Activer le thème renforcé',
+        mode: 'auto',
+        detail: ({ snapshot }) => snapshot?.contrast?.enabled ? 'Thème haute visibilité actif.' : 'Le thème renforcé est désactivé.',
+        check: ({ snapshot }) => !!snapshot?.contrast?.enabled,
+        announce: 'Thème contraste activé.'
+      },
+      {
+        id: 'contrast-ui-review',
+        label: 'Revue visuelle rapide',
+        mode: 'manual',
+        detail: 'Contrôlez la lisibilité des zones interactives et l’absence d’inversion gênante.',
+        toggleLabels: {
+          complete: 'Revue terminée',
+          reset: 'À revoir'
+        }
+      },
+      {
+        id: 'contrast-keyboard',
+        label: 'Tester le contraste au clavier',
+        mode: 'manual',
+        detail: 'Parcourez quelques composants au clavier pour vérifier le focus visible.',
+        toggleLabels: {
+          complete: 'Focus validé',
+          reset: 'Re-tester'
+        }
+      }
+    ],
+    tags: ['fastpass', 'vision']
+  },
+  {
+    id: 'vision-personalization',
+    moduleId: 'spacing',
+    title: 'Personnalisation vision & confort de lecture',
+    description: 'Combinez contraste renforcé, espacements personnalisés et vitesse vocale adaptée.',
+    category: 'vision',
+    order: 40,
+    prerequisites: [
+      { type: 'module', id: 'contrast' },
+      { type: 'module', id: 'spacing' },
+      { type: 'module', id: 'tts', optional: true, label: 'Synthèse vocale (optionnel)' }
+    ],
+    assistance: {
+      microcopy: 'Ajustez progressivement les paramètres et sauvegardez un profil dédié pour le reproduire facilement.',
+      examples: [
+        {
+          id: 'vision-personalization-example-1',
+          title: 'Exemple',
+          description: 'Profil Vision basse : interlignage 1,9 · espacement 12 % · vitesse vocale 0,9×.'
+        }
+      ],
+      resources: [
+        {
+          id: 'vision-personalization-wcag',
+          href: 'https://www.w3.org/WAI/WCAG21/Understanding/text-spacing',
+          label: 'WCAG 1.4.12 — Espacement du texte',
+          external: true
+        }
+      ]
+    },
+    steps: [
+      {
+        id: 'contrast-enabled',
+        label: 'Activer le thème à fort contraste',
+        mode: 'auto',
+        detail: ({ snapshot }) => snapshot?.contrast?.enabled ? 'Thème haute visibilité actif.' : 'Le thème renforcé est désactivé.',
+        check: ({ snapshot }) => !!snapshot?.contrast?.enabled,
+        announce: 'Contraste renforcé validé.'
+      },
+      {
+        id: 'spacing-adjustment',
+        label: 'Adapter les espacements du texte',
+        mode: 'auto',
+        detail: ({ snapshot }) => {
+          const lineHeight = Number(snapshot?.spacing?.lineHeight ?? 1.5);
+          const letterSpacing = Number(snapshot?.spacing?.letterSpacing ?? 0);
+          if (Number.isNaN(lineHeight) || Number.isNaN(letterSpacing)) return 'Valeurs d’espacement non définies.';
+          if (Math.abs(lineHeight - 1.5) < 0.05 && Math.abs(letterSpacing - 0) < 0.01) {
+            return 'Espacements par défaut encore appliqués.';
+          }
+          return `Interlignage ${lineHeight.toFixed(1)} · Espacement ${Math.round(letterSpacing * 100)} %.`;
+        },
+        check: ({ snapshot }) => {
+          const lineHeight = Number(snapshot?.spacing?.lineHeight ?? 1.5);
+          const letterSpacing = Number(snapshot?.spacing?.letterSpacing ?? 0);
+          if (Number.isNaN(lineHeight) || Number.isNaN(letterSpacing)) return false;
+          return Math.abs(lineHeight - 1.5) >= 0.05 || Math.abs(letterSpacing - 0) >= 0.01;
+        },
+        announce: 'Espacements personnalisés appliqués.'
+      },
+      {
+        id: 'tts-adjustment',
+        label: 'Ajuster la vitesse de lecture vocale',
+        mode: 'auto',
+        when: ({ getRuntime }) => !!getRuntime('tts')?.enabled,
+        detail: ({ snapshot }) => {
+          if (!snapshot?.tts) return 'Synthèse vocale non configurée.';
+          const rate = Number(snapshot.tts.rate ?? 1);
+          if (Number.isNaN(rate)) return 'Vitesse vocale inconnue.';
+          if (Math.abs(rate - 1) < 0.05) return 'Vitesse par défaut (1,0×).';
+          return `Vitesse actuelle : ${rate.toFixed(1)}×.`;
+        },
+        check: ({ snapshot }) => {
+          if (!snapshot?.tts) return true;
+          const rate = Number(snapshot.tts.rate ?? 1);
+          if (Number.isNaN(rate)) return false;
+          return Math.abs(rate - 1) >= 0.05;
+        },
+        announce: 'Réglage de vitesse vocale vérifié.'
+      },
+      {
+        id: 'vision-profile-save',
+        label: 'Sauvegarder un profil personnalisé',
+        mode: 'manual',
+        detail: 'Enregistrez ou exportez un profil dédié pour partager ces réglages.',
+        toggleLabels: {
+          complete: 'Profil sauvegardé',
+          reset: 'À revoir'
+        }
+      }
+    ],
+    tags: ['fastpass', 'vision', 'profil']
+  }
+];
+
 function ensureArray(value) {
   if (value === undefined || value === null) return [];
   return Array.isArray(value) ? value : [value];
@@ -471,18 +943,41 @@ export function buildGuidedChecklists(snapshot = {}) {
   const baseContext = { snapshot, manualMap, runtimeMap };
 
   const scenarios = [];
+  const seenScenarioIds = new Set();
+
   const criticalScenario = buildCriticalServicesScenario(baseContext);
-  if (criticalScenario) scenarios.push(criticalScenario);
+  if (criticalScenario) {
+    scenarios.push(criticalScenario);
+    seenScenarioIds.add(criticalScenario.id);
+  }
+
+  fastPassFlows.forEach((definition) => {
+    const moduleId = definition.moduleId || null;
+    const manifest = moduleId ? moduleCatalogById.get(moduleId)?.manifest || null : null;
+    const scenario = buildScenarioFromDefinition(definition, {
+      ...baseContext,
+      moduleId,
+      manifest: manifest || definition.manifest || null
+    });
+    if (scenario && !seenScenarioIds.has(scenario.id)) {
+      scenarios.push(scenario);
+      seenScenarioIds.add(scenario.id);
+    }
+  });
 
   moduleCatalog.forEach(({ id, manifest }) => {
     const guides = ensureArray(manifest?.guides);
     guides.forEach((guideDefinition) => {
+      if (guideDefinition?.id && seenScenarioIds.has(guideDefinition.id)) return;
       const scenario = buildScenarioFromDefinition(guideDefinition, {
         ...baseContext,
         moduleId: id,
         manifest
       });
-      if (scenario) scenarios.push(scenario);
+      if (scenario && !seenScenarioIds.has(scenario.id)) {
+        scenarios.push(scenario);
+        seenScenarioIds.add(scenario.id);
+      }
     });
   });
 
