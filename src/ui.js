@@ -6756,6 +6756,7 @@ export function mountUI({ root, state, config = {} }) {
 
   let lastFocusedElement = null;
   let releaseOutsideInert = null;
+  let releasePanelFocusTrap = null;
 
   const FOCUSABLE_SELECTORS = [
     'a[href]',
@@ -6784,6 +6785,86 @@ export function mountUI({ root, state, config = {} }) {
       || el.offsetHeight > 0
       || el.getClientRects().length > 0
     );
+  }
+
+  function setupPanelFocusTrap() {
+    teardownPanelFocusTrap();
+
+    const initialTabIndex = panel.tabIndex;
+
+    const getCycle = () => {
+      const focusableNodes = collectFocusable(panel);
+      if (focusableNodes.length === 0) {
+        if (panel.tabIndex < 0) {
+          panel.tabIndex = 0;
+        }
+        return [panel];
+      }
+      if (panel.tabIndex !== initialTabIndex) {
+        panel.tabIndex = initialTabIndex;
+      }
+      return focusableNodes;
+    };
+
+    const handleKeydown = (event) => {
+      if (event.key !== 'Tab' || panel.dataset.open !== 'true') {
+        return;
+      }
+      const target = event.target;
+      const optionsToggle = viewButtons?.get ? viewButtons.get('options') : null;
+      if (releaseOptionsFocusTrap && (
+        (optionsView && optionsView.contains(target))
+        || (optionsToggle && optionsToggle.contains?.(target))
+      )) {
+        return;
+      }
+      const cycle = getCycle();
+      if (!cycle.length) {
+        return;
+      }
+      const first = cycle[0];
+      const last = cycle[cycle.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey) {
+        if (!panel.contains(active) || active === first) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    const handleFocusIn = (event) => {
+      if (panel.dataset.open !== 'true') {
+        return;
+      }
+      if (panel.contains(event.target)) {
+        return;
+      }
+      const cycle = getCycle();
+      const fallback = cycle[0];
+      if (fallback && typeof fallback.focus === 'function') {
+        fallback.focus();
+      }
+    };
+
+    panel.addEventListener('keydown', handleKeydown, true);
+    document.addEventListener('focusin', handleFocusIn);
+
+    releasePanelFocusTrap = () => {
+      panel.removeEventListener('keydown', handleKeydown, true);
+      document.removeEventListener('focusin', handleFocusIn);
+      panel.tabIndex = initialTabIndex;
+    };
+  }
+
+  function teardownPanelFocusTrap() {
+    if (typeof releasePanelFocusTrap === 'function') {
+      releasePanelFocusTrap();
+    }
+    releasePanelFocusTrap = null;
   }
 
   function collectFocusable(container) {
@@ -6835,6 +6916,7 @@ export function mountUI({ root, state, config = {} }) {
         releaseOutsideInert();
       }
       releaseOutsideInert = applyInertToSiblings(root);
+      setupPanelFocusTrap();
       lastFocusedElement = document.activeElement;
       const focusables = getFocusableElements();
       (focusables[0] || panel).focus();
@@ -6842,6 +6924,7 @@ export function mountUI({ root, state, config = {} }) {
         setupOptionsFocusTrap();
       }
     } else {
+      teardownPanelFocusTrap();
       if (typeof releaseOutsideInert === 'function') {
         releaseOutsideInert();
         releaseOutsideInert = null;
