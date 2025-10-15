@@ -18,6 +18,39 @@ if (!defined('ABSPATH')) {
 const A11YTB_PLUGIN_VERSION = '1.0.0';
 
 /**
+ * Charge les traductions du plugin dès que WordPress est prêt.
+ */
+function a11ytb_load_textdomain(): void
+{
+    load_plugin_textdomain('a11ytb', false, dirname(plugin_basename(__FILE__)) . '/languages');
+}
+add_action('plugins_loaded', 'a11ytb_load_textdomain');
+
+/**
+ * Initialise les options critiques à l’activation pour éviter les notices lors du téléversement.
+ */
+function a11ytb_activate_plugin(): void
+{
+    $defaults = [
+        'a11ytb_enable_frontend' => '1',
+        'a11ytb_default_dock' => 'right',
+        'a11ytb_default_view' => 'modules',
+        'a11ytb_auto_open_panel' => '0',
+        'a11ytb_gemini_api_key' => '',
+        'a11ytb_gemini_quota' => 15,
+        'a11ytb_activity_webhook_url' => '',
+        'a11ytb_activity_webhook_token' => '',
+    ];
+
+    foreach ($defaults as $option => $value) {
+        if (null === get_option($option, null)) {
+            add_option($option, $value);
+        }
+    }
+}
+register_activation_hook(__FILE__, 'a11ytb_activate_plugin');
+
+/**
  * Retourne la clé de chiffrement dérivée des salts WordPress.
  */
 function a11ytb_get_secret_encryption_key(): string

@@ -5,6 +5,35 @@ function normalizeModules(modules) {
   return Array.from(new Set(modules.filter(Boolean)));
 }
 
+function normalizeCollectionRequirements(requirements) {
+  if (!Array.isArray(requirements)) {
+    return [];
+  }
+
+  return requirements
+    .map((entry) => {
+      if (!entry) {
+        return null;
+      }
+
+      if (typeof entry === 'string') {
+        return { id: entry, type: 'collection', reason: '', label: '' };
+      }
+
+      if (typeof entry === 'object' && typeof entry.id === 'string') {
+        return {
+          id: entry.id,
+          type: entry.type === 'module' ? 'module' : 'collection',
+          reason: typeof entry.reason === 'string' ? entry.reason : '',
+          label: typeof entry.label === 'string' ? entry.label : ''
+        };
+      }
+
+      return null;
+    })
+    .filter(Boolean);
+}
+
 export const moduleCollections = [
   {
     id: 'vision-plus',
@@ -58,6 +87,15 @@ export const moduleCollections = [
     label: 'Interaction hybride',
     description: 'Combine dictée et synthèse vocale pour faciliter les allers-retours entre parole et texte.',
     modules: ['stt', 'tts'],
+    requires: [
+      {
+        id: 'voix-et-audio',
+        type: 'collection',
+        reason:
+          'Réutilise les réglages voix/feedback de Voix et retours audio pour garantir la cohérence des annonces et éviter les ruptures entre dictée et lecture.',
+        label: 'Voix et retours audio'
+      }
+    ],
     children: [
       {
         id: 'interaction-hybride.capture',
@@ -69,7 +107,16 @@ export const moduleCollections = [
         id: 'interaction-hybride.boucle',
         label: 'Boucle voix ↔ texte',
         description: 'Synchronise dictée et restitution vocale pour accélérer les revues et validations.',
-        modules: ['stt', 'tts']
+        modules: ['stt', 'tts'],
+        requires: [
+          {
+            id: 'voix-et-audio.tts',
+            type: 'collection',
+            reason:
+              'S’appuie sur la configuration fine de la synthèse vocale (timbres, rythme) pour fluidifier les retours audio comme dans Stark ou Accessibility Insights.',
+            label: 'Synthèse vocale guidée'
+          }
+        ]
       }
     ]
   }
@@ -84,6 +131,7 @@ function flattenCollections(collections, meta = { parentId: null, depth: 0, ance
     }
 
     const directModules = normalizeModules(collection.modules);
+    const requirements = normalizeCollectionRequirements(collection.requires);
     const childMeta = {
       parentId: collection.id,
       depth: (meta.depth || 0) + 1,
@@ -113,7 +161,8 @@ function flattenCollections(collections, meta = { parentId: null, depth: 0, ance
       ancestors: meta.ancestors || [],
       depth: meta.depth || 0,
       descendants: Array.from(new Set(descendantIds)),
-      pathLabel: pathLabels.length ? `${pathLabels.join(' › ')} › ${collection.label || collection.id}` : collection.label || collection.id
+      pathLabel: pathLabels.length ? `${pathLabels.join(' › ')} › ${collection.label || collection.id}` : collection.label || collection.id,
+      requires: requirements
     };
 
     result.push(entry, ...childEntries);

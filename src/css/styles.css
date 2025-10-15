@@ -3167,6 +3167,69 @@ body {
   color: color-mix(in srgb, var(--a11ytb-fg) 72%, transparent);
 }
 
+.a11ytb-collection-requirements {
+  margin: 6px 0 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--a11ytb-warning) 36%, transparent);
+  background: color-mix(in srgb, var(--a11ytb-warning) 14%, transparent);
+  display: grid;
+  gap: 10px;
+}
+
+.a11ytb-collection-requirements-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--a11ytb-warning) 75%, transparent);
+}
+
+.a11ytb-collection-requirement-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.a11ytb-collection-requirement {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.a11ytb-collection-requirement[data-status='missing'] {
+  color: color-mix(in srgb, var(--a11ytb-danger) 78%, transparent);
+}
+
+.a11ytb-collection-requirement-badge {
+  flex-shrink: 0;
+  min-width: 86px;
+  text-align: center;
+}
+
+.a11ytb-collection-requirement-content {
+  display: grid;
+  gap: 4px;
+}
+
+.a11ytb-collection-requirement-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.a11ytb-collection-requirement-note {
+  margin: 0;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--a11ytb-fg) 68%, transparent);
+}
+
+.a11ytb-collection-requirement-note[data-status='missing'] {
+  color: color-mix(in srgb, var(--a11ytb-danger) 84%, transparent);
+}
+
 .a11ytb-config-fields {
   display: grid;
   gap: 16px;

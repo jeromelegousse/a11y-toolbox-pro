@@ -2669,9 +2669,38 @@ export function mountUI({ root, state, config = {} }) {
       pathLabel: entry.pathLabel || entry.label || entry.id,
       ancestors: Array.isArray(entry.ancestors) ? entry.ancestors.slice() : [],
       descendants: Array.isArray(entry.descendants) ? entry.descendants.slice() : [],
-      directModules: Array.isArray(entry.directModules) ? entry.directModules.slice() : []
+      directModules: Array.isArray(entry.directModules) ? entry.directModules.slice() : [],
+      requires: Array.isArray(entry.requires)
+        ? entry.requires
+            .filter((requirement) => requirement && typeof requirement.id === 'string')
+            .map((requirement) => ({
+              id: requirement.id,
+              type: requirement.type === 'module' ? 'module' : 'collection',
+              reason: typeof requirement.reason === 'string' ? requirement.reason : '',
+              label: typeof requirement.label === 'string' ? requirement.label : ''
+            }))
+        : []
     }))
     .filter((entry) => entry.modules.length);
+
+  const cloneRequirements = (input) => {
+    if (!Array.isArray(input)) {
+      return [];
+    }
+    return input
+      .map((requirement) => {
+        if (!requirement || typeof requirement.id !== 'string') {
+          return null;
+        }
+        return {
+          id: requirement.id,
+          type: requirement.type === 'module' ? 'module' : 'collection',
+          reason: typeof requirement.reason === 'string' ? requirement.reason : '',
+          label: typeof requirement.label === 'string' ? requirement.label : ''
+        };
+      })
+      .filter(Boolean);
+  };
 
   function buildCollectionStructures(snapshot) {
     const overrides = snapshot?.ui?.collections?.presets || {};
@@ -2683,6 +2712,8 @@ export function mountUI({ root, state, config = {} }) {
       const overrideModules = Array.isArray(override?.modules)
         ? Array.from(new Set(override.modules.filter(Boolean)))
         : null;
+      const baseRequires = cloneRequirements(entry.requires);
+      const overrideRequires = cloneRequirements(override?.requires);
       const definition = {
         id: entry.id,
         label: override?.label || entry.label,
@@ -2693,7 +2724,8 @@ export function mountUI({ root, state, config = {} }) {
         ancestors: Array.isArray(entry.ancestors) ? entry.ancestors.slice() : [],
         descendants: Array.isArray(entry.descendants) ? entry.descendants.slice() : [],
         pathLabel: entry.pathLabel || entry.label || entry.id,
-        directModules: entry.directModules && entry.directModules.length ? entry.directModules.slice() : []
+        directModules: entry.directModules && entry.directModules.length ? entry.directModules.slice() : [],
+        requires: overrideRequires.length ? overrideRequires : baseRequires
       };
       resolved.push(definition);
       seen.add(entry.id);
@@ -2716,7 +2748,8 @@ export function mountUI({ root, state, config = {} }) {
           ancestors: Array.isArray(override?.ancestors) ? override.ancestors.slice() : [],
           descendants: Array.isArray(override?.descendants) ? override.descendants.slice() : [],
           pathLabel: override?.pathLabel || override?.label || id,
-          directModules: modules.slice()
+          directModules: modules.slice(),
+          requires: cloneRequirements(override?.requires)
         });
         seen.add(id);
       });
@@ -2739,7 +2772,8 @@ export function mountUI({ root, state, config = {} }) {
         pathLabel: definition.pathLabel || definition.label,
         directModules: Array.isArray(definition.directModules)
           ? definition.directModules.filter((moduleId) => moduleToBlockIds.has(moduleId))
-          : members
+          : members,
+        requires: cloneRequirements(definition.requires)
       };
       byId.set(next.id, next);
       blockIds.set(next.id, members.flatMap((moduleId) => moduleToBlockIds.get(moduleId) ?? []));
@@ -2788,6 +2822,7 @@ export function mountUI({ root, state, config = {} }) {
   const adminToolbarCounts = { active: null, hidden: null, pinned: null };
   const organizeFilterToggles = new Map();
   const collectionButtons = new Map();
+  const collectionRequirementDisplays = new Map();
   const availableFilterSelects = {};
   let collectionsPanel = null;
   let collectionsSummary = null;
@@ -4824,6 +4859,7 @@ export function mountUI({ root, state, config = {} }) {
     if (!collectionButtons.size) return;
     const prefs = getPreferences();
     const disabledSet = new Set(prefs.collections.disabled);
+    let missingRequirements = 0;
     collectionButtons.forEach((button, collectionId) => {
       const storedEnabled = !disabledSet.has(collectionId);
       const label = button.dataset.collectionLabel || collectionId;
@@ -4871,11 +4907,43 @@ export function mountUI({ root, state, config = {} }) {
       button.classList.toggle('is-active', effectiveEnabled);
       button.setAttribute('aria-label', accessibleLabel);
       button.title = tooltip;
+
+      const requirementViews = collectionRequirementDisplays.get(collectionId) || [];
+      requirementViews.forEach((view) => {
+        if (!view || !view.requirement || !view.badge || !view.element) return;
+        const requirement = view.requirement;
+        let satisfied = true;
+        if (requirement.type === 'collection') {
+          satisfied = !disabledSet.has(requirement.id);
+        } else if (requirement.type === 'module') {
+          const moduleBlocks = moduleToBlockIds.get(requirement.id) || [];
+          satisfied = moduleBlocks.every((blockId) => !prefs.disabled.includes(blockId));
+        }
+        const variant = satisfied ? 'dependency-ok' : 'dependency-missing';
+        view.badge.classList.remove('a11ytb-module-badge--dependency-ok', 'a11ytb-module-badge--dependency-missing');
+        view.badge.classList.add(`a11ytb-module-badge--${variant}`);
+        view.badge.textContent = satisfied ? 'Active' : 'À activer';
+        const statusMessage = satisfied
+          ? 'Dépendance active'
+          : 'Activez cette dépendance pour profiter de la collection.';
+        view.badge.title = statusMessage;
+        view.badge.setAttribute('aria-label', statusMessage);
+        view.element.dataset.status = satisfied ? 'ok' : 'missing';
+        if (view.note) {
+          view.note.dataset.status = view.element.dataset.status;
+        }
+        if (!satisfied) {
+          missingRequirements += 1;
+        }
+      });
     });
     if (collectionsSummary) {
       const total = collectionButtons.size;
       const active = total - disabledSet.size;
-      collectionsSummary.textContent = `Collections de modules (${active}/${total} actives)`;
+      const suffix = missingRequirements > 0
+        ? ` – ${missingRequirements} dépendance(s) à réactiver`
+        : '';
+      collectionsSummary.textContent = `Collections de modules (${active}/${total} actives${suffix})`;
     }
   }
 
@@ -5155,6 +5223,15 @@ export function mountUI({ root, state, config = {} }) {
       delete drafts[id];
       saveBuilderPrefs({ activeCollectionId: prefs.activeCollectionId === id ? '' : prefs.activeCollectionId, drafts });
     }
+  }
+
+  function getCollectionLabel(collectionId) {
+    if (!collectionId) return '';
+    const info = collectionById.get(collectionId) || moduleCollectionsById.get(collectionId);
+    if (info?.label) {
+      return info.label;
+    }
+    return collectionId;
   }
 
   function getModuleLabel(moduleId) {
@@ -5495,6 +5572,7 @@ export function mountUI({ root, state, config = {} }) {
     if (!collectionsPanel || !collectionsListRoot) return;
     collectionsListRoot.innerHTML = '';
     collectionButtons.clear();
+    collectionRequirementDisplays.clear();
     if (!collectionDefinitions.length) {
       const empty = document.createElement('p');
       empty.className = 'a11ytb-admin-help';
@@ -5546,6 +5624,49 @@ export function mountUI({ root, state, config = {} }) {
       }
       card.append(members);
 
+      const requirements = cloneRequirements(collection.requires);
+      if (requirements.length) {
+        const requirementWrapper = document.createElement('div');
+        requirementWrapper.className = 'a11ytb-collection-requirements';
+        const requirementTitle = document.createElement('p');
+        requirementTitle.className = 'a11ytb-collection-requirements-title';
+        requirementTitle.textContent = 'Dépendances';
+        requirementWrapper.append(requirementTitle);
+        const requirementList = document.createElement('ul');
+        requirementList.className = 'a11ytb-collection-requirement-list';
+        const requirementViews = [];
+        requirements.forEach((requirement) => {
+          const item = document.createElement('li');
+          item.className = 'a11ytb-collection-requirement';
+          item.dataset.requirementId = requirement.id;
+          item.dataset.requirementType = requirement.type || 'collection';
+          item.dataset.status = 'unknown';
+          const statusBadge = createBadge('Active', 'dependency-ok', { title: 'Statut de la dépendance' });
+          statusBadge.classList.add('a11ytb-collection-requirement-badge');
+          const content = document.createElement('div');
+          content.className = 'a11ytb-collection-requirement-content';
+          const labelEl = document.createElement('span');
+          labelEl.className = 'a11ytb-collection-requirement-label';
+          labelEl.textContent = requirement.label || getCollectionLabel(requirement.id);
+          content.append(labelEl);
+          let note = null;
+          if (requirement.reason) {
+            note = document.createElement('p');
+            note.className = 'a11ytb-collection-requirement-note';
+            note.textContent = requirement.reason;
+            content.append(note);
+          }
+          item.append(statusBadge, content);
+          requirementList.append(item);
+          requirementViews.push({ element: item, badge: statusBadge, requirement, note });
+        });
+        if (requirementViews.length) {
+          requirementWrapper.append(requirementList);
+          card.append(requirementWrapper);
+          collectionRequirementDisplays.set(collection.id, requirementViews);
+        }
+      }
+
       const controls = document.createElement('div');
       controls.className = 'a11ytb-collection-actions';
       const toggle = document.createElement('button');
@@ -5565,24 +5686,76 @@ export function mountUI({ root, state, config = {} }) {
         const prefs = getPreferences();
         const disabledList = Array.isArray(prefs.collections?.disabled) ? prefs.collections.disabled : [];
         const disabledSet = new Set(disabledList);
-        const isCurrentlyDisabled = disabledSet.has(collection.id);
-        if (isCurrentlyDisabled) {
+        const info = collectionById.get(collection.id);
+        const descendants = Array.isArray(info?.descendants) ? info.descendants : [];
+        const requirements = cloneRequirements(info?.requires || collection.requires || []);
+        const previouslyDisabled = new Set(disabledSet);
+        const wasDisabled = disabledSet.has(collection.id);
+        const cascadedCollections = [];
+        const restoredDependencies = [];
+
+        if (wasDisabled) {
           disabledSet.delete(collection.id);
+          requirements.forEach((requirement) => {
+            if (requirement.type !== 'collection') {
+              return;
+            }
+            if (disabledSet.has(requirement.id)) {
+              disabledSet.delete(requirement.id);
+              if (previouslyDisabled.has(requirement.id)) {
+                restoredDependencies.push(requirement.id);
+              }
+            }
+          });
         } else {
           disabledSet.add(collection.id);
+          descendants.forEach((descendantId) => {
+            if (!disabledSet.has(descendantId)) {
+              disabledSet.add(descendantId);
+            }
+            if (!previouslyDisabled.has(descendantId)) {
+              cascadedCollections.push(descendantId);
+            }
+          });
         }
-        const next = Array.from(disabledSet);
+
+        const next = collectionDefinitions
+          .map((definition) => definition.id)
+          .filter((id) => disabledSet.has(id));
+
         if (!arraysEqual(next, disabledList)) {
           setListIfChanged('ui.collections.disabled', next, disabledList);
           markProfileAsCustom();
-          const actionLabel = isCurrentlyDisabled ? 'Collection activée' : 'Collection désactivée';
+          const actionLabel = wasDisabled ? 'Collection activée' : 'Collection désactivée';
           const collectionDisplay = collection.pathLabel || collection.label || collection.id;
-          logActivity(`${actionLabel} : ${collectionDisplay}`, {
-            tone: isCurrentlyDisabled ? 'confirm' : 'toggle',
-            tags: ['organisation']
+          const extra = [];
+          if (!wasDisabled && cascadedCollections.length) {
+            const cascadedLabels = cascadedCollections.map((id) => getCollectionLabel(id));
+            extra.push(`cascade : ${cascadedLabels.join(', ')}`);
+          }
+          if (wasDisabled && restoredDependencies.length) {
+            const restoredLabels = restoredDependencies.map((id) => getCollectionLabel(id));
+            extra.push(`dépendances restaurées : ${restoredLabels.join(', ')}`);
+          }
+          const message = extra.length
+            ? `${actionLabel} : ${collectionDisplay} (${extra.join(' · ')})`
+            : `${actionLabel} : ${collectionDisplay}`;
+          logActivity(message, {
+            tone: wasDisabled ? 'confirm' : 'toggle',
+            tags: ['organisation', 'collections']
           });
           const modulesText = moduleLabels.length ? ` Modules concernés : ${moduleLabels.join(', ')}.` : '';
-          announceOrganize(`${actionLabel} : ${collectionDisplay}.${modulesText}`.trim());
+          const srParts = [];
+          if (!wasDisabled && cascadedCollections.length) {
+            const cascadedLabels = cascadedCollections.map((id) => getCollectionLabel(id));
+            srParts.push(`Collections désactivées automatiquement : ${cascadedLabels.join(', ')}`);
+          }
+          if (wasDisabled && restoredDependencies.length) {
+            const restoredLabels = restoredDependencies.map((id) => getCollectionLabel(id));
+            srParts.push(`Dépendances réactivées : ${restoredLabels.join(', ')}`);
+          }
+          const announceMessage = [`${actionLabel} : ${collectionDisplay}.`, ...srParts].join(' ');
+          announceOrganize(`${announceMessage}${modulesText}`.trim());
         }
       });
       controls.append(toggle);
