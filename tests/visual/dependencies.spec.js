@@ -12,8 +12,14 @@ test.describe('Organisation — dépendances', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await page.locator('.a11ytb-fab').click();
-    await page.getByRole('button', { name: 'Organisation' }).click();
+    const fab = page.locator('.a11ytb-fab');
+    await expect(fab).toBeVisible();
+    await fab.click();
+    await expect(page.locator('.a11ytb-panel')).toHaveAttribute('data-open', 'true');
+
+    const organizeButton = page.getByRole('tab', { name: 'Organisation' });
+    await expect(organizeButton).toBeVisible();
+    await organizeButton.click();
     await expect(page.locator('.a11ytb-view--organize')).toBeVisible();
   });
 
