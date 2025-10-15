@@ -5,10 +5,11 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
+    "lint:manifests": "node scripts/validate-manifests.mjs",
     "lint:axe": "node scripts/check-axe-core.mjs",
     "lint:js": "eslint src --max-warnings=0",
     "lint:css": "stylelint \"src/**/*.css\"",
-    "lint": "npm run lint:axe && npm run lint:js && npm run lint:css",
+    "lint": "npm run lint:manifests && npm run lint:axe && npm run lint:js && npm run lint:css",
     "postinstall": "playwright install",
     "test:unit": "vitest run",
     "test:visual": "playwright test",

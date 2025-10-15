@@ -16,6 +16,140 @@ if (!defined('ABSPATH')) {
 }
 
 const A11YTB_PLUGIN_VERSION = '1.0.0';
+const A11YTB_MIN_WP_VERSION = '6.2';
+const A11YTB_MIN_PHP_VERSION = '7.4';
+
+/**
+ * Charge le textdomain du plugin.
+ */
+function a11ytb_load_textdomain(): void
+{
+    load_plugin_textdomain('a11ytb', false, dirname(plugin_basename(__FILE__)) . '/languages');
+}
+add_action('plugins_loaded', 'a11ytb_load_textdomain');
+
+/**
+ * Retourne la liste des erreurs de prérequis.
+ *
+ * @return string[]
+ */
+function a11ytb_get_requirement_errors(): array
+{
+    global $wp_version;
+
+    $errors = [];
+
+    if (version_compare(PHP_VERSION, A11YTB_MIN_PHP_VERSION, '<')) {
+        $errors[] = sprintf(
+            /* translators: %s: version PHP minimale */
+            esc_html__('PHP %s ou supérieur est requis.', 'a11ytb'),
+            A11YTB_MIN_PHP_VERSION
+        );
+    }
+
+    if (version_compare((string) $wp_version, A11YTB_MIN_WP_VERSION, '<')) {
+        $errors[] = sprintf(
+            /* translators: %s: version WordPress minimale */
+            esc_html__('WordPress %s ou supérieur est requis.', 'a11ytb'),
+            A11YTB_MIN_WP_VERSION
+        );
+    }
+
+    return $errors;
+}
+
+/**
+ * Initialise les options du plugin lors de l’activation.
+ */
+function a11ytb_initialize_options(): void
+{
+    $defaults = [
+        'a11ytb_enable_frontend' => '1',
+        'a11ytb_default_dock' => 'right',
+        'a11ytb_default_view' => 'modules',
+        'a11ytb_auto_open_panel' => '0',
+        'a11ytb_gemini_quota' => 15,
+        'a11ytb_gemini_api_key' => '',
+        'a11ytb_activity_webhook_url' => '',
+        'a11ytb_activity_webhook_token' => '',
+    ];
+
+    foreach ($defaults as $key => $value) {
+        if (get_option($key, null) === null) {
+            add_option($key, $value);
+        }
+    }
+}
+
+/**
+ * Affiche un avis en cas d’environnement incompatible.
+ */
+function a11ytb_render_requirements_notice(): void
+{
+    if (!current_user_can('activate_plugins')) {
+        return;
+    }
+
+    $errors = a11ytb_get_requirement_errors();
+    if (!$errors) {
+        return;
+    }
+
+    $items = array_map(static function ($message) {
+        return '<li>' . esc_html($message) . '</li>';
+    }, $errors);
+
+    echo '<div class="notice notice-error"><p><strong>' . esc_html__('A11y Toolbox Pro ne peut pas fonctionner :', 'a11ytb') . '</strong></p><ul>' . implode('', $items) . '</ul></div>';
+}
+
+add_action('admin_notices', 'a11ytb_render_requirements_notice');
+
+/**
+ * Vérifie les prérequis lors de l’activation.
+ */
+function a11ytb_on_activation(): void
+{
+    $errors = a11ytb_get_requirement_errors();
+    if ($errors) {
+        if (!function_exists('deactivate_plugins')) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+
+        deactivate_plugins(plugin_basename(__FILE__), true);
+
+        $items = array_map(static function ($message) {
+            return '<li>' . esc_html($message) . '</li>';
+        }, $errors);
+
+        $message = '<p><strong>' . esc_html__('A11y Toolbox Pro ne peut pas être activé :', 'a11ytb') . '</strong></p>';
+        $message .= '<ul>' . implode('', $items) . '</ul>';
+
+        wp_die(
+            wp_kses_post($message),
+            esc_html__('Activation impossible', 'a11ytb'),
+            ['back_link' => true]
+        );
+    }
+
+    a11ytb_initialize_options();
+}
+register_activation_hook(__FILE__, 'a11ytb_on_activation');
+
+/**
+ * Ajoute un lien vers la page de réglages depuis la liste des extensions.
+ *
+ * @param string[] $links
+ * @return string[]
+ */
+function a11ytb_register_plugin_action_links(array $links): array
+{
+    $settings_url = admin_url('admin.php?page=a11y-toolbox-pro');
+    $settings_link = '<a href="' . esc_url($settings_url) . '">' . esc_html__('Réglages', 'a11ytb') . '</a>';
+    array_unshift($links, $settings_link);
+
+    return $links;
+}
+add_filter('plugin_action_links_' . plugin_basename(__FILE__), 'a11ytb_register_plugin_action_links');
 
 /**
  * Retourne la clé de chiffrement dérivée des salts WordPress.

@@ -56,7 +56,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 ## Manques face à la concurrence
 
 - **Audit automatisé continu** : l’analyse axe-core manuelle, ses exports et désormais une planification locale (heure, jour, semaine, fenêtre horaire) existent, et les parcours guidés FastPass couvrent les vérifications critiques ; le suivi multi-pages proposé par Accessibility Insights reste cependant absent.
-- **Guidage** : la vue Guides propose désormais des checklists dynamiques inspirées des FastPass (prérequis, annonces `aria-live`, ressources). Il reste à scénariser des parcours utilisateurs complets et à ajouter des exports résumés.
+- **Guidage** : la vue Guides propose désormais des checklists dynamiques inspirées des FastPass (prérequis, annonces `aria-live`, ressources) et inclut un parcours de calibration audio aligné sur les recommandations Stark. Il reste à scénariser des parcours utilisateurs complets et à ajouter des exports résumés.
 - **Personnalisation avancée** : la hiérarchie de collections rapproche l’outil des regroupements modulaires proposés par Stark (groupes imbriqués, états parent/enfant), mais il manque encore la duplication/partage de profils, les raccourcis personnalisables et les automatisations.
 - **Collaboration** : toujours aucune intégration Jira/Linear/Slack ni gestion multi-utilisateurs.
 - **Observabilité** : les métriques runtime sont locales, désormais agrégées dans un indice de conformité AA/AAA consolidé **et dans un suivi d’historique manifestes**. Il manque encore l’agrégation historique multi-instance et des tableaux de bord partageables comme sur les plateformes enterprise.
@@ -180,7 +180,7 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
 3. ✅ Ouvrir la **duplication de profils** (création, sauvegarde, partage) et un premier lot de raccourcis personnalisables.
 4. ✅ Agréger les **métriques runtime** dans le centre d’état (graphiques, tendances, export) avec score de conformité AA/AAA consolidé.
 5. ✅ Connecter l’**audit axe-core** au journal d’activité (plans FastPass, historique des scans, notifications) et préparer les intégrations externes.
-6. Formaliser le **processus de contribution modules** (template PR, checklist accessibilité/design system, validations automatiques dans la CI).
+6. ✅ Formaliser le **processus de contribution modules** (template PR, checklist accessibilité/design system, validations automatiques dans la CI) via `docs/module-contribution.md` et l’audit `npm run lint:manifests` aligné sur axe DevTools / Accessibility Insights / Stark.
 7. ✅ Calculer et exposer un **score de qualité des manifestes** (badge + recommandations dans la vue Modules disponibles) pour rapprocher la gouvernance des suites enterprise.
 
 ## Étapes moyen terme
@@ -200,4 +200,4 @@ permettant de composer l'expérience utilisateur et de cocher/décocher dynamiqu
 - Mise en place d'un **système de licences** et de partenariats pour les modules premium.
 - Gouvernance multi-tenant (espaces organisationnels, workflow de validation, intégrations Jira/Linear/Slack).
 
-Mise à jour : 2025-04-05
+Mise à jour : 2025-04-06
