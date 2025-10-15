@@ -6807,7 +6807,15 @@ export function mountUI({ root, state, config = {} }) {
     };
 
     const handleKeydown = (event) => {
-      if (event.key !== 'Tab' || panel.dataset.open !== 'true') {
+      if (panel.dataset.open !== 'true') {
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        toggle(false);
+        return;
+      }
+      if (event.key !== 'Tab') {
         return;
       }
       const target = event.target;
@@ -7102,40 +7110,6 @@ export function mountUI({ root, state, config = {} }) {
         logActivity(`Module affiché : ${title}`, { tone: 'confirm' });
       }
       markProfileAsCustom();
-    }
-  });
-
-  panel.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      e.stopPropagation();
-      toggle(false);
-      return;
-    }
-    if (e.key === 'Tab') {
-      const focusables = getFocusableElements();
-      if (!focusables.length) {
-        e.preventDefault();
-        panel.focus();
-        return;
-      }
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    }
-  });
-
-  document.addEventListener('focusin', (event) => {
-    if (panel.dataset.open === 'true') {
-      if (!panel.contains(event.target) && event.target !== fab) {
-        const focusables = getFocusableElements();
-        (focusables[0] || panel).focus();
-      }
     }
   });
 
