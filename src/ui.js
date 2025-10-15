@@ -7,6 +7,7 @@ import { normalizeAudioEvents } from './audio-config.js';
 import { flattenedModuleCollections, moduleCollectionsById } from './module-collections.js';
 import { updateDependencyDisplay } from './utils/dependency-display.js';
 import { createActivityIntegration } from './integrations/activity.js';
+import { collectFocusable } from './utils/focus.js';
 
 const DEFAULT_BLOCK_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h7v7H4V5zm9 0h7v7h-7V5zM4 12h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>';
 
@@ -6758,35 +6759,6 @@ export function mountUI({ root, state, config = {} }) {
   let releaseOutsideInert = null;
   let releasePanelFocusTrap = null;
 
-  const FOCUSABLE_SELECTORS = [
-    'a[href]',
-    'button:not([disabled])',
-    'textarea:not([disabled])',
-    'input:not([disabled])',
-    'select:not([disabled])',
-    '[tabindex]:not([tabindex="-1"])'
-  ].join(',');
-
-  function isElementVisible(el) {
-    if (!el) return false;
-    if (el.hasAttribute('hidden')) return false;
-    if (el.getAttribute('aria-hidden') === 'true') return false;
-
-    const style = typeof window !== 'undefined' && window.getComputedStyle
-      ? window.getComputedStyle(el)
-      : null;
-
-    if (style && (style.visibility === 'hidden' || style.display === 'none')) {
-      return false;
-    }
-
-    return (
-      el.offsetWidth > 0
-      || el.offsetHeight > 0
-      || el.getClientRects().length > 0
-    );
-  }
-
   function setupPanelFocusTrap() {
     teardownPanelFocusTrap();
 
@@ -6873,12 +6845,6 @@ export function mountUI({ root, state, config = {} }) {
       releasePanelFocusTrap();
     }
     releasePanelFocusTrap = null;
-  }
-
-  function collectFocusable(container) {
-    if (!container) return [];
-    return Array.from(container.querySelectorAll(FOCUSABLE_SELECTORS))
-      .filter((el) => isElementVisible(el));
   }
 
   function getFocusableElements() {
