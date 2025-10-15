@@ -5693,18 +5693,21 @@ export function mountUI({ root, state, config = {} }) {
         const wasDisabled = disabledSet.has(collection.id);
         const cascadedCollections = [];
         const restoredDependencies = [];
+        const reactivatedCollections = [];
 
         if (wasDisabled) {
           disabledSet.delete(collection.id);
+          descendants.forEach((descendantId) => {
+            if (disabledSet.delete(descendantId)) {
+              reactivatedCollections.push(descendantId);
+            }
+          });
           requirements.forEach((requirement) => {
             if (requirement.type !== 'collection') {
               return;
             }
-            if (disabledSet.has(requirement.id)) {
-              disabledSet.delete(requirement.id);
-              if (previouslyDisabled.has(requirement.id)) {
-                restoredDependencies.push(requirement.id);
-              }
+            if (disabledSet.delete(requirement.id)) {
+              restoredDependencies.push(requirement.id);
             }
           });
         } else {
@@ -5737,6 +5740,10 @@ export function mountUI({ root, state, config = {} }) {
             const restoredLabels = restoredDependencies.map((id) => getCollectionLabel(id));
             extra.push(`dépendances restaurées : ${restoredLabels.join(', ')}`);
           }
+          if (wasDisabled && reactivatedCollections.length) {
+            const reactivatedLabels = reactivatedCollections.map((id) => getCollectionLabel(id));
+            extra.push(`collections réactivées automatiquement : ${reactivatedLabels.join(', ')}`);
+          }
           const message = extra.length
             ? `${actionLabel} : ${collectionDisplay} (${extra.join(' · ')})`
             : `${actionLabel} : ${collectionDisplay}`;
@@ -5753,6 +5760,10 @@ export function mountUI({ root, state, config = {} }) {
           if (wasDisabled && restoredDependencies.length) {
             const restoredLabels = restoredDependencies.map((id) => getCollectionLabel(id));
             srParts.push(`Dépendances réactivées : ${restoredLabels.join(', ')}`);
+          }
+          if (wasDisabled && reactivatedCollections.length) {
+            const reactivatedLabels = reactivatedCollections.map((id) => getCollectionLabel(id));
+            srParts.push(`Collections réactivées automatiquement : ${reactivatedLabels.join(', ')}`);
           }
           const announceMessage = [`${actionLabel} : ${collectionDisplay}.`, ...srParts].join(' ');
           announceOrganize(`${announceMessage}${modulesText}`.trim());
