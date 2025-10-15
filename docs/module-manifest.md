@@ -53,6 +53,14 @@ Les champs inconnus sont ignorés avec un avertissement console pour éviter les
 
 Ces conventions préparent l’introduction d’un fichier `module.json` par module tout en sécurisant l’intégration multi-équipe.
 
+## Audit automatisé des manifestes
+
+- `npm run lint:manifests` exécute `scripts/validate-manifests.mjs`.
+- Le script réutilise `validateModuleManifest`, vérifie l’unicité des identifiants et exige un niveau **AA** de couverture métadonnées (seuils inspirés de Deque axe DevTools, Accessibility Insights et Stark).
+- Les avertissements listent les recommandations manquantes (`metadataQuality.recommendations`) pour cibler rapidement les champs à compléter.
+
+L’audit s’exécute automatiquement via `npm run lint` et doit rester vert avant toute Pull Request.
+
 ## Guides FastPass et checklists
 
 Les manifestes exposent des parcours FastPass via `manifest.guides`. Chaque entrée décrit une checklist séquencée qui alimente la vue **Guides** et rapproche l’expérience des parcours proposés par Accessibility Insights.
