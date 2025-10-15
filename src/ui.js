@@ -973,19 +973,19 @@ export function mountUI({ root, state, config = {} }) {
   header.innerHTML = `
     <div class="a11ytb-title">A11y Toolbox Pro</div>
     <div class="a11ytb-actions" role="toolbar" aria-label="Actions d’interface">
-      <button class="a11ytb-button" data-action="dock-left">
+      <button class="a11ytb-button" data-action="dock-left" aria-pressed="false">
         <span class="a11ytb-button-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm8 1H6v12h6V6zm2 0v12h5V6h-5z"/></svg>
         </span>
         Dock gauche
       </button>
-      <button class="a11ytb-button" data-action="dock-right">
+      <button class="a11ytb-button" data-action="dock-right" aria-pressed="false">
         <span class="a11ytb-button-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false"><path d="M5 4a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V5a1 1 0 00-1-1H5zm11 2h3v12h-3V6zm-2 0H6v12h8V6z"/></svg>
         </span>
         Dock droite
       </button>
-      <button class="a11ytb-button" data-action="dock-bottom">
+      <button class="a11ytb-button" data-action="dock-bottom" aria-pressed="false">
         <span class="a11ytb-button-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm1 8v5h14v-5H5zm0-2h14V6H5v5z"/></svg>
         </span>
@@ -1013,6 +1013,21 @@ export function mountUI({ root, state, config = {} }) {
   const fullscreenToggle = header.querySelector('[data-action="toggle-fullscreen"]');
   const fullscreenIcon = fullscreenToggle?.querySelector('[data-ref="fullscreen-icon"]');
   const fullscreenLabel = fullscreenToggle?.querySelector('[data-ref="fullscreen-label"]');
+
+  const dockControls = new Map([
+    ['left', header.querySelector('[data-action="dock-left"]')],
+    ['right', header.querySelector('[data-action="dock-right"]')],
+    ['bottom', header.querySelector('[data-action="dock-bottom"]')]
+  ]);
+
+  dockControls.forEach((button, position) => {
+    if (!button) return;
+    button.type = 'button';
+    button.setAttribute('aria-pressed', 'false');
+    button.addEventListener('click', () => {
+      state.set('ui.dock', position);
+    });
+  });
 
   const body = document.createElement('div');
   body.className = 'a11ytb-body';
@@ -6797,6 +6812,16 @@ export function mountUI({ root, state, config = {} }) {
     }
   }
 
+  function syncDockControls(snapshot) {
+    const dock = snapshot?.ui?.dock || state.get('ui.dock') || 'right';
+    dockControls.forEach((button, position) => {
+      if (!button) return;
+      const active = position === dock;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+  }
+
   function toggle(open) {
     const shouldOpen = open ?? panel.dataset.open !== 'true';
     panel.dataset.open = String(shouldOpen);
@@ -6855,9 +6880,6 @@ export function mountUI({ root, state, config = {} }) {
     window.a11ytb?.feedback?.play('alert');
     logActivity('Préférences réinitialisées');
   });
-  header.querySelector('[data-action="dock-left"]').addEventListener('click', () => state.set('ui.dock', 'left'));
-  header.querySelector('[data-action="dock-right"]').addEventListener('click', () => state.set('ui.dock', 'right'));
-  header.querySelector('[data-action="dock-bottom"]').addEventListener('click', () => state.set('ui.dock', 'bottom'));
   if (fullscreenToggle) {
     fullscreenToggle.addEventListener('click', () => {
       const nextValue = !state.get('ui.fullscreen');
@@ -7068,6 +7090,7 @@ export function mountUI({ root, state, config = {} }) {
     refreshDependencyViews(snapshot);
     syncView();
     syncFullscreenMode(snapshot);
+    syncDockControls(snapshot);
     renderProfiles(snapshot);
     updateActiveShortcuts(snapshot);
     refreshShortcutDisplays(snapshot);
@@ -7088,6 +7111,7 @@ export function mountUI({ root, state, config = {} }) {
   refreshDependencyViews(initialSnapshot);
   syncView();
   syncFullscreenMode(initialSnapshot);
+  syncDockControls(initialSnapshot);
   renderProfiles(initialSnapshot);
   updateActiveShortcuts(initialSnapshot);
   refreshShortcutDisplays(initialSnapshot);
