@@ -973,19 +973,19 @@ export function mountUI({ root, state, config = {} }) {
   header.innerHTML = `
     <div class="a11ytb-title">A11y Toolbox Pro</div>
     <div class="a11ytb-actions" role="toolbar" aria-label="Actions d’interface">
-      <button class="a11ytb-button" data-action="dock-left">
+      <button class="a11ytb-button" data-action="dock-left" aria-pressed="false">
         <span class="a11ytb-button-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm8 1H6v12h6V6zm2 0v12h5V6h-5z"/></svg>
         </span>
         Dock gauche
       </button>
-      <button class="a11ytb-button" data-action="dock-right">
+      <button class="a11ytb-button" data-action="dock-right" aria-pressed="false">
         <span class="a11ytb-button-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false"><path d="M5 4a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V5a1 1 0 00-1-1H5zm11 2h3v12h-3V6zm-2 0H6v12h8V6z"/></svg>
         </span>
         Dock droite
       </button>
-      <button class="a11ytb-button" data-action="dock-bottom">
+      <button class="a11ytb-button" data-action="dock-bottom" aria-pressed="false">
         <span class="a11ytb-button-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm1 8v5h14v-5H5zm0-2h14V6H5v5z"/></svg>
         </span>
@@ -1013,6 +1013,21 @@ export function mountUI({ root, state, config = {} }) {
   const fullscreenToggle = header.querySelector('[data-action="toggle-fullscreen"]');
   const fullscreenIcon = fullscreenToggle?.querySelector('[data-ref="fullscreen-icon"]');
   const fullscreenLabel = fullscreenToggle?.querySelector('[data-ref="fullscreen-label"]');
+
+  const dockControls = new Map([
+    ['left', header.querySelector('[data-action="dock-left"]')],
+    ['right', header.querySelector('[data-action="dock-right"]')],
+    ['bottom', header.querySelector('[data-action="dock-bottom"]')]
+  ]);
+
+  dockControls.forEach((button, position) => {
+    if (!button) return;
+    button.type = 'button';
+    button.setAttribute('aria-pressed', 'false');
+    button.addEventListener('click', () => {
+      state.set('ui.dock', position);
+    });
+  });
 
   const body = document.createElement('div');
   body.className = 'a11ytb-body';
@@ -1530,6 +1545,15 @@ export function mountUI({ root, state, config = {} }) {
 
   const viewToggle = document.createElement('div');
   viewToggle.className = 'a11ytb-view-toggle';
+  viewToggle.setAttribute('role', 'tablist');
+  viewToggle.setAttribute('aria-label', 'Sections de la boîte à outils');
+  viewToggle.setAttribute('aria-orientation', 'horizontal');
+  const viewAnnouncement = document.createElement('p');
+  viewAnnouncement.id = 'a11ytb-view-status';
+  viewAnnouncement.className = 'a11ytb-sr-only';
+  viewAnnouncement.setAttribute('role', 'status');
+  viewAnnouncement.setAttribute('aria-live', 'polite');
+  viewAnnouncement.textContent = '';
   const viewButtons = new Map();
   const viewDefinitions = [
     {
@@ -1558,7 +1582,13 @@ export function mountUI({ root, state, config = {} }) {
       icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 7a3 3 0 013-3h10a3 3 0 013 3v10a3 3 0 01-3 3H7a3 3 0 01-3-3zm5 2v6h2V9zm4 0v6h2V9z"/></svg>'
     }
   ];
+  const viewOrder = viewDefinitions.map((view) => view.id);
+  const viewMetaById = new Map(viewDefinitions.map((view) => [view.id, view]));
   viewDefinitions.forEach((view) => {
+    const tabId = `a11ytb-tab-${view.id}`;
+    const panelId = `a11ytb-panel-${view.id}`;
+    view.tabId = tabId;
+    view.panelId = panelId;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'a11ytb-chip a11ytb-chip--view';
@@ -1567,7 +1597,11 @@ export function mountUI({ root, state, config = {} }) {
       <span class="a11ytb-view-icon" aria-hidden="true">${view.icon}</span>
       <span class="a11ytb-view-label">${view.label}</span>
     `;
-    btn.setAttribute('aria-pressed', 'false');
+    btn.id = tabId;
+    btn.setAttribute('role', 'tab');
+    btn.setAttribute('aria-controls', panelId);
+    btn.setAttribute('aria-selected', 'false');
+    btn.setAttribute('tabindex', '-1');
     btn.addEventListener('click', () => {
       state.set('ui.view', view.id);
       syncView();
@@ -1576,39 +1610,96 @@ export function mountUI({ root, state, config = {} }) {
     viewToggle.append(btn);
   });
 
+  function activateTabByIndex(index) {
+    const normalizedIndex = (index + viewOrder.length) % viewOrder.length;
+    const viewId = viewOrder[normalizedIndex];
+    const tab = viewButtons.get(viewId);
+    if (!tab) return;
+    tab.focus();
+    state.set('ui.view', viewId);
+    syncView();
+  }
+
+  viewToggle.addEventListener('keydown', (event) => {
+    const activeElement = document.activeElement;
+    if (!viewToggle.contains(activeElement)) return;
+
+    const currentIndex = viewOrder.findIndex((id) => viewButtons.get(id) === activeElement);
+    if (currentIndex === -1) return;
+
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        event.preventDefault();
+        activateTabByIndex(currentIndex + 1);
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        event.preventDefault();
+        activateTabByIndex(currentIndex - 1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        activateTabByIndex(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        activateTabByIndex(viewOrder.length - 1);
+        break;
+      default:
+        break;
+    }
+  });
+
   const viewContainer = document.createElement('div');
   viewContainer.className = 'a11ytb-view-container';
 
   const modulesView = document.createElement('div');
   modulesView.className = 'a11ytb-view a11ytb-view--modules';
-  modulesView.setAttribute('role', 'region');
-  modulesView.setAttribute('aria-label', 'Modules d’accessibilité');
+  const modulesMeta = viewMetaById.get('modules');
+  modulesView.id = modulesMeta?.panelId || 'a11ytb-panel-modules';
+  modulesView.setAttribute('role', 'tabpanel');
+  modulesView.setAttribute('aria-labelledby', modulesMeta?.tabId || 'a11ytb-tab-modules');
+  modulesView.setAttribute('aria-hidden', 'false');
+  modulesView.tabIndex = 0;
 
   const optionsView = document.createElement('div');
   optionsView.className = 'a11ytb-view a11ytb-view--options';
-  optionsView.setAttribute('role', 'region');
-  optionsView.setAttribute('aria-label', 'Profils et options avancées');
+  const optionsMeta = viewMetaById.get('options');
+  optionsView.id = optionsMeta?.panelId || 'a11ytb-panel-options';
+  optionsView.setAttribute('role', 'tabpanel');
+  optionsView.setAttribute('aria-labelledby', optionsMeta?.tabId || 'a11ytb-tab-options');
+  optionsView.setAttribute('aria-hidden', 'true');
   optionsView.setAttribute('hidden', '');
   optionsView.tabIndex = -1;
 
   const organizeView = document.createElement('div');
   organizeView.className = 'a11ytb-view a11ytb-view--organize';
-  organizeView.setAttribute('role', 'region');
-  organizeView.setAttribute('aria-label', 'Organisation des modules');
+  const organizeMeta = viewMetaById.get('organize');
+  organizeView.id = organizeMeta?.panelId || 'a11ytb-panel-organize';
+  organizeView.setAttribute('role', 'tabpanel');
+  organizeView.setAttribute('aria-labelledby', organizeMeta?.tabId || 'a11ytb-tab-organize');
+  organizeView.setAttribute('aria-hidden', 'true');
   organizeView.setAttribute('hidden', '');
   organizeView.tabIndex = -1;
 
   const guidesView = document.createElement('div');
   guidesView.className = 'a11ytb-view a11ytb-view--guides';
-  guidesView.setAttribute('role', 'region');
-  guidesView.setAttribute('aria-label', 'Parcours guidés et checklists');
+  const guidesMeta = viewMetaById.get('guides');
+  guidesView.id = guidesMeta?.panelId || 'a11ytb-panel-guides';
+  guidesView.setAttribute('role', 'tabpanel');
+  guidesView.setAttribute('aria-labelledby', guidesMeta?.tabId || 'a11ytb-tab-guides');
+  guidesView.setAttribute('aria-hidden', 'true');
   guidesView.setAttribute('hidden', '');
   guidesView.tabIndex = -1;
 
   const shortcutsView = document.createElement('div');
   shortcutsView.className = 'a11ytb-view a11ytb-view--shortcuts';
-  shortcutsView.setAttribute('role', 'region');
-  shortcutsView.setAttribute('aria-label', 'Raccourcis clavier et navigation');
+  const shortcutsMeta = viewMetaById.get('shortcuts');
+  shortcutsView.id = shortcutsMeta?.panelId || 'a11ytb-panel-shortcuts';
+  shortcutsView.setAttribute('role', 'tabpanel');
+  shortcutsView.setAttribute('aria-labelledby', shortcutsMeta?.tabId || 'a11ytb-tab-shortcuts');
+  shortcutsView.setAttribute('aria-hidden', 'true');
   shortcutsView.setAttribute('hidden', '');
   shortcutsView.tabIndex = -1;
 
@@ -1883,7 +1974,7 @@ export function mountUI({ root, state, config = {} }) {
   let releaseFlyoutInert = null;
   let lastFlyoutFocus = null;
 
-  shellNav.append(statusCenter, viewToggle);
+  shellNav.append(statusCenter, viewToggle, viewAnnouncement);
   shellMain.append(viewContainer);
   shell.append(shellNav, shellMain);
   body.append(shell);
@@ -6096,16 +6187,13 @@ export function mountUI({ root, state, config = {} }) {
   function syncView() {
     const prefs = getPreferences();
     const currentView = prefs.view || 'modules';
+    const viewChanged = activeViewId !== currentView;
     const focusedElement = typeof document !== 'undefined' ? document.activeElement : null;
     viewButtons.forEach((btn, id) => {
       const active = id === currentView;
       btn.classList.toggle('is-active', active);
-      btn.setAttribute('aria-pressed', String(active));
-      if (active) {
-        btn.setAttribute('aria-current', 'page');
-      } else {
-        btn.removeAttribute('aria-current');
-      }
+      btn.setAttribute('aria-selected', String(active));
+      btn.setAttribute('tabindex', active ? '0' : '-1');
     });
     const nextViewElement = viewElements.get(currentView);
     const previousViewElement = activeViewId ? viewElements.get(activeViewId) : null;
@@ -6123,11 +6211,13 @@ export function mountUI({ root, state, config = {} }) {
         element.style.visibility = 'visible';
         element.removeAttribute('hidden');
         element.setAttribute('aria-hidden', 'false');
+        element.tabIndex = 0;
       } else {
         element.hidden = true;
         element.style.visibility = 'hidden';
         element.setAttribute('hidden', '');
         element.setAttribute('aria-hidden', 'true');
+        element.tabIndex = -1;
         if (!shouldRefocus && element && focusedElement && element.contains(focusedElement)) {
           shouldRefocus = true;
         }
@@ -6187,6 +6277,10 @@ export function mountUI({ root, state, config = {} }) {
           shortcutsView.focus();
         }
       });
+    }
+    if (viewChanged && viewAnnouncement) {
+      const meta = viewMetaById.get(currentView);
+      viewAnnouncement.textContent = meta ? `${meta.label} affichée` : '';
     }
     activeViewId = currentView;
   }
@@ -6672,10 +6766,30 @@ export function mountUI({ root, state, config = {} }) {
     '[tabindex]:not([tabindex="-1"])'
   ].join(',');
 
+  function isElementVisible(el) {
+    if (!el) return false;
+    if (el.hasAttribute('hidden')) return false;
+    if (el.getAttribute('aria-hidden') === 'true') return false;
+
+    const style = typeof window !== 'undefined' && window.getComputedStyle
+      ? window.getComputedStyle(el)
+      : null;
+
+    if (style && (style.visibility === 'hidden' || style.display === 'none')) {
+      return false;
+    }
+
+    return (
+      el.offsetWidth > 0
+      || el.offsetHeight > 0
+      || el.getClientRects().length > 0
+    );
+  }
+
   function collectFocusable(container) {
     if (!container) return [];
     return Array.from(container.querySelectorAll(FOCUSABLE_SELECTORS))
-      .filter((el) => el.offsetParent !== null && !el.hasAttribute('hidden'));
+      .filter((el) => isElementVisible(el));
   }
 
   function getFocusableElements() {
@@ -6696,6 +6810,16 @@ export function mountUI({ root, state, config = {} }) {
       }
       fullscreenToggle.setAttribute('title', fullscreen ? 'Revenir à la vue compacte' : 'Agrandir la boîte à outils');
     }
+  }
+
+  function syncDockControls(snapshot) {
+    const dock = snapshot?.ui?.dock || state.get('ui.dock') || 'right';
+    dockControls.forEach((button, position) => {
+      if (!button) return;
+      const active = position === dock;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
   }
 
   function toggle(open) {
@@ -6756,9 +6880,6 @@ export function mountUI({ root, state, config = {} }) {
     window.a11ytb?.feedback?.play('alert');
     logActivity('Préférences réinitialisées');
   });
-  header.querySelector('[data-action="dock-left"]').addEventListener('click', () => state.set('ui.dock', 'left'));
-  header.querySelector('[data-action="dock-right"]').addEventListener('click', () => state.set('ui.dock', 'right'));
-  header.querySelector('[data-action="dock-bottom"]').addEventListener('click', () => state.set('ui.dock', 'bottom'));
   if (fullscreenToggle) {
     fullscreenToggle.addEventListener('click', () => {
       const nextValue = !state.get('ui.fullscreen');
@@ -6969,6 +7090,7 @@ export function mountUI({ root, state, config = {} }) {
     refreshDependencyViews(snapshot);
     syncView();
     syncFullscreenMode(snapshot);
+    syncDockControls(snapshot);
     renderProfiles(snapshot);
     updateActiveShortcuts(snapshot);
     refreshShortcutDisplays(snapshot);
@@ -6989,6 +7111,7 @@ export function mountUI({ root, state, config = {} }) {
   refreshDependencyViews(initialSnapshot);
   syncView();
   syncFullscreenMode(initialSnapshot);
+  syncDockControls(initialSnapshot);
   renderProfiles(initialSnapshot);
   updateActiveShortcuts(initialSnapshot);
   refreshShortcutDisplays(initialSnapshot);
