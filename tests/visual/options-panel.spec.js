@@ -66,13 +66,19 @@ test.describe('Panneau Options & Profils', () => {
     }, FIXED_SCHEDULE_TIMESTAMP);
 
     await page.goto('/');
-    await page.locator('.a11ytb-fab').click();
-    await page.getByRole('button', { name: 'Options & Profils' }).click();
+    const fab = page.locator('.a11ytb-fab');
+    await expect(fab).toBeVisible();
+    await fab.click();
+    await expect(page.locator('.a11ytb-panel')).toHaveAttribute('data-open', 'true');
+
+    const optionsButton = page.getByRole('tab', { name: 'Options & Profils' });
+    await expect(optionsButton).toBeVisible();
+    await optionsButton.click();
     await expect(page.locator('.a11ytb-view--options')).toBeVisible();
   });
 
   test('le cycle de focus reste confiné au panneau', async ({ page }) => {
-    const optionsToggle = page.getByRole('button', { name: 'Options & Profils' });
+    const optionsToggle = page.getByRole('tab', { name: 'Options & Profils' });
     await optionsToggle.focus();
 
     const cycleLength = await page.evaluate((selectors) => {
