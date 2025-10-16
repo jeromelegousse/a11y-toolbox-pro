@@ -52,7 +52,8 @@ function coerceValue(key, value) {
 }
 
 function parseArgs(rawArgs) {
-  const args = { engine: openAiWhisperEngine.id };
+  const [defaultEngine] = ENGINES.keys();
+  const args = { engine: defaultEngine };
 
   for (const token of rawArgs) {
     if (!token.startsWith('--')) {
@@ -97,7 +98,8 @@ async function main() {
   console.log(JSON.stringify({
     engine: engine.id,
     file: absoluteFile,
-    text: result.text
+    text: result.text,
+    raw: result
   }, null, 2));
 }
 
