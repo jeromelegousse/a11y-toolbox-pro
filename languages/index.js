@@ -4,11 +4,11 @@ const TRANSLATIONS = {
   fr: {
     meta: {
       label: 'fr',
-      nativeName: 'Français'
+      nativeName: 'Français',
     },
     panel: {
       title: 'A11y Toolbox Pro',
-      openFab: 'Ouvrir la boîte à outils d’accessibilité'
+      openFab: 'Ouvrir la boîte à outils d’accessibilité',
     },
     toolbar: {
       ariaLabel: 'Actions d’interface',
@@ -20,11 +20,20 @@ const TRANSLATIONS = {
       fullscreenEnterTitle: 'Agrandir la boîte à outils',
       fullscreenExitTitle: 'Revenir à la vue compacte',
       reset: 'Réinitialiser',
-      close: 'Fermer'
+      close: 'Fermer',
     },
     language: {
       label: 'Langue',
-      helper: 'Choisir la langue de l’interface'
+      helper: 'Choisir la langue de l’interface',
+    },
+    notifications: {
+      regionLabel: 'Notifications système',
+      dismiss: 'Masquer',
+      dismissAria: 'Masquer la notification « {title} »',
+      fallbackMessage: 'Une notification a été reçue.',
+      defaultAlertTitle: 'Alerte',
+      alertFallbackMessage: 'Une alerte système a été reçue.',
+      empty: 'Aucune notification active.',
     },
     status: {
       regionLabel: 'État en temps réel des modules vocaux, braille et vision',
@@ -45,23 +54,23 @@ const TRANSLATIONS = {
       alertSummary: 'Alertes consolidées : {alerts}.',
       alertCritical: {
         one: '{count} alerte critique',
-        other: '{count} alertes critiques'
+        other: '{count} alertes critiques',
       },
       alertWarning: {
         one: '{count} avertissement modéré',
-        other: '{count} avertissements modérés'
+        other: '{count} avertissements modérés',
       },
       successCount: {
         one: '{count} succès',
-        other: '{count} succès'
+        other: '{count} succès',
       },
       failureCount: {
         one: '{count} échec',
-        other: '{count} échecs'
+        other: '{count} échecs',
       },
       samples: {
         one: '{count} échantillon',
-        other: '{count} échantillons'
+        other: '{count} échantillons',
       },
       latencyCombined: 'Latence combinée',
       retries: 'Retentatives',
@@ -78,17 +87,17 @@ const TRANSLATIONS = {
       windowDayRange: '{start} → {end}',
       windowTimeRange: '{start} → {end}',
       windowCombined: '{days} · {times}',
-      windowFallback: 'Fenêtre {start} → {end}'
-    }
+      windowFallback: 'Fenêtre {start} → {end}',
+    },
   },
   en: {
     meta: {
       label: 'en',
-      nativeName: 'English'
+      nativeName: 'English',
     },
     panel: {
       title: 'A11y Toolbox Pro',
-      openFab: 'Open the accessibility toolbox'
+      openFab: 'Open the accessibility toolbox',
     },
     toolbar: {
       ariaLabel: 'Interface actions',
@@ -100,11 +109,20 @@ const TRANSLATIONS = {
       fullscreenEnterTitle: 'Expand the toolbox',
       fullscreenExitTitle: 'Return to compact view',
       reset: 'Reset',
-      close: 'Close'
+      close: 'Close',
     },
     language: {
       label: 'Language',
-      helper: 'Choose the interface language'
+      helper: 'Choose the interface language',
+    },
+    notifications: {
+      regionLabel: 'System notifications',
+      dismiss: 'Dismiss',
+      dismissAria: 'Dismiss notification “{title}”',
+      fallbackMessage: 'A notification was received.',
+      defaultAlertTitle: 'Alert',
+      alertFallbackMessage: 'A system alert was received.',
+      empty: 'No active notifications.',
     },
     status: {
       regionLabel: 'Real-time status for speech, braille and vision modules',
@@ -125,23 +143,23 @@ const TRANSLATIONS = {
       alertSummary: 'Consolidated alerts: {alerts}.',
       alertCritical: {
         one: '{count} critical alert',
-        other: '{count} critical alerts'
+        other: '{count} critical alerts',
       },
       alertWarning: {
         one: '{count} warning',
-        other: '{count} warnings'
+        other: '{count} warnings',
       },
       successCount: {
         one: '{count} success',
-        other: '{count} successes'
+        other: '{count} successes',
       },
       failureCount: {
         one: '{count} failure',
-        other: '{count} failures'
+        other: '{count} failures',
       },
       samples: {
         one: '{count} sample',
-        other: '{count} samples'
+        other: '{count} samples',
       },
       latencyCombined: 'Combined latency',
       retries: 'Retries',
@@ -158,9 +176,9 @@ const TRANSLATIONS = {
       windowDayRange: '{start} → {end}',
       windowTimeRange: '{start} → {end}',
       windowCombined: '{days} · {times}',
-      windowFallback: 'Window {start} → {end}'
-    }
-  }
+      windowFallback: 'Window {start} → {end}',
+    },
+  },
 };
 
 const pluralRulesCache = new Map();
@@ -187,14 +205,16 @@ function formatTemplate(template, replacements = {}) {
 function resolveMessage(locale, keyPath) {
   const segments = keyPath.split('.');
   const bundle = TRANSLATIONS[locale];
-  return segments.reduce((acc, segment) => (acc && acc[segment] !== undefined ? acc[segment] : undefined), bundle);
+  return segments.reduce(
+    (acc, segment) => (acc && acc[segment] !== undefined ? acc[segment] : undefined),
+    bundle
+  );
 }
 
 function pickMessageValue(locale, key, replacements, fallbackLocale) {
   const primary = resolveMessage(locale, key);
-  const fallback = fallbackLocale && fallbackLocale !== locale
-    ? resolveMessage(fallbackLocale, key)
-    : undefined;
+  const fallback =
+    fallbackLocale && fallbackLocale !== locale ? resolveMessage(fallbackLocale, key) : undefined;
   return primary !== undefined ? primary : fallback;
 }
 
@@ -241,13 +261,16 @@ export function translate(locale, key, replacements = {}, fallbackLocale = FALLB
   if (message === undefined) {
     return '';
   }
-  return formatMessage(normalizedLocale, message, replacements) || formatMessage(normalizedFallback, message, replacements);
+  return (
+    formatMessage(normalizedLocale, message, replacements) ||
+    formatMessage(normalizedFallback, message, replacements)
+  );
 }
 
 export function getAvailableLocales() {
   return Object.keys(TRANSLATIONS).map((code) => ({
     code,
-    label: TRANSLATIONS[code].meta?.nativeName || code
+    label: TRANSLATIONS[code].meta?.nativeName || code,
   }));
 }
 
@@ -294,7 +317,7 @@ export function createI18n({ initialLocale, fallbackLocale } = {}) {
     getLocale,
     onChange,
     getAvailableLocales: () => getAvailableLocales(),
-    getLocaleLabel: (code) => getLocaleLabel(code)
+    getLocaleLabel: (code) => getLocaleLabel(code),
   };
 }
 
@@ -303,5 +326,5 @@ export default {
   getAvailableLocales,
   getLocaleLabel,
   resolveLocale,
-  translate
+  translate,
 };
