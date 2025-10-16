@@ -130,6 +130,13 @@ function createDefaultEventTable(presets) {
   );
 }
 
+function cloneEventTable(source) {
+  if (typeof globalThis.structuredClone === 'function') {
+    return globalThis.structuredClone(source);
+  }
+  return JSON.parse(JSON.stringify(source));
+}
+
 export function createFeedback(options = {}) {
   const player = makeTonePlayer();
   const initialTheme = buildPresets(options.theme);
@@ -223,7 +230,7 @@ export function createFeedback(options = {}) {
   function getConfig() {
     return {
       volume: masterVolume,
-      events: structuredClone(eventTable),
+      events: cloneEventTable(eventTable),
       theme: currentThemeKey
     };
   }
