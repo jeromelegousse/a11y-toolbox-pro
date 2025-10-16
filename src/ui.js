@@ -1,4 +1,3 @@
-import { createI18n } from '../languages/index.js';
 import { listBlocks, renderBlock, listModuleManifests } from './registry.js';
 import { moduleCatalog } from './module-catalog.js';
 import { applyInertToSiblings } from './utils/inert.js';
@@ -9,10 +8,13 @@ import { flattenedModuleCollections, moduleCollectionsById } from './module-coll
 import { updateDependencyDisplay } from './utils/dependency-display.js';
 import { createActivityIntegration } from './integrations/activity.js';
 import { collectFocusable } from './utils/focus.js';
+import { createI18nService } from './i18n-service.js';
+import { createNotificationCenter } from './notifications.js';
 
-const DEFAULT_BLOCK_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h7v7H4V5zm9 0h7v7h-7V5zM4 12h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>';
+const DEFAULT_BLOCK_ICON =
+  '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h7v7H4V5zm9 0h7v7h-7V5zM4 12h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>';
 
-export function mountUI({ root, state, config = {} }) {
+export function mountUI({ root, state, config = {}, i18n: providedI18n, notifications }) {
   const pluginConfig = config || {};
   const behaviorConfig = pluginConfig.behavior || {};
   const integrationsConfig = pluginConfig.integrations || {};
@@ -24,7 +26,7 @@ export function mountUI({ root, state, config = {} }) {
     { id: 'all', label: 'Tous' },
     { id: 'vision', label: 'Vision' },
     { id: 'lecture', label: 'Lecture' },
-    { id: 'interaction', label: 'Interaction' }
+    { id: 'interaction', label: 'Interaction' },
   ];
 
   const PRIORITY_DEFAULT_WEIGHT = 2;
@@ -36,7 +38,7 @@ export function mountUI({ root, state, config = {} }) {
       shortLabel: 'Critique',
       description: 'Toujours afficher en premier et éviter de masquer le module.',
       weight: 0,
-      tone: 'alert'
+      tone: 'alert',
     },
     {
       id: 'focus',
@@ -44,7 +46,7 @@ export function mountUI({ root, state, config = {} }) {
       shortLabel: 'Priorité',
       description: 'Mettre le module en avant dans le panneau principal.',
       weight: 1,
-      tone: 'confirm'
+      tone: 'confirm',
     },
     {
       id: 'later',
@@ -52,20 +54,42 @@ export function mountUI({ root, state, config = {} }) {
       shortLabel: 'Secondaire',
       description: 'Module non critique pouvant rester en bas de liste.',
       weight: 3,
-      tone: 'info'
-    }
+      tone: 'info',
+    },
   ];
   const PRIORITY_LOOKUP = new Map(PRIORITY_LEVELS.map((level) => [level.id, level]));
 
   const CUSTOM_SHORTCUT_DEFINITIONS = [
     { id: 'toggle-panel', label: 'Ouvrir ou fermer la boîte à outils.', default: 'Alt+Shift+A' },
-    { id: 'view-modules', label: 'Afficher la vue Modules.', default: 'Alt+Shift+M', view: 'modules' },
-    { id: 'view-options', label: 'Afficher la vue Options & Profils.', default: 'Alt+Shift+O', view: 'options' },
-    { id: 'view-organize', label: 'Afficher la vue Organisation.', default: 'Alt+Shift+G', view: 'organize' },
+    {
+      id: 'view-modules',
+      label: 'Afficher la vue Modules.',
+      default: 'Alt+Shift+M',
+      view: 'modules',
+    },
+    {
+      id: 'view-options',
+      label: 'Afficher la vue Options & Profils.',
+      default: 'Alt+Shift+O',
+      view: 'options',
+    },
+    {
+      id: 'view-organize',
+      label: 'Afficher la vue Organisation.',
+      default: 'Alt+Shift+G',
+      view: 'organize',
+    },
     { id: 'view-guides', label: 'Afficher la vue Guides.', default: 'Alt+Shift+P', view: 'guides' },
-    { id: 'view-shortcuts', label: 'Afficher cette vue Raccourcis.', default: 'Alt+Shift+H', view: 'shortcuts' }
+    {
+      id: 'view-shortcuts',
+      label: 'Afficher cette vue Raccourcis.',
+      default: 'Alt+Shift+H',
+      view: 'shortcuts',
+    },
   ];
-  const CUSTOM_SHORTCUT_LOOKUP = new Map(CUSTOM_SHORTCUT_DEFINITIONS.map((item) => [item.id, item]));
+  const CUSTOM_SHORTCUT_LOOKUP = new Map(
+    CUSTOM_SHORTCUT_DEFINITIONS.map((item) => [item.id, item])
+  );
 
   const SHORTCUT_KEY_DISPLAY = new Map([
     ['escape', 'Échap'],
@@ -81,7 +105,7 @@ export function mountUI({ root, state, config = {} }) {
     ['pageup', 'Page▲'],
     ['pagedown', 'Page▼'],
     ['home', 'Origine'],
-    ['end', 'Fin']
+    ['end', 'Fin'],
   ]);
 
   const SHORTCUT_KEY_ALIASES = new Map([
@@ -98,7 +122,7 @@ export function mountUI({ root, state, config = {} }) {
     ['↑', 'arrowup'],
     ['↓', 'arrowdown'],
     ['page▲', 'pageup'],
-    ['page▼', 'pagedown']
+    ['page▼', 'pagedown'],
   ]);
 
   function slugifyProfileId(input) {
@@ -166,7 +190,10 @@ export function mountUI({ root, state, config = {} }) {
 
   function parseShortcutCombo(input) {
     if (!input || typeof input !== 'string') return null;
-    const tokens = input.split('+').map((token) => token.trim()).filter(Boolean);
+    const tokens = input
+      .split('+')
+      .map((token) => token.trim())
+      .filter(Boolean);
     if (!tokens.length) return null;
     const combo = { alt: false, shift: false, ctrl: false, meta: false, key: '' };
     tokens.forEach((token) => {
@@ -177,7 +204,12 @@ export function mountUI({ root, state, config = {} }) {
         combo.shift = true;
       } else if (normalized === 'ctrl' || normalized === 'control' || normalized === 'ctl') {
         combo.ctrl = true;
-      } else if (normalized === 'cmd' || normalized === '⌘' || normalized === 'meta' || normalized === 'command') {
+      } else if (
+        normalized === 'cmd' ||
+        normalized === '⌘' ||
+        normalized === 'meta' ||
+        normalized === 'command'
+      ) {
         combo.meta = true;
       } else if (normalized === 'cmdorctrl') {
         combo.meta = true;
@@ -231,7 +263,7 @@ export function mountUI({ root, state, config = {} }) {
       shift: event.shiftKey || false,
       ctrl: event.ctrlKey || false,
       meta: event.metaKey || false,
-      key
+      key,
     };
     if (!combo.alt && !combo.ctrl && !combo.meta) {
       return null;
@@ -263,12 +295,13 @@ export function mountUI({ root, state, config = {} }) {
     {
       id: 'custom',
       label: 'Profil personnalisé',
-      description: 'Ajustez librement les modules et leurs paramètres.'
+      description: 'Ajustez librement les modules et leurs paramètres.',
     },
     {
       id: 'vision-low',
       label: 'Vision basse',
-      description: 'Active le contraste renforcé, agrandit les espacements et met la lecture vocale en avant.',
+      description:
+        'Active le contraste renforcé, agrandit les espacements et met la lecture vocale en avant.',
       apply({ state, ensureEnabled, ensurePinned, ensureVisible }) {
         ensureEnabled(['contrast-controls', 'spacing-controls', 'tts-controls']);
         ensureVisible(['contrast-controls', 'spacing-controls', 'tts-controls']);
@@ -297,12 +330,12 @@ export function mountUI({ root, state, config = {} }) {
               events: {
                 alert: { volume: 1, timbre: 'bright' },
                 confirm: { volume: 0.9 },
-                info: { volume: 0.85 }
-              }
-            }
+                info: { volume: 0.85 },
+              },
+            },
           }
         );
-      }
+      },
     },
     {
       id: 'reading-comfort',
@@ -335,15 +368,15 @@ export function mountUI({ root, state, config = {} }) {
               events: {
                 alert: { volume: 0.85 },
                 confirm: { volume: 0.7 },
-                info: { volume: 0.6 }
-              }
-            }
+                info: { volume: 0.6 },
+              },
+            },
           }
         );
-      }
-    }
+      },
+    },
   ];
-  const profileMap = new Map(accessibilityProfiles.map(profile => [profile.id, profile]));
+  const profileMap = new Map(accessibilityProfiles.map((profile) => [profile.id, profile]));
 
   function getPriorityEntry(priorityId) {
     if (!priorityId) return null;
@@ -406,7 +439,7 @@ export function mountUI({ root, state, config = {} }) {
     }
     return {
       raw: serializeShortcutCombo(parsed),
-      parsed
+      parsed,
     };
   }
 
@@ -491,7 +524,10 @@ export function mountUI({ root, state, config = {} }) {
       button.setAttribute('aria-live', 'assertive');
       button.focus();
     }
-    setShortcutStatus(`Appuyez sur la nouvelle combinaison pour « ${definition.label} » (Échap pour annuler).`, 'info');
+    setShortcutStatus(
+      `Appuyez sur la nouvelle combinaison pour « ${definition.label} » (Échap pour annuler).`,
+      'info'
+    );
     cancelRecordingHandler = (event) => {
       if (!recordingShortcutId) return;
       if (event.key === 'Escape') {
@@ -502,7 +538,10 @@ export function mountUI({ root, state, config = {} }) {
       const combo = buildShortcutFromEvent(event);
       if (!combo) {
         if (!event.metaKey && !event.ctrlKey && !event.altKey) {
-          setShortcutStatus('Utilisez au moins Alt, Ctrl ou Cmd pour définir le raccourci.', 'warning');
+          setShortcutStatus(
+            'Utilisez au moins Alt, Ctrl ou Cmd pour définir le raccourci.',
+            'warning'
+          );
         }
         return;
       }
@@ -511,8 +550,15 @@ export function mountUI({ root, state, config = {} }) {
       const overrides = { ...getShortcutOverrides() };
       overrides[actionId] = serialized;
       state.set('ui.shortcuts.overrides', overrides);
-      state.set('ui.shortcuts.lastRecorded', { id: actionId, combo: serialized, timestamp: Date.now() });
-      logActivity(`Raccourci mis à jour : ${definition.label}`, { tone: 'confirm', tags: ['raccourcis', actionId] });
+      state.set('ui.shortcuts.lastRecorded', {
+        id: actionId,
+        combo: serialized,
+        timestamp: Date.now(),
+      });
+      logActivity(`Raccourci mis à jour : ${definition.label}`, {
+        tone: 'confirm',
+        tags: ['raccourcis', actionId],
+      });
       stopShortcutRecording();
       setShortcutStatus(`Nouveau raccourci enregistré : ${serialized}`, 'confirm');
     };
@@ -526,7 +572,10 @@ export function mountUI({ root, state, config = {} }) {
     if (overrides[actionId]) {
       delete overrides[actionId];
       state.set('ui.shortcuts.overrides', overrides);
-      logActivity(`Raccourci réinitialisé : ${definition.label}`, { tone: 'info', tags: ['raccourcis', actionId] });
+      logActivity(`Raccourci réinitialisé : ${definition.label}`, {
+        tone: 'info',
+        tags: ['raccourcis', actionId],
+      });
     }
     stopShortcutRecording();
     const restored = serializeShortcutCombo(parseShortcutCombo(definition.default));
@@ -547,7 +596,7 @@ export function mountUI({ root, state, config = {} }) {
     'input:not([disabled])',
     'select:not([disabled])',
     'textarea:not([disabled])',
-    '[tabindex]:not([tabindex="-1"])'
+    '[tabindex]:not([tabindex="-1"])',
   ].join(',');
 
   function getProfilesState() {
@@ -559,8 +608,9 @@ export function mountUI({ root, state, config = {} }) {
   }
 
   function getFocusableIn(container) {
-    return Array.from(container.querySelectorAll(MODAL_FOCUSABLE))
-      .filter((el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true');
+    return Array.from(container.querySelectorAll(MODAL_FOCUSABLE)).filter(
+      (el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true'
+    );
   }
 
   function openModalDialog(options = {}) {
@@ -784,7 +834,7 @@ export function mountUI({ root, state, config = {} }) {
       confirmLabel: 'Créer',
       cancelLabel: 'Annuler',
       inputLabel: 'Nom du nouveau profil',
-      requireValue: true
+      requireValue: true,
     });
     if (!nameInput) return;
     const trimmedName = nameInput;
@@ -797,7 +847,10 @@ export function mountUI({ root, state, config = {} }) {
     const newId = ensureUniqueProfileId(baseId, profiles);
     const next = { ...profiles, [newId]: clone };
     saveProfilesState(next);
-    logActivity(`Profil dupliqué : ${trimmedName}`, { tone: 'confirm', tags: ['profils', 'duplication'] });
+    logActivity(`Profil dupliqué : ${trimmedName}`, {
+      tone: 'confirm',
+      tags: ['profils', 'duplication'],
+    });
   }
 
   async function exportProfile(profileId) {
@@ -807,10 +860,16 @@ export function mountUI({ root, state, config = {} }) {
     const payload = JSON.stringify({ id: profileId, ...profile }, null, 2);
     const copied = await copyToClipboard(payload);
     if (copied) {
-      logActivity(`Profil copié : ${profile.name || profileId}`, { tone: 'confirm', tags: ['profils', 'export'] });
+      logActivity(`Profil copié : ${profile.name || profileId}`, {
+        tone: 'confirm',
+        tags: ['profils', 'export'],
+      });
     } else {
       downloadText(`a11ytb-profile-${profileId}.json`, payload, 'application/json');
-      logActivity(`Profil exporté : ${profile.name || profileId}`, { tone: 'info', tags: ['profils', 'export'] });
+      logActivity(`Profil exporté : ${profile.name || profileId}`, {
+        tone: 'info',
+        tags: ['profils', 'export'],
+      });
     }
   }
 
@@ -824,7 +883,7 @@ export function mountUI({ root, state, config = {} }) {
       title: 'Supprimer le profil',
       description: `Confirmez la suppression de « ${name} ».`,
       confirmLabel: 'Supprimer',
-      cancelLabel: 'Annuler'
+      cancelLabel: 'Annuler',
     });
     if (!confirmed) return;
     const next = { ...profiles };
@@ -849,7 +908,7 @@ export function mountUI({ root, state, config = {} }) {
       confirmLabel: 'Renommer',
       cancelLabel: 'Annuler',
       inputLabel: 'Nouveau nom',
-      requireValue: true
+      requireValue: true,
     });
     if (!nameInput || nameInput === currentName) return;
     const trimmed = nameInput;
@@ -871,7 +930,7 @@ export function mountUI({ root, state, config = {} }) {
       settings,
       preset: false,
       source: raw.source || null,
-      createdAt: Date.now()
+      createdAt: Date.now(),
     };
     return normalized;
   }
@@ -887,7 +946,7 @@ export function mountUI({ root, state, config = {} }) {
       multiline: true,
       trimValue: false,
       requireValue: true,
-      emptyMessage: 'Veuillez coller un JSON valide.'
+      emptyMessage: 'Veuillez coller un JSON valide.',
     });
     if (!input) return;
     try {
@@ -897,7 +956,7 @@ export function mountUI({ root, state, config = {} }) {
         await openModalDialog({
           mode: 'alert',
           title: 'Import impossible',
-          description: 'Profil invalide : paramètres manquants.'
+          description: 'Profil invalide : paramètres manquants.',
         });
         return;
       }
@@ -913,7 +972,7 @@ export function mountUI({ root, state, config = {} }) {
       await openModalDialog({
         mode: 'alert',
         title: 'Import impossible',
-        description: 'Impossible de lire ce profil. Vérifiez le format JSON.'
+        description: 'Impossible de lire ce profil. Vérifiez le format JSON.',
       });
     }
   }
@@ -940,10 +999,14 @@ export function mountUI({ root, state, config = {} }) {
     }
   }
 
-  const i18n = createI18n({ initialLocale: state.get('ui.locale') });
-  if (state.get('ui.locale') !== i18n.getLocale()) {
-    state.set('ui.locale', i18n.getLocale());
-  }
+  const i18n = providedI18n ?? createI18nService({ state });
+  const notificationsCenter =
+    notifications ??
+    createNotificationCenter({
+      state,
+      i18n,
+      overrideAlert: !notifications,
+    });
 
   let languageSelect = null;
   let languageLabelEl = null;
@@ -964,6 +1027,8 @@ export function mountUI({ root, state, config = {} }) {
   let aggregationCollectionLabel = null;
   let aggregationTimeFormatter = null;
   let aggregationDayFormatter = null;
+  let notificationsContainer = null;
+  let currentNotifications = [];
 
   const dockLabelRefs = new Map();
 
@@ -976,8 +1041,10 @@ export function mountUI({ root, state, config = {} }) {
   </svg>`;
 
   const fullscreenIcons = {
-    expand: '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 4h7v2H6v5H4V4zm10 0h6v6h-2V6h-4V4zM4 14h2v4h5v2H4v-6zm12 4v-4h2v6h-6v-2z"/></svg>',
-    collapse: '<svg viewBox="0 0 24 24" focusable="false"><path d="M8 4v2H6v4H4V4h4zm14 4h-4V6h-2V4h6v4zM4 20v-6h2v4h2v2H4zm18-6v6h-6v-2h4v-4h2z"/></svg>'
+    expand:
+      '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 4h7v2H6v5H4V4zm10 0h6v6h-2V6h-4V4zM4 14h2v4h5v2H4v-6zm12 4v-4h2v6h-6v-2z"/></svg>',
+    collapse:
+      '<svg viewBox="0 0 24 24" focusable="false"><path d="M8 4v2H6v4H4V4h4zm14 4h-4V6h-2V4h6v4zM4 20v-6h2v4h2v2H4zm18-6v6h-6v-2h4v-4h2z"/></svg>',
   };
 
   const overlay = document.createElement('div');
@@ -995,6 +1062,13 @@ export function mountUI({ root, state, config = {} }) {
   panel.tabIndex = -1;
   panel.dataset.fullscreen = String(!!state.get('ui.fullscreen'));
   fab.setAttribute('aria-controls', panel.id);
+
+  notificationsContainer = document.createElement('div');
+  notificationsContainer.className = 'a11ytb-notifications';
+  notificationsContainer.setAttribute('role', 'region');
+  notificationsContainer.setAttribute('aria-live', 'polite');
+  notificationsContainer.setAttribute('aria-label', i18n.t('notifications.regionLabel'));
+  notificationsContainer.hidden = true;
 
   const header = document.createElement('div');
   header.className = 'a11ytb-header';
@@ -1029,9 +1103,27 @@ export function mountUI({ root, state, config = {} }) {
   }
 
   const dockButtons = new Map([
-    ['left', createDockButton('left', '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm8 1H6v12h6V6zm2 0v12h5V6h-5z"/></svg>')],
-    ['right', createDockButton('right', '<svg viewBox="0 0 24 24" focusable="false"><path d="M5 4a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V5a1 1 0 00-1-1H5zm11 2h3v12h-3V6zm-2 0H6v12h8V6z"/></svg>')],
-    ['bottom', createDockButton('bottom', '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm1 8v5h14v-5H5zm0-2h14V6H5v5z"/></svg>')]
+    [
+      'left',
+      createDockButton(
+        'left',
+        '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm8 1H6v12h6V6zm2 0v12h5V6h-5z"/></svg>'
+      ),
+    ],
+    [
+      'right',
+      createDockButton(
+        'right',
+        '<svg viewBox="0 0 24 24" focusable="false"><path d="M5 4a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V5a1 1 0 00-1-1H5zm11 2h3v12h-3V6zm-2 0H6v12h8V6z"/></svg>'
+      ),
+    ],
+    [
+      'bottom',
+      createDockButton(
+        'bottom',
+        '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm1 8v5h14v-5H5zm0-2h14V6H5v5z"/></svg>'
+      ),
+    ],
   ]);
 
   dockButtons.forEach((button) => actionsToolbar.append(button));
@@ -1059,7 +1151,8 @@ export function mountUI({ root, state, config = {} }) {
   const resetIconEl = document.createElement('span');
   resetIconEl.className = 'a11ytb-button-icon';
   resetIconEl.setAttribute('aria-hidden', 'true');
-  resetIconEl.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 5a7 7 0 015.917 10.777l1.52 1.318A9 9 0 103 12H1l3.5 3.5L8 12H5a7 7 0 017-7z"/></svg>';
+  resetIconEl.innerHTML =
+    '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 5a7 7 0 015.917 10.777l1.52 1.318A9 9 0 103 12H1l3.5 3.5L8 12H5a7 7 0 017-7z"/></svg>';
   resetLabel = document.createElement('span');
   resetLabel.className = 'a11ytb-button-label';
   resetButton.append(resetIconEl, resetLabel);
@@ -1083,7 +1176,7 @@ export function mountUI({ root, state, config = {} }) {
   languageSelect.value = i18n.getLocale();
   languageSelect.addEventListener('change', (event) => {
     const nextLocale = event.target.value || i18n.getLocale();
-    state.set('ui.locale', nextLocale);
+    i18n.use(nextLocale);
   });
   languagePicker.append(languageLabelEl, languageSelect);
   actionsToolbar.append(languagePicker);
@@ -1095,7 +1188,8 @@ export function mountUI({ root, state, config = {} }) {
   const closeIconEl = document.createElement('span');
   closeIconEl.className = 'a11ytb-button-icon';
   closeIconEl.setAttribute('aria-hidden', 'true');
-  closeIconEl.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M6.343 5.343L5.343 6.343 10.999 12l-5.656 5.657 1 1L12 13l5.657 5.657 1-1L13.001 12l5.656-5.657-1-1L12 11l-5.657-5.657z"/></svg>';
+  closeIconEl.innerHTML =
+    '<svg viewBox="0 0 24 24" focusable="false"><path d="M6.343 5.343L5.343 6.343 10.999 12l-5.656 5.657 1 1L12 13l5.657 5.657 1-1L13.001 12l5.656-5.657-1-1L12 11l-5.657-5.657z"/></svg>';
   closeLabel = document.createElement('span');
   closeLabel.className = 'a11ytb-button-label';
   closeButton.append(closeIconEl, closeLabel);
@@ -1170,9 +1264,77 @@ export function mountUI({ root, state, config = {} }) {
   aggregationLive.className = 'a11ytb-sr-only';
   aggregationLive.setAttribute('aria-live', 'assertive');
 
-  aggregationSection.append(aggregationHeader, aggregationFilters, aggregationList, aggregationLive);
+  aggregationSection.append(
+    aggregationHeader,
+    aggregationFilters,
+    aggregationList,
+    aggregationLive
+  );
 
   statusCenter.append(statusHeader, statusGrid, aggregationSection);
+
+  function createNotificationElement(entry) {
+    const tone = entry?.tone || 'info';
+    const item = document.createElement('div');
+    item.className = `a11ytb-notification a11ytb-notification--${tone}`;
+    item.dataset.tone = tone;
+    item.setAttribute('role', tone === 'alert' || tone === 'error' ? 'alert' : 'status');
+    item.setAttribute('aria-live', tone === 'alert' || tone === 'error' ? 'assertive' : 'polite');
+
+    const titleText = entry?.title ? String(entry.title) : '';
+    const messageText = entry?.message || i18n.t('notifications.fallbackMessage');
+
+    if (titleText) {
+      const titleEl = document.createElement('p');
+      titleEl.className = 'a11ytb-notification__title';
+      titleEl.textContent = titleText;
+      item.append(titleEl);
+    }
+
+    const messageEl = document.createElement('p');
+    messageEl.className = 'a11ytb-notification__message';
+    messageEl.textContent = messageText;
+    item.append(messageEl);
+
+    const actions = document.createElement('div');
+    actions.className = 'a11ytb-notification__actions';
+
+    const dismissButton = document.createElement('button');
+    dismissButton.type = 'button';
+    dismissButton.className = 'a11ytb-notification__dismiss';
+    dismissButton.dataset.notificationId = entry?.id;
+    const dismissLabel = i18n.t('notifications.dismiss');
+    const dismissAria =
+      i18n.t('notifications.dismissAria', {
+        title: titleText || messageText,
+      }) || dismissLabel;
+    dismissButton.textContent = dismissLabel;
+    dismissButton.setAttribute('aria-label', dismissAria);
+    dismissButton.addEventListener('click', () => {
+      if (notificationsCenter && typeof notificationsCenter.dismiss === 'function') {
+        notificationsCenter.dismiss(entry.id);
+      }
+    });
+
+    actions.append(dismissButton);
+    item.append(actions);
+
+    return item;
+  }
+
+  function renderNotificationsFromList(list = currentNotifications) {
+    if (!notificationsContainer) {
+      return;
+    }
+    currentNotifications = Array.isArray(list) ? list : [];
+    notificationsContainer.hidden = currentNotifications.length === 0;
+    if (!currentNotifications.length) {
+      notificationsContainer.replaceChildren();
+      return;
+    }
+    const elements = currentNotifications.map((entry) => createNotificationElement(entry));
+    notificationsContainer.replaceChildren(...elements);
+  }
 
   function applyLocaleToStaticUI(snapshot = state.get()) {
     updateLocaleFormatters();
@@ -1185,11 +1347,12 @@ export function mountUI({ root, state, config = {} }) {
       actionsToolbar.setAttribute('aria-label', i18n.t('toolbar.ariaLabel'));
     }
     dockButtons.forEach((button, position) => {
-      const key = position === 'left'
-        ? 'toolbar.dockLeft'
-        : position === 'right'
-          ? 'toolbar.dockRight'
-          : 'toolbar.dockBottom';
+      const key =
+        position === 'left'
+          ? 'toolbar.dockLeft'
+          : position === 'right'
+            ? 'toolbar.dockRight'
+            : 'toolbar.dockBottom';
       const labelText = i18n.t(key);
       const labelEl = dockLabelRefs.get(position);
       if (labelEl) {
@@ -1204,9 +1367,12 @@ export function mountUI({ root, state, config = {} }) {
         : i18n.t('toolbar.fullscreenEnter');
     }
     if (fullscreenToggle) {
-      fullscreenToggle.setAttribute('title', fullscreenState
-        ? i18n.t('toolbar.fullscreenExitTitle')
-        : i18n.t('toolbar.fullscreenEnterTitle'));
+      fullscreenToggle.setAttribute(
+        'title',
+        fullscreenState
+          ? i18n.t('toolbar.fullscreenExitTitle')
+          : i18n.t('toolbar.fullscreenEnterTitle')
+      );
     }
     if (resetLabel) {
       resetLabel.textContent = i18n.t('toolbar.reset');
@@ -1227,6 +1393,9 @@ export function mountUI({ root, state, config = {} }) {
       if (languageSelect.value !== i18n.getLocale()) {
         languageSelect.value = i18n.getLocale();
       }
+    }
+    if (notificationsContainer) {
+      notificationsContainer.setAttribute('aria-label', i18n.t('notifications.regionLabel'));
     }
     if (statusCenter) {
       statusCenter.setAttribute('aria-label', i18n.t('status.regionLabel'));
@@ -1257,19 +1426,27 @@ export function mountUI({ root, state, config = {} }) {
   }
 
   applyLocaleToStaticUI();
+  renderNotificationsFromList(state.get('runtime.notifications'));
+
+  if (notificationsCenter && typeof notificationsCenter.subscribe === 'function') {
+    notificationsCenter.subscribe((entries) => {
+      renderNotificationsFromList(entries);
+    });
+  } else if (state && typeof state.on === 'function') {
+    state.on((snapshot) => {
+      renderNotificationsFromList(snapshot?.runtime?.notifications ?? []);
+    });
+  }
 
   let currentLocale = i18n.getLocale();
 
-  state.on((snapshot) => {
-    const nextLocale = snapshot?.ui?.locale;
-    if (!nextLocale || nextLocale === currentLocale) {
-      return;
+  i18n.onChange((nextLocale) => {
+    currentLocale = nextLocale;
+    if (languageSelect && languageSelect.value !== nextLocale) {
+      languageSelect.value = nextLocale;
     }
-    currentLocale = i18n.setLocale(nextLocale);
-    if (languageSelect && languageSelect.value !== currentLocale) {
-      languageSelect.value = currentLocale;
-    }
-    applyLocaleToStaticUI(snapshot);
+    applyLocaleToStaticUI(state.get());
+    renderNotificationsFromList(currentNotifications);
   });
 
   let collectionDefinitions = [];
@@ -1288,7 +1465,10 @@ export function mountUI({ root, state, config = {} }) {
       return;
     }
     const locale = i18n.getLocale();
-    aggregationTimeFormatter = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' });
+    aggregationTimeFormatter = new Intl.DateTimeFormat(locale, {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
     aggregationDayFormatter = new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'short' });
   }
 
@@ -1306,7 +1486,7 @@ export function mountUI({ root, state, config = {} }) {
     });
     const nextValue = allowedValues.has(preferredValue)
       ? preferredValue
-      : (options[0]?.value || 'all');
+      : options[0]?.value || 'all';
     select.value = nextValue;
     return nextValue;
   }
@@ -1345,8 +1525,10 @@ export function mountUI({ root, state, config = {} }) {
 
   function createAggregationChart(successes = 0, failures = 0) {
     const total = Math.max(0, Number(successes) + Number(failures));
-    const successRatio = total > 0 ? Math.max(0, Math.min(100, (Number(successes) / total) * 100)) : 0;
-    const failureRatio = total > 0 ? Math.max(0, Math.min(100, (Number(failures) / total) * 100)) : 0;
+    const successRatio =
+      total > 0 ? Math.max(0, Math.min(100, (Number(successes) / total) * 100)) : 0;
+    const failureRatio =
+      total > 0 ? Math.max(0, Math.min(100, (Number(failures) / total) * 100)) : 0;
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 100 12');
     svg.setAttribute('focusable', 'false');
@@ -1411,7 +1593,10 @@ export function mountUI({ root, state, config = {} }) {
     scoreBadge.className = 'a11ytb-status-risk';
     scoreBadge.dataset.score = windowData.score || 'AAA';
     scoreBadge.textContent = windowData.score || 'AAA';
-    scoreBadge.setAttribute('aria-label', i18n.t('status.scoreLabel', { score: windowData.score || 'AAA' }));
+    scoreBadge.setAttribute(
+      'aria-label',
+      i18n.t('status.scoreLabel', { score: windowData.score || 'AAA' })
+    );
     header.append(scoreBadge);
 
     const chart = createAggregationChart(windowData.successes, windowData.failures);
@@ -1458,7 +1643,7 @@ export function mountUI({ root, state, config = {} }) {
     ['stt', 'stt'],
     ['braille', 'braille'],
     ['audio', 'audio-feedback'],
-    ['audit', 'audit']
+    ['audit', 'audit'],
   ]);
 
   function extractModulesFromProfile(settings = {}) {
@@ -1496,7 +1681,11 @@ export function mountUI({ root, state, config = {} }) {
       });
     });
 
-    const nextProfile = setAggregationSelectOptions(aggregationProfileSelect, profileOptions, preferredProfile);
+    const nextProfile = setAggregationSelectOptions(
+      aggregationProfileSelect,
+      profileOptions,
+      preferredProfile
+    );
     aggregationFilterState.profile = nextProfile;
     if (preferredProfile !== nextProfile) {
       state.set('ui.statusFilters.profile', nextProfile);
@@ -1506,14 +1695,20 @@ export function mountUI({ root, state, config = {} }) {
     collectionDefinitions.forEach((definition) => {
       collectionOptions.push(formatCollectionOption(definition));
     });
-    const nextCollection = setAggregationSelectOptions(aggregationCollectionSelect, collectionOptions, preferredCollection);
+    const nextCollection = setAggregationSelectOptions(
+      aggregationCollectionSelect,
+      collectionOptions,
+      preferredCollection
+    );
     aggregationFilterState.collection = nextCollection;
     if (preferredCollection !== nextCollection) {
       state.set('ui.statusFilters.collection', nextCollection);
     }
 
     const metricsSyncState = data?.runtime?.metricsSync || {};
-    const windows = Array.isArray(metricsSyncState.activeWindows) ? metricsSyncState.activeWindows : [];
+    const windows = Array.isArray(metricsSyncState.activeWindows)
+      ? metricsSyncState.activeWindows
+      : [];
     aggregationList.innerHTML = '';
 
     if (!windows.length) {
@@ -1529,21 +1724,27 @@ export function mountUI({ root, state, config = {} }) {
     let criticalCount = 0;
     let warningCount = 0;
 
-    const filteredWindows = windows.filter((windowData) => {
-      const moduleId = windowData.moduleId;
-      const profileSet = moduleProfileIndex.get(moduleId) || new Set();
-      const matchesProfile = aggregationFilterState.profile === 'all'
-        || profileSet.has(aggregationFilterState.profile);
-      if (!matchesProfile) return false;
-      const collectionCandidates = new Set(Array.isArray(windowData.collections) ? windowData.collections : []);
-      const indexedCollections = moduleCollectionsIndex.get(moduleId);
-      if (indexedCollections && typeof indexedCollections.forEach === 'function') {
-        indexedCollections.forEach((id) => collectionCandidates.add(id));
-      }
-      const matchesCollection = aggregationFilterState.collection === 'all'
-        || collectionCandidates.has(aggregationFilterState.collection);
-      return matchesCollection;
-    }).sort((a, b) => (b.lastTimestamp || 0) - (a.lastTimestamp || 0));
+    const filteredWindows = windows
+      .filter((windowData) => {
+        const moduleId = windowData.moduleId;
+        const profileSet = moduleProfileIndex.get(moduleId) || new Set();
+        const matchesProfile =
+          aggregationFilterState.profile === 'all' ||
+          profileSet.has(aggregationFilterState.profile);
+        if (!matchesProfile) return false;
+        const collectionCandidates = new Set(
+          Array.isArray(windowData.collections) ? windowData.collections : []
+        );
+        const indexedCollections = moduleCollectionsIndex.get(moduleId);
+        if (indexedCollections && typeof indexedCollections.forEach === 'function') {
+          indexedCollections.forEach((id) => collectionCandidates.add(id));
+        }
+        const matchesCollection =
+          aggregationFilterState.collection === 'all' ||
+          collectionCandidates.has(aggregationFilterState.collection);
+        return matchesCollection;
+      })
+      .sort((a, b) => (b.lastTimestamp || 0) - (a.lastTimestamp || 0));
 
     if (!filteredWindows.length) {
       const empty = document.createElement('p');
@@ -1654,7 +1855,19 @@ export function mountUI({ root, state, config = {} }) {
 
       card.append(headerRow, value, detail, meta, announcement);
       statusGrid.append(card);
-      entry = { card, badge, risk, value, detail, label, latencyValue, compatValue, latencyTerm, compatTerm, announcement };
+      entry = {
+        card,
+        badge,
+        risk,
+        value,
+        detail,
+        label,
+        latencyValue,
+        compatValue,
+        latencyTerm,
+        compatTerm,
+        announcement,
+      };
       statusCards.set(summary.id, entry);
     }
     return entry;
@@ -1706,7 +1919,8 @@ export function mountUI({ root, state, config = {} }) {
         entry.compatTerm.textContent = summary.metaLabels.compat;
       }
       if (entry.compatValue) {
-        entry.compatValue.textContent = insights.compatLabel || i18n.t('status.compatibilityUnknown');
+        entry.compatValue.textContent =
+          insights.compatLabel || i18n.t('status.compatibilityUnknown');
       }
       if (entry.announcement) {
         entry.announcement.textContent = insights.announcement || '';
@@ -1735,28 +1949,28 @@ export function mountUI({ root, state, config = {} }) {
     {
       id: 'modules',
       label: 'Modules',
-      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 5h6v6H5zm8 0h6v6h-6zm0 8h6v6h-6zm-8 0h6v6H5z"/></svg>'
+      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 5h6v6H5zm8 0h6v6h-6zm0 8h6v6h-6zm-8 0h6v6H5z"/></svg>',
     },
     {
       id: 'options',
       label: 'Options & Profils',
-      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 6h14v2H5zm0 5h10v2H5zm0 5h14v2H5z"/></svg>'
+      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 6h14v2H5zm0 5h10v2H5zm0 5h14v2H5z"/></svg>',
     },
     {
       id: 'organize',
       label: 'Organisation',
-      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h9v4H4zm0 5h6v4H4zm0 5h11v4H4zm12-5l4-3v10z"/></svg>'
+      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h9v4H4zm0 5h6v4H4zm0 5h11v4H4zm12-5l4-3v10z"/></svg>',
     },
     {
       id: 'guides',
       label: 'Guides',
-      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M6 4h9l3 3v13H6zm2 4v2h8V8zm0 4v2h5v-2z"/></svg>'
+      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M6 4h9l3 3v13H6zm2 4v2h8V8zm0 4v2h5v-2z"/></svg>',
     },
     {
       id: 'shortcuts',
       label: 'Raccourcis',
-      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 7a3 3 0 013-3h10a3 3 0 013 3v10a3 3 0 01-3 3H7a3 3 0 01-3-3zm5 2v6h2V9zm4 0v6h2V9z"/></svg>'
-    }
+      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 7a3 3 0 013-3h10a3 3 0 013 3v10a3 3 0 01-3 3H7a3 3 0 01-3-3zm5 2v6h2V9zm4 0v6h2V9z"/></svg>',
+    },
   ];
   const viewOrder = viewDefinitions.map((view) => view.id);
   const viewMetaById = new Map(viewDefinitions.map((view) => [view.id, view]));
@@ -1884,7 +2098,7 @@ export function mountUI({ root, state, config = {} }) {
     ['options', optionsView],
     ['organize', organizeView],
     ['guides', guidesView],
-    ['shortcuts', shortcutsView]
+    ['shortcuts', shortcutsView],
   ]);
 
   const layoutPresets = [
@@ -1892,20 +2106,20 @@ export function mountUI({ root, state, config = {} }) {
       id: 'double-column',
       label: 'Double colonne',
       description: 'Catégories à gauche, modules détaillés à droite.',
-      tone: 'confirm'
+      tone: 'confirm',
     },
     {
       id: 'mosaic',
       label: 'Mosaïque filtrable',
       description: 'Groupes expansibles en grille responsive pour comparer rapidement.',
-      tone: 'info'
+      tone: 'info',
     },
     {
       id: 'compact-flyout',
       label: 'Barre compacte + panneau',
       description: 'Barre iconique minimaliste avec panneau flottant temporaire.',
-      tone: 'focus'
-    }
+      tone: 'focus',
+    },
   ];
   const layoutPresetMap = new Map(layoutPresets.map((preset) => [preset.id, preset]));
   const layoutControls = new Map();
@@ -1935,7 +2149,7 @@ export function mountUI({ root, state, config = {} }) {
   const profileSelect = document.createElement('select');
   profileSelect.className = 'a11ytb-profile-select';
   profileSelect.id = 'a11ytb-profile-select';
-  accessibilityProfiles.forEach(profile => {
+  accessibilityProfiles.forEach((profile) => {
     const option = document.createElement('option');
     option.value = profile.id;
     option.textContent = profile.label;
@@ -1948,7 +2162,9 @@ export function mountUI({ root, state, config = {} }) {
   profileDescription.setAttribute('aria-live', 'polite');
 
   profileSelect.setAttribute('aria-describedby', profileDescription.id);
-  const initialProfileId = profileMap.has(state.get('ui.activeProfile')) ? state.get('ui.activeProfile') : 'custom';
+  const initialProfileId = profileMap.has(state.get('ui.activeProfile'))
+    ? state.get('ui.activeProfile')
+    : 'custom';
   profileSelect.value = initialProfileId || 'custom';
   const initialProfile = profileMap.get(profileSelect.value) || profileMap.get('custom');
   profileDescription.textContent = initialProfile?.description || '';
@@ -2064,7 +2280,10 @@ export function mountUI({ root, state, config = {} }) {
     input.addEventListener('change', () => {
       if (input.checked) {
         state.set('ui.moduleLayout', preset.id);
-        logActivity(`Affichage modules : ${preset.label}`, { tone: preset.tone || 'info', tags: ['navigation'] });
+        logActivity(`Affichage modules : ${preset.label}`, {
+          tone: preset.tone || 'info',
+          tags: ['navigation'],
+        });
       }
     });
   });
@@ -2082,7 +2301,8 @@ export function mountUI({ root, state, config = {} }) {
   helperTitle.textContent = 'Comment choisir ?';
   const helperText = document.createElement('p');
   helperText.className = 'a11ytb-helper-text';
-  helperText.textContent = 'Comparez les préréglages selon votre besoin (vision, lecture ou interaction).';
+  helperText.textContent =
+    'Comparez les préréglages selon votre besoin (vision, lecture ou interaction).';
   helperBanner.append(helperTitle, helperText);
 
   modulesMain.append(helperBanner, filters, modulesContainer);
@@ -2096,7 +2316,8 @@ export function mountUI({ root, state, config = {} }) {
   const flyoutLauncher = document.createElement('button');
   flyoutLauncher.type = 'button';
   flyoutLauncher.className = 'a11ytb-flyout-launcher';
-  flyoutLauncher.innerHTML = '<span aria-hidden="true">☰</span><span>Ouvrir la bibliothèque</span>';
+  flyoutLauncher.innerHTML =
+    '<span aria-hidden="true">☰</span><span>Ouvrir la bibliothèque</span>';
   flyoutLauncher.hidden = true;
   flyoutLauncher.setAttribute('aria-expanded', 'false');
   flyoutLauncher.addEventListener('click', () => {
@@ -2169,7 +2390,8 @@ export function mountUI({ root, state, config = {} }) {
   profilesTitle.textContent = 'Profils d’accessibilité';
   const profilesDescription = document.createElement('p');
   profilesDescription.className = 'a11ytb-section-description';
-  profilesDescription.textContent = 'Appliquez des réglages combinés en un clic pour différents besoins (vision basse, dyslexie, etc.).';
+  profilesDescription.textContent =
+    'Appliquez des réglages combinés en un clic pour différents besoins (vision basse, dyslexie, etc.).';
   profilesHeader.append(profilesTitle, profilesDescription);
   const profilesToolbar = document.createElement('div');
   profilesToolbar.className = 'a11ytb-profile-toolbar';
@@ -2222,7 +2444,8 @@ export function mountUI({ root, state, config = {} }) {
   guidesTitle.textContent = 'Parcours guidés';
   const guidesDescription = document.createElement('p');
   guidesDescription.className = 'a11ytb-section-description';
-  guidesDescription.textContent = 'Suivez les checklists d’onboarding pour valider les réglages essentiels et surveiller vos services.';
+  guidesDescription.textContent =
+    'Suivez les checklists d’onboarding pour valider les réglages essentiels et surveiller vos services.';
   guidesHeader.append(guidesTitle, guidesDescription);
   const guidesLayout = document.createElement('div');
   guidesLayout.className = 'a11ytb-guides-layout';
@@ -2269,7 +2492,9 @@ export function mountUI({ root, state, config = {} }) {
       if (scenario.tone) button.dataset.tone = scenario.tone;
       const stateLabel = scenario.blocked
         ? 'blocked'
-        : (scenario.completedCount === scenario.total ? 'done' : 'active');
+        : scenario.completedCount === scenario.total
+          ? 'done'
+          : 'active';
       button.dataset.state = stateLabel;
       button.setAttribute('aria-pressed', scenario.id === selectedId ? 'true' : 'false');
 
@@ -2338,9 +2563,10 @@ export function mountUI({ root, state, config = {} }) {
 
     const cursors = state.get('ui.guides.cursors') || {};
     const storedIndex = Number.isInteger(cursors[scenarioId]) ? cursors[scenarioId] : null;
-    const validIndex = Number.isInteger(storedIndex) && storedIndex >= 0 && storedIndex < scenario.steps.length
-      ? storedIndex
-      : null;
+    const validIndex =
+      Number.isInteger(storedIndex) && storedIndex >= 0 && storedIndex < scenario.steps.length
+        ? storedIndex
+        : null;
     if (validIndex === null) {
       const fallbackIndex = Math.max(0, scenario.recommendedStepIndex ?? 0);
       state.set(`ui.guides.cursors.${scenarioId}`, fallbackIndex);
@@ -2543,7 +2769,7 @@ export function mountUI({ root, state, config = {} }) {
     const activeStep = scenario.steps[currentGuideStepIndex];
     if (activeStep) {
       const messageParts = [
-        `Étape ${currentGuideStepIndex + 1} sur ${scenario.steps.length} : ${activeStep.label}`
+        `Étape ${currentGuideStepIndex + 1} sur ${scenario.steps.length} : ${activeStep.label}`,
       ];
       if (activeStep.detail) messageParts.push(activeStep.detail);
       const progressMessage = `Progression : ${scenario.completedCount}/${scenario.total} étape${scenario.total > 1 ? 's' : ''} complétée${scenario.completedCount > 1 ? 's' : ''}.`;
@@ -2637,10 +2863,13 @@ export function mountUI({ root, state, config = {} }) {
       toggle.textContent = nowCompleted ? resetLabel : completeLabel;
       const scenario = currentGuideMap.get(scenarioId);
       const guideLabel = scenario ? scenario.title : 'Guide';
-      logActivity(`${guideLabel} — ${nowCompleted ? 'étape validée' : 'étape réinitialisée'} : ${label}`, {
-        tone: nowCompleted ? 'confirm' : 'info',
-        tags: ['guides', stepKey]
-      });
+      logActivity(
+        `${guideLabel} — ${nowCompleted ? 'étape validée' : 'étape réinitialisée'} : ${label}`,
+        {
+          tone: nowCompleted ? 'confirm' : 'info',
+          tags: ['guides', stepKey],
+        }
+      );
       return;
     }
 
@@ -2732,7 +2961,8 @@ export function mountUI({ root, state, config = {} }) {
   shortcutsTitle.textContent = 'Raccourcis clavier';
   const shortcutsDescription = document.createElement('p');
   shortcutsDescription.className = 'a11ytb-section-description';
-  shortcutsDescription.textContent = 'Accédez rapidement aux vues du panneau et maîtrisez les déplacements au clavier.';
+  shortcutsDescription.textContent =
+    'Accédez rapidement aux vues du panneau et maîtrisez les déplacements au clavier.';
   shortcutsHeader.append(shortcutsTitle, shortcutsDescription);
 
   const shortcutsGrid = document.createElement('div');
@@ -2745,11 +2975,13 @@ export function mountUI({ root, state, config = {} }) {
   customShortcutsTitle.textContent = 'Personnalisez les raccourcis globaux';
   const customShortcutsIntro = document.createElement('p');
   customShortcutsIntro.className = 'a11ytb-shortcuts-custom-intro';
-  customShortcutsIntro.textContent = 'Définissez vos propres combinaisons pour ouvrir la boîte à outils et naviguer entre les vues.';
+  customShortcutsIntro.textContent =
+    'Définissez vos propres combinaisons pour ouvrir la boîte à outils et naviguer entre les vues.';
   shortcutStatusElement = document.createElement('p');
   shortcutStatusElement.className = 'a11ytb-shortcuts-status';
   shortcutStatusElement.dataset.tone = 'info';
-  shortcutStatusElement.textContent = 'Cliquez sur « Définir » puis saisissez la nouvelle combinaison (Alt/Ctrl/Cmd requis).';
+  shortcutStatusElement.textContent =
+    'Cliquez sur « Définir » puis saisissez la nouvelle combinaison (Alt/Ctrl/Cmd requis).';
 
   const customShortcutsList = document.createElement('ul');
   customShortcutsList.className = 'a11ytb-shortcuts-custom-list';
@@ -2788,7 +3020,12 @@ export function mountUI({ root, state, config = {} }) {
     customShortcutsList.append(item);
   });
 
-  customShortcutsPanel.append(customShortcutsTitle, customShortcutsIntro, customShortcutsList, shortcutStatusElement);
+  customShortcutsPanel.append(
+    customShortcutsTitle,
+    customShortcutsIntro,
+    customShortcutsList,
+    shortcutStatusElement
+  );
 
   customShortcutsPanel.addEventListener('click', (event) => {
     const button = event.target.closest('[data-shortcut-action]');
@@ -2813,26 +3050,32 @@ export function mountUI({ root, state, config = {} }) {
         { id: 'view-options', description: 'Afficher la vue Options & Profils.' },
         { id: 'view-organize', description: 'Afficher la vue Organisation.' },
         { id: 'view-guides', description: 'Afficher la vue Guides.' },
-        { id: 'view-shortcuts', description: 'Afficher cette vue Raccourcis.' }
-      ]
+        { id: 'view-shortcuts', description: 'Afficher cette vue Raccourcis.' },
+      ],
     },
     {
       title: 'Gestion du panneau',
       description: 'Disponible lorsque la boîte à outils est ouverte.',
       shortcuts: [
         { combo: [['Tab'], ['Shift', 'Tab']], description: 'Parcourir les commandes disponibles.' },
-        { combo: [['Échap']], description: 'Fermer le panneau en conservant le focus précédent.' }
-      ]
+        { combo: [['Échap']], description: 'Fermer le panneau en conservant le focus précédent.' },
+      ],
     },
     {
       title: 'Réorganisation des modules',
       description: 'Raccourcis utilisables dans la vue Organisation.',
       shortcuts: [
-        { combo: [['Entrée'], ['Espace']], description: 'Saisir ou déposer la carte sélectionnée.' },
-        { combo: [['↑'], ['↓']], description: 'Déplacer la carte saisie vers le haut ou vers le bas.' },
-        { combo: [['Échap']], description: 'Annuler la saisie et replacer la carte.' }
-      ]
-    }
+        {
+          combo: [['Entrée'], ['Espace']],
+          description: 'Saisir ou déposer la carte sélectionnée.',
+        },
+        {
+          combo: [['↑'], ['↓']],
+          description: 'Déplacer la carte saisie vers le haut ou vers le bas.',
+        },
+        { combo: [['Échap']], description: 'Annuler la saisie et replacer la carte.' },
+      ],
+    },
   ];
 
   shortcutGroups.forEach((group) => {
@@ -2902,8 +3145,8 @@ export function mountUI({ root, state, config = {} }) {
   panel.append(header, body, footer);
 
   const blocks = listBlocks();
-  const blockInfo = new Map(blocks.map(block => [block.id, block]));
-  const blockIds = blocks.map(block => block.id);
+  const blockInfo = new Map(blocks.map((block) => [block.id, block]));
+  const blockIds = blocks.map((block) => block.id);
   const allowedIds = new Set(blockIds);
   const blockIndex = new Map(blockIds.map((id, index) => [id, index]));
   const moduleToBlockIds = new Map();
@@ -2919,10 +3162,9 @@ export function mountUI({ root, state, config = {} }) {
 
   const allManifests = listModuleManifests();
   const manifestByModuleId = new Map(allManifests.map((manifest) => [manifest.id, manifest]));
-  const catalogModuleIds = Array.from(new Set([
-    ...moduleCatalog.map((entry) => entry.id),
-    ...manifestByModuleId.keys()
-  ]));
+  const catalogModuleIds = Array.from(
+    new Set([...moduleCatalog.map((entry) => entry.id), ...manifestByModuleId.keys()])
+  );
 
   const baseCollectionDefinitions = flattenedModuleCollections
     .filter((entry) => entry && entry.id && Array.isArray(entry.modules))
@@ -2944,9 +3186,9 @@ export function mountUI({ root, state, config = {} }) {
               id: requirement.id,
               type: requirement.type === 'module' ? 'module' : 'collection',
               reason: typeof requirement.reason === 'string' ? requirement.reason : '',
-              label: typeof requirement.label === 'string' ? requirement.label : ''
+              label: typeof requirement.label === 'string' ? requirement.label : '',
             }))
-        : []
+        : [],
     }))
     .filter((entry) => entry.modules.length);
 
@@ -2963,7 +3205,7 @@ export function mountUI({ root, state, config = {} }) {
           id: requirement.id,
           type: requirement.type === 'module' ? 'module' : 'collection',
           reason: typeof requirement.reason === 'string' ? requirement.reason : '',
-          label: typeof requirement.label === 'string' ? requirement.label : ''
+          label: typeof requirement.label === 'string' ? requirement.label : '',
         };
       })
       .filter(Boolean);
@@ -2985,14 +3227,16 @@ export function mountUI({ root, state, config = {} }) {
         id: entry.id,
         label: override?.label || entry.label,
         description: override?.description ?? entry.description ?? '',
-        modules: overrideModules && overrideModules.length ? overrideModules : entry.modules.slice(),
+        modules:
+          overrideModules && overrideModules.length ? overrideModules : entry.modules.slice(),
         depth: entry.depth || 0,
         parentId: entry.parentId || null,
         ancestors: Array.isArray(entry.ancestors) ? entry.ancestors.slice() : [],
         descendants: Array.isArray(entry.descendants) ? entry.descendants.slice() : [],
         pathLabel: entry.pathLabel || entry.label || entry.id,
-        directModules: entry.directModules && entry.directModules.length ? entry.directModules.slice() : [],
-        requires: overrideRequires.length ? overrideRequires : baseRequires
+        directModules:
+          entry.directModules && entry.directModules.length ? entry.directModules.slice() : [],
+        requires: overrideRequires.length ? overrideRequires : baseRequires,
       };
       resolved.push(definition);
       seen.add(entry.id);
@@ -3016,7 +3260,7 @@ export function mountUI({ root, state, config = {} }) {
           descendants: Array.isArray(override?.descendants) ? override.descendants.slice() : [],
           pathLabel: override?.pathLabel || override?.label || id,
           directModules: modules.slice(),
-          requires: cloneRequirements(override?.requires)
+          requires: cloneRequirements(override?.requires),
         });
         seen.add(id);
       });
@@ -3040,10 +3284,13 @@ export function mountUI({ root, state, config = {} }) {
         directModules: Array.isArray(definition.directModules)
           ? definition.directModules.filter((moduleId) => moduleToBlockIds.has(moduleId))
           : members,
-        requires: cloneRequirements(definition.requires)
+        requires: cloneRequirements(definition.requires),
       };
       byId.set(next.id, next);
-      blockIds.set(next.id, members.flatMap((moduleId) => moduleToBlockIds.get(moduleId) ?? []));
+      blockIds.set(
+        next.id,
+        members.flatMap((moduleId) => moduleToBlockIds.get(moduleId) ?? [])
+      );
       members.forEach((moduleId) => {
         if (!moduleIndex.has(moduleId)) {
           moduleIndex.set(moduleId, new Set());
@@ -3055,8 +3302,12 @@ export function mountUI({ root, state, config = {} }) {
 
     normalized.forEach((definition) => {
       const ancestorLabels = Array.isArray(definition.ancestors)
-        ? definition.ancestors
-            .map((ancestorId) => byId.get(ancestorId)?.label || moduleCollectionsById.get(ancestorId)?.label || ancestorId)
+        ? definition.ancestors.map(
+            (ancestorId) =>
+              byId.get(ancestorId)?.label ||
+              moduleCollectionsById.get(ancestorId)?.label ||
+              ancestorId
+          )
         : [];
       if (ancestorLabels.length) {
         definition.pathLabel = `${ancestorLabels.join(' › ')} › ${definition.label}`;
@@ -3069,7 +3320,7 @@ export function mountUI({ root, state, config = {} }) {
       definitions: normalized,
       byId,
       moduleIndex,
-      blockIds
+      blockIds,
     };
   }
 
@@ -3106,13 +3357,13 @@ export function mountUI({ root, state, config = {} }) {
     saveButton: null,
     resetButton: null,
     emptyNotice: null,
-    helper: null
+    helper: null,
   };
   const builderState = {
     activeId: '',
     workingModules: [],
     label: '',
-    description: ''
+    description: '',
   };
   let builderDragState = null;
 
@@ -3125,7 +3376,7 @@ export function mountUI({ root, state, config = {} }) {
       return {
         id,
         label: profile?.name || id,
-        modules
+        modules,
       };
     })
     .filter((entry) => entry.modules.length);
@@ -3203,7 +3454,8 @@ export function mountUI({ root, state, config = {} }) {
   availableTitle.textContent = 'Modules disponibles';
   const availableDescription = document.createElement('p');
   availableDescription.className = 'a11ytb-section-description';
-  availableDescription.textContent = 'Filtrez le catalogue interne, vérifiez la compatibilité et identifiez rapidement les dépendances avant activation.';
+  availableDescription.textContent =
+    'Filtrez le catalogue interne, vérifiez la compatibilité et identifiez rapidement les dépendances avant activation.';
   availableHeader.append(availableTitle, availableDescription);
 
   const availableFiltersBar = document.createElement('div');
@@ -3249,7 +3501,7 @@ export function mountUI({ root, state, config = {} }) {
     select.innerHTML = '';
     const options = [
       { value: 'all', label: 'Toutes les collections' },
-      ...collectionDefinitions.map((collection) => formatCollectionOption(collection))
+      ...collectionDefinitions.map((collection) => formatCollectionOption(collection)),
     ];
     options.forEach((option) => {
       const opt = document.createElement('option');
@@ -3265,12 +3517,12 @@ export function mountUI({ root, state, config = {} }) {
 
   const profileFilterChoices = [
     { value: 'all', label: 'Tous les profils' },
-    ...profileFilterEntries.map((entry) => ({ value: entry.id, label: entry.label }))
+    ...profileFilterEntries.map((entry) => ({ value: entry.id, label: entry.label })),
   ];
 
   const collectionFilterChoices = [
     { value: 'all', label: 'Toutes les collections' },
-    ...collectionDefinitions.map((collection) => formatCollectionOption(collection))
+    ...collectionDefinitions.map((collection) => formatCollectionOption(collection)),
   ];
 
   const compatibilityFilterChoices = [
@@ -3278,17 +3530,36 @@ export function mountUI({ root, state, config = {} }) {
     { value: 'full', label: 'Compatibles' },
     { value: 'partial', label: 'Partielles' },
     { value: 'unknown', label: 'À vérifier' },
-    { value: 'none', label: 'Non déclarées' }
+    { value: 'none', label: 'Non déclarées' },
   ];
 
-  const profileFilterField = createFilterControl('profile', 'a11ytb-available-filter-profile', 'Profils', profileFilterChoices);
-  const collectionFilterField = createFilterControl('collection', 'a11ytb-available-filter-collection', 'Collections', collectionFilterChoices);
-  const compatibilityFilterField = createFilterControl('compatibility', 'a11ytb-available-filter-compat', 'Compatibilité', compatibilityFilterChoices);
+  const profileFilterField = createFilterControl(
+    'profile',
+    'a11ytb-available-filter-profile',
+    'Profils',
+    profileFilterChoices
+  );
+  const collectionFilterField = createFilterControl(
+    'collection',
+    'a11ytb-available-filter-collection',
+    'Collections',
+    collectionFilterChoices
+  );
+  const compatibilityFilterField = createFilterControl(
+    'compatibility',
+    'a11ytb-available-filter-compat',
+    'Compatibilité',
+    compatibilityFilterChoices
+  );
 
   availableFiltersBar.append(profileFilterField, collectionFilterField, compatibilityFilterField);
   updateCollectionFilterOptions();
 
-  [['profile', availableFilterSelects.profile], ['collection', availableFilterSelects.collection], ['compatibility', availableFilterSelects.compatibility]].forEach(([key, select]) => {
+  [
+    ['profile', availableFilterSelects.profile],
+    ['collection', availableFilterSelects.collection],
+    ['compatibility', availableFilterSelects.compatibility],
+  ].forEach(([key, select]) => {
     if (!select) return;
     select.addEventListener('change', () => {
       state.set(`ui.availableModules.${key}`, select.value);
@@ -3310,18 +3581,21 @@ export function mountUI({ root, state, config = {} }) {
   organizeTitle.textContent = 'Organisation des modules';
   const organizeDescription = document.createElement('p');
   organizeDescription.className = 'a11ytb-section-description';
-  organizeDescription.textContent = 'Réordonnez les cartes pour prioriser les modules affichés dans le panneau principal.';
+  organizeDescription.textContent =
+    'Réordonnez les cartes pour prioriser les modules affichés dans le panneau principal.';
   organizeHeader.append(organizeTitle, organizeDescription);
 
   const organizeKeyboardHint = document.createElement('p');
   organizeKeyboardHint.className = 'a11ytb-admin-help';
   organizeKeyboardHint.id = 'a11ytb-organize-help';
-  organizeKeyboardHint.textContent = 'Au clavier : appuyez sur Espace ou Entrée pour saisir une carte, utilisez ↑ ou ↓ pour la déplacer, Échap pour annuler.';
+  organizeKeyboardHint.textContent =
+    'Au clavier : appuyez sur Espace ou Entrée pour saisir une carte, utilisez ↑ ou ↓ pour la déplacer, Échap pour annuler.';
 
   const organizePointerHint = document.createElement('p');
   organizePointerHint.className = 'a11ytb-admin-help';
   organizePointerHint.id = 'a11ytb-organize-pointer';
-  organizePointerHint.textContent = 'À la souris ou au tactile : maintenez la carte enfoncée pour la déplacer, relâchez pour déposer.';
+  organizePointerHint.textContent =
+    'À la souris ou au tactile : maintenez la carte enfoncée pour la déplacer, relâchez pour déposer.';
 
   if (collectionDefinitions.length) {
     collectionsPanel = document.createElement('details');
@@ -3357,7 +3631,8 @@ export function mountUI({ root, state, config = {} }) {
   builderTitle.textContent = 'Composer des collections';
   const builderDescription = document.createElement('p');
   builderDescription.className = 'a11ytb-section-description';
-  builderDescription.textContent = 'Glissez-déposez les modules pour organiser des packs adaptés à vos profils utilisateurs. Utilisez les boutons pour ajouter ou réordonner au clavier.';
+  builderDescription.textContent =
+    'Glissez-déposez les modules pour organiser des packs adaptés à vos profils utilisateurs. Utilisez les boutons pour ajouter ou réordonner au clavier.';
   builderHeader.append(builderTitle, builderDescription);
 
   const builderControls = document.createElement('div');
@@ -3377,7 +3652,8 @@ export function mountUI({ root, state, config = {} }) {
   const builderHelper = document.createElement('p');
   builderHelper.className = 'a11ytb-admin-help';
   builderHelper.id = 'a11ytb-builder-helper';
-  builderHelper.textContent = 'Sélectionnez une collection existante ou créez-en une nouvelle pour préparer un préréglage.';
+  builderHelper.textContent =
+    'Sélectionnez une collection existante ou créez-en une nouvelle pour préparer un préréglage.';
 
   const builderActions = document.createElement('div');
   builderActions.className = 'a11ytb-builder-action-bar';
@@ -3477,7 +3753,8 @@ export function mountUI({ root, state, config = {} }) {
 
   const builderEmpty = document.createElement('p');
   builderEmpty.className = 'a11ytb-builder-empty';
-  builderEmpty.textContent = 'Aucune collection disponible pour le moment. Créez-en une pour commencer.';
+  builderEmpty.textContent =
+    'Aucune collection disponible pour le moment. Créez-en une pour commencer.';
   builderEmpty.hidden = true;
 
   builderSection.append(
@@ -3594,7 +3871,10 @@ export function mountUI({ root, state, config = {} }) {
   const adminList = document.createElement('ol');
   adminList.className = 'a11ytb-admin-list';
   adminList.setAttribute('aria-labelledby', organizeTitle.id);
-  adminList.setAttribute('aria-describedby', `${organizeKeyboardHint.id} ${organizePointerHint.id}`);
+  adminList.setAttribute(
+    'aria-describedby',
+    `${organizeKeyboardHint.id} ${organizePointerHint.id}`
+  );
 
   const organizeLive = document.createElement('p');
   organizeLive.className = 'a11ytb-sr-only';
@@ -3617,14 +3897,14 @@ export function mountUI({ root, state, config = {} }) {
     none: 'Non déclarée',
     full: 'Compatible',
     partial: 'Partielle',
-    unknown: 'À vérifier'
+    unknown: 'À vérifier',
   };
 
   const COMPAT_STATUS_DESCRIPTIONS = {
     none: 'Aucune information de compatibilité n’est fournie.',
     full: 'Compatibilité annoncée avec les plateformes ciblées.',
     partial: 'Certaines fonctionnalités requises manquent sur cet environnement.',
-    unknown: 'Compatibilité non vérifiée automatiquement.'
+    unknown: 'Compatibilité non vérifiée automatiquement.',
   };
 
   function ensureSelectValue(select, value) {
@@ -3674,10 +3954,14 @@ export function mountUI({ root, state, config = {} }) {
       const profileIds = Array.from(moduleToProfiles.get(moduleId) ?? []);
       const collectionIds = Array.from(moduleCollectionsIndex.get(moduleId) ?? []);
       const matchesProfile = profileFilter === 'all' || profileIds.includes(profileFilter);
-      const matchesCollection = collectionFilter === 'all' || collectionIds.includes(collectionFilter);
-      const matchesCompat = compatibilityFilter === 'all' || (compatStatus || 'none') === compatibilityFilter;
+      const matchesCollection =
+        collectionFilter === 'all' || collectionIds.includes(collectionFilter);
+      const matchesCompat =
+        compatibilityFilter === 'all' || (compatStatus || 'none') === compatibilityFilter;
       if (!matchesProfile || !matchesCollection || !matchesCompat) return;
-      const dependencies = Array.isArray(runtimeEntry.dependencies) ? runtimeEntry.dependencies : [];
+      const dependencies = Array.isArray(runtimeEntry.dependencies)
+        ? runtimeEntry.dependencies
+        : [];
       modules.push({
         id: moduleId,
         manifest,
@@ -3686,7 +3970,7 @@ export function mountUI({ root, state, config = {} }) {
         compatStatus,
         dependencies,
         profileIds,
-        collectionIds
+        collectionIds,
       });
     });
 
@@ -3734,7 +4018,11 @@ export function mountUI({ root, state, config = {} }) {
 
       const meta = document.createElement('div');
       meta.className = 'a11ytb-available-card-meta';
-      meta.append(createBadge(formatCategoryLabel(entry.manifest.category), 'category', { title: 'Catégorie du module' }));
+      meta.append(
+        createBadge(formatCategoryLabel(entry.manifest.category), 'category', {
+          title: 'Catégorie du module',
+        })
+      );
 
       const quality = entry.manifest.metadataQuality;
       if (quality) {
@@ -3750,7 +4038,7 @@ export function mountUI({ root, state, config = {} }) {
           title: badgeTitleParts.filter(Boolean).join(' '),
           ariaLabel: coverageLabel
             ? `${badgeLabel}. Couverture ${coverageLabel}. ${quality.detail || ''}`.trim()
-            : `${badgeLabel}. ${quality.detail || ''}`.trim()
+            : `${badgeLabel}. ${quality.detail || ''}`.trim(),
         });
         badge.dataset.level = quality.level || '';
         if (coverageLabel) {
@@ -3760,21 +4048,35 @@ export function mountUI({ root, state, config = {} }) {
       }
 
       const compatLabel = COMPAT_STATUS_LABELS[entry.compatStatus] || COMPAT_STATUS_LABELS.none;
-      const compatBadge = createBadge(`Compatibilité : ${compatLabel}`, `compat-${entry.compatStatus}`, {
-        title: COMPAT_STATUS_DESCRIPTIONS[entry.compatStatus] || COMPAT_STATUS_DESCRIPTIONS.none
-      });
+      const compatBadge = createBadge(
+        `Compatibilité : ${compatLabel}`,
+        `compat-${entry.compatStatus}`,
+        {
+          title: COMPAT_STATUS_DESCRIPTIONS[entry.compatStatus] || COMPAT_STATUS_DESCRIPTIONS.none,
+        }
+      );
       meta.append(compatBadge);
 
       if (entry.runtime.enabled) {
-        meta.append(createBadge('Actif', 'active', { title: 'Module chargé dans la configuration actuelle.' }));
+        meta.append(
+          createBadge('Actif', 'active', { title: 'Module chargé dans la configuration actuelle.' })
+        );
       }
 
       if (entry.dependencies.length) {
-        meta.append(createBadge('Requis', 'required', { title: 'Ce module dépend d’autres modules pour fonctionner.' }));
+        meta.append(
+          createBadge('Requis', 'required', {
+            title: 'Ce module dépend d’autres modules pour fonctionner.',
+          })
+        );
       }
 
       if (entry.dependencies.some((dep) => dep.status && dep.status !== 'ok')) {
-        meta.append(createBadge('En conflit', 'conflict', { title: 'Certaines dépendances signalent un conflit.' }));
+        meta.append(
+          createBadge('En conflit', 'conflict', {
+            title: 'Certaines dépendances signalent un conflit.',
+          })
+        );
       }
 
       card.append(meta);
@@ -3795,9 +4097,13 @@ export function mountUI({ root, state, config = {} }) {
           name.className = 'a11ytb-available-dep-name';
           name.textContent = dep.label || dep.id;
 
-          const statusBadge = createBadge(dep.statusLabel || 'Requis', `dependency-${dep.status || 'ok'}`, {
-            title: dep.message || ''
-          });
+          const statusBadge = createBadge(
+            dep.statusLabel || 'Requis',
+            `dependency-${dep.status || 'ok'}`,
+            {
+              title: dep.message || '',
+            }
+          );
           statusBadge.dataset.status = dep.status || 'ok';
 
           const headerRow = document.createElement('div');
@@ -3819,10 +4125,18 @@ export function mountUI({ root, state, config = {} }) {
       }
 
       const compatMessages = [];
-      const missingFeatures = Array.isArray(entry.compat?.missing?.features) ? entry.compat.missing.features : [];
-      const missingBrowsers = Array.isArray(entry.compat?.missing?.browsers) ? entry.compat.missing.browsers : [];
-      const unknownFeatures = Array.isArray(entry.compat?.unknown?.features) ? entry.compat.unknown.features : [];
-      const unknownBrowsers = Array.isArray(entry.compat?.unknown?.browsers) ? entry.compat.unknown.browsers : [];
+      const missingFeatures = Array.isArray(entry.compat?.missing?.features)
+        ? entry.compat.missing.features
+        : [];
+      const missingBrowsers = Array.isArray(entry.compat?.missing?.browsers)
+        ? entry.compat.missing.browsers
+        : [];
+      const unknownFeatures = Array.isArray(entry.compat?.unknown?.features)
+        ? entry.compat.unknown.features
+        : [];
+      const unknownBrowsers = Array.isArray(entry.compat?.unknown?.browsers)
+        ? entry.compat.unknown.browsers
+        : [];
 
       if (missingFeatures.length) {
         compatMessages.push(`Fonctionnalités manquantes : ${missingFeatures.join(', ')}`);
@@ -3916,7 +4230,7 @@ export function mountUI({ root, state, config = {} }) {
   renderAvailableModules(state.get());
   state.on(renderAvailableModules);
 
-  blocks.forEach(block => {
+  blocks.forEach((block) => {
     const el = renderBlock(block, state, modulesContainer);
     moduleElements.set(block.id, el);
     adminItems.set(block.id, createAdminItem(block));
@@ -3967,7 +4281,7 @@ export function mountUI({ root, state, config = {} }) {
     success: 'Succès',
     alert: 'Alerte',
     warning: 'Avertissement',
-    info: 'Info'
+    info: 'Info',
   };
 
   function toneToSeverity(tone) {
@@ -3988,7 +4302,7 @@ export function mountUI({ root, state, config = {} }) {
 
   function normalizeTags(tags, moduleId) {
     const list = Array.isArray(tags) ? tags.filter(Boolean).map(String) : [];
-    if (moduleId && !list.some(tag => tag.startsWith('module:'))) {
+    if (moduleId && !list.some((tag) => tag.startsWith('module:'))) {
       return [`module:${moduleId}`, ...list];
     }
     return list;
@@ -3996,11 +4310,12 @@ export function mountUI({ root, state, config = {} }) {
 
   function normalizeActivityEntry(entry) {
     if (!entry || typeof entry !== 'object') return null;
-    const timestamp = typeof entry.timestamp === 'number'
-      ? entry.timestamp
-      : typeof entry.time === 'number'
-        ? entry.time
-        : Date.now();
+    const timestamp =
+      typeof entry.timestamp === 'number'
+        ? entry.timestamp
+        : typeof entry.time === 'number'
+          ? entry.time
+          : Date.now();
     const tone = entry.tone || entry.sound || null;
     const moduleId = entry.module || entry.moduleId || null;
     const severity = normalizeSeverity(entry.severity, tone);
@@ -4013,20 +4328,20 @@ export function mountUI({ root, state, config = {} }) {
       severity,
       module: moduleId,
       tags,
-      payload: entry.payload || null
+      payload: entry.payload || null,
     };
   }
 
   function getActivityEntries() {
     const current = state.get('ui.activity') || [];
-    return current
-      .map(normalizeActivityEntry)
-      .filter(Boolean);
+    return current.map(normalizeActivityEntry).filter(Boolean);
   }
 
   function readValue(source, path) {
     if (!source || !path) return undefined;
-    return path.split('.').reduce((acc, key) => (acc && typeof acc === 'object' ? acc[key] : undefined), source);
+    return path
+      .split('.')
+      .reduce((acc, key) => (acc && typeof acc === 'object' ? acc[key] : undefined), source);
   }
 
   function formatFieldValue(field, value) {
@@ -4243,7 +4558,10 @@ export function mountUI({ root, state, config = {} }) {
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
       };
 
-      const fallback = normalizeTimeValue(typeof field.defaultValue === 'string' ? field.defaultValue : '', '00:00');
+      const fallback = normalizeTimeValue(
+        typeof field.defaultValue === 'string' ? field.defaultValue : '',
+        '00:00'
+      );
 
       const commitValue = (raw) => {
         const safe = normalizeTimeValue(raw, fallback);
@@ -4305,9 +4623,10 @@ export function mountUI({ root, state, config = {} }) {
 
       let optionSignature = '';
       update = (snapshot) => {
-        const options = typeof field.getOptions === 'function'
-          ? (field.getOptions(snapshot) || [])
-          : (field.options || []);
+        const options =
+          typeof field.getOptions === 'function'
+            ? field.getOptions(snapshot) || []
+            : field.options || [];
         const signature = JSON.stringify(options.map((opt) => [opt.value, opt.label]));
         if (signature !== optionSignature) {
           optionSignature = signature;
@@ -4327,7 +4646,7 @@ export function mountUI({ root, state, config = {} }) {
           emptyMessage.hidden = true;
         }
         const current = readValue(snapshot, field.path);
-        const currentValue = current ?? (options[0]?.value ?? '');
+        const currentValue = current ?? options[0]?.value ?? '';
         if (document.activeElement !== select) {
           select.value = String(currentValue ?? '');
         }
@@ -4336,7 +4655,7 @@ export function mountUI({ root, state, config = {} }) {
 
     return {
       element: wrapper,
-      update
+      update,
     };
   }
 
@@ -4350,13 +4669,16 @@ export function mountUI({ root, state, config = {} }) {
       disabled: Array.isArray(ui.disabled) ? [...ui.disabled] : [],
       moduleOrder: Array.isArray(ui.moduleOrder) ? [...ui.moduleOrder] : [],
       showHidden: !!ui.showHidden,
-      organizeFilter: ui.organizeFilter === 'pinned' || ui.organizeFilter === 'hidden' ? ui.organizeFilter : 'all',
+      organizeFilter:
+        ui.organizeFilter === 'pinned' || ui.organizeFilter === 'hidden'
+          ? ui.organizeFilter
+          : 'all',
       view: ui.view || 'modules',
       activeProfile: ui.activeProfile || 'custom',
       priorities: normalizePriorityObject(ui.priorities),
       collections: {
-        disabled: Array.isArray(ui.collections?.disabled) ? [...ui.collections.disabled] : []
-      }
+        disabled: Array.isArray(ui.collections?.disabled) ? [...ui.collections.disabled] : [],
+      },
     };
   }
 
@@ -4366,13 +4688,13 @@ export function mountUI({ root, state, config = {} }) {
 
   function getCurrentAdminOrder() {
     return Array.from(adminList.querySelectorAll('.a11ytb-admin-item'))
-      .map(item => item.dataset.blockId)
+      .map((item) => item.dataset.blockId)
       .filter(Boolean);
   }
 
   function updateAdminPositions() {
     const items = Array.from(adminList.querySelectorAll('.a11ytb-admin-item'));
-    const visible = items.filter(item => !item.hasAttribute('hidden'));
+    const visible = items.filter((item) => !item.hasAttribute('hidden'));
     const total = visible.length;
     visible.forEach((item, index) => {
       item.setAttribute('aria-posinset', String(index + 1));
@@ -4381,7 +4703,7 @@ export function mountUI({ root, state, config = {} }) {
       if (badge) badge.textContent = String(index + 1);
     });
     items
-      .filter(item => item.hasAttribute('hidden'))
+      .filter((item) => item.hasAttribute('hidden'))
       .forEach((item) => {
         item.removeAttribute('aria-posinset');
         item.setAttribute('aria-setsize', String(total));
@@ -4397,7 +4719,7 @@ export function mountUI({ root, state, config = {} }) {
   }
 
   function commitModuleOrder(nextOrder, { moduleId, position, total } = {}) {
-    const sanitized = Array.isArray(nextOrder) ? nextOrder.filter(id => allowedIds.has(id)) : [];
+    const sanitized = Array.isArray(nextOrder) ? nextOrder.filter((id) => allowedIds.has(id)) : [];
     if (!sanitized.length) return false;
     const prefs = getPreferences();
     const storedOrder = Array.isArray(prefs.moduleOrder) ? prefs.moduleOrder : [];
@@ -4484,7 +4806,9 @@ export function mountUI({ root, state, config = {} }) {
     item.setAttribute('aria-grabbed', 'true');
     adminList.classList.add('is-keyboard-dragging');
     const title = item.dataset.title || item.dataset.blockId;
-    announceOrganize(`${title} sélectionné. Utilisez les flèches pour déplacer, appuyez de nouveau sur Entrée pour déposer.`);
+    announceOrganize(
+      `${title} sélectionné. Utilisez les flèches pour déplacer, appuyez de nouveau sur Entrée pour déposer.`
+    );
   }
 
   function moveKeyboardItem(direction) {
@@ -4498,7 +4822,9 @@ export function mountUI({ root, state, config = {} }) {
     if (targetIndex < 0 || targetIndex >= siblings.length) {
       const block = blockInfo.get(keyboardDragId);
       const title = block?.title || keyboardDragId;
-      announceOrganize(`${title} est déjà ${direction < 0 ? 'en première position' : 'en dernière position'}.`);
+      announceOrganize(
+        `${title} est déjà ${direction < 0 ? 'en première position' : 'en dernière position'}.`
+      );
       return;
     }
     const reference = siblings[targetIndex];
@@ -4516,7 +4842,9 @@ export function mountUI({ root, state, config = {} }) {
       }
     }
     const total = siblings.length;
-    const visibleSiblings = Array.from(adminList.querySelectorAll('.a11ytb-admin-item:not([hidden])'));
+    const visibleSiblings = Array.from(
+      adminList.querySelectorAll('.a11ytb-admin-item:not([hidden])')
+    );
     const newIndex = visibleSiblings.indexOf(item);
     const block = blockInfo.get(keyboardDragId);
     const title = block?.title || keyboardDragId;
@@ -4578,26 +4906,30 @@ export function mountUI({ root, state, config = {} }) {
     pointerDragState = {
       id: item.dataset.blockId,
       item,
-      pointerId: event.pointerId
+      pointerId: event.pointerId,
     };
     adminList.classList.add('is-pointer-dragging');
     item.classList.add('is-grabbed');
     item.setAttribute('aria-grabbed', 'true');
     item.setPointerCapture?.(event.pointerId);
     const title = item.dataset.title || item.dataset.blockId;
-    announceOrganize(`${title} sélectionné. Glissez pour modifier la position, relâchez pour déposer.`);
+    announceOrganize(
+      `${title} sélectionné. Glissez pour modifier la position, relâchez pour déposer.`
+    );
   }
 
   function onAdminItemPointerMove(event) {
     if (!pointerDragState || event.pointerId !== pointerDragState.pointerId) return;
     event.preventDefault();
     const { item } = pointerDragState;
-    const siblings = Array.from(adminList.querySelectorAll('.a11ytb-admin-item:not([hidden])')).filter(el => el !== item);
+    const siblings = Array.from(
+      adminList.querySelectorAll('.a11ytb-admin-item:not([hidden])')
+    ).filter((el) => el !== item);
     const clientY = event.clientY;
     let inserted = false;
     for (const sibling of siblings) {
       const rect = sibling.getBoundingClientRect();
-      const midpoint = rect.top + (rect.height / 2);
+      const midpoint = rect.top + rect.height / 2;
       if (clientY < midpoint) {
         adminList.insertBefore(item, sibling);
         inserted = true;
@@ -4674,7 +5006,8 @@ export function mountUI({ root, state, config = {} }) {
     const handle = document.createElement('span');
     handle.className = 'a11ytb-admin-handle';
     handle.setAttribute('aria-hidden', 'true');
-    handle.innerHTML = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M10 4h4v2h-4V4zm0 7h4v2h-4v-2zm0 7h4v2h-4v-2z"/></svg>';
+    handle.innerHTML =
+      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M10 4h4v2h-4V4zm0 7h4v2h-4v-2zm0 7h4v2h-4v-2z"/></svg>';
 
     const order = document.createElement('span');
     order.className = 'a11ytb-admin-order';
@@ -4740,7 +5073,8 @@ export function mountUI({ root, state, config = {} }) {
     const pinLabel = `Épingler le module ${block.title || block.id}`.trim();
     pinButton.setAttribute('aria-label', pinLabel);
     pinButton.title = pinLabel;
-    pinButton.innerHTML = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M15 2l3 3-2.29 2.29 2 2L19 12l-3-1-2-2L6 17l-2-2 8-8-2-2 1-1h4z"/></svg>';
+    pinButton.innerHTML =
+      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M15 2l3 3-2.29 2.29 2 2L19 12l-3-1-2-2L6 17l-2-2 8-8-2-2 1-1h4z"/></svg>';
 
     const hideButton = document.createElement('button');
     hideButton.type = 'button';
@@ -4750,7 +5084,8 @@ export function mountUI({ root, state, config = {} }) {
     const hideLabel = `Masquer le module ${block.title || block.id}`.trim();
     hideButton.setAttribute('aria-label', hideLabel);
     hideButton.title = hideLabel;
-    hideButton.innerHTML = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 5c4.73 0 8.74 3.11 10 7-1.26 3.89-5.27 7-10 7s-8.74-3.11-10-7c1.26-3.89 5.27-7 10-7zm0 2c-3.05 0-6.17 2.09-7.27 5 1.1 2.91 4.22 5 7.27 5s6.17-2.09 7.27-5C18.17 9.09 15.05 7 12 7zm0 2a3 3 0 110 6 3 3 0 010-6z"/></svg>';
+    hideButton.innerHTML =
+      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 5c4.73 0 8.74 3.11 10 7-1.26 3.89-5.27 7-10 7s-8.74-3.11-10-7c1.26-3.89 5.27-7 10-7zm0 2c-3.05 0-6.17 2.09-7.27 5 1.1 2.91 4.22 5 7.27 5s6.17-2.09 7.27-5C18.17 9.09 15.05 7 12 7zm0 2a3 3 0 110 6 3 3 0 010-6z"/></svg>';
 
     actions.append(pinButton, hideButton);
 
@@ -4759,7 +5094,8 @@ export function mountUI({ root, state, config = {} }) {
 
     const categoryBadge = document.createElement('span');
     categoryBadge.className = 'a11ytb-admin-category';
-    categoryBadge.textContent = categories.find(cat => cat.id === block.category)?.label || 'Divers';
+    categoryBadge.textContent =
+      categories.find((cat) => cat.id === block.category)?.label || 'Divers';
     meta.append(categoryBadge);
 
     const priorityWrapper = document.createElement('div');
@@ -4775,7 +5111,10 @@ export function mountUI({ root, state, config = {} }) {
     prioritySelect.className = 'a11ytb-admin-priority-select';
     prioritySelect.dataset.ref = 'priority';
     prioritySelect.id = prioritySelectId;
-    prioritySelect.setAttribute('aria-label', `Définir la priorité du module ${block.title || block.id}`);
+    prioritySelect.setAttribute(
+      'aria-label',
+      `Définir la priorité du module ${block.title || block.id}`
+    );
 
     const autoOption = document.createElement('option');
     autoOption.value = '';
@@ -4831,7 +5170,7 @@ export function mountUI({ root, state, config = {} }) {
         list: dependenciesList,
         summary: dependenciesSummary,
         live: dependenciesLive,
-        moduleName: block.title || moduleId
+        moduleName: block.title || moduleId,
       };
       if (dependencyViews.has(moduleId)) {
         dependencyViews.get(moduleId).push(view);
@@ -4840,7 +5179,9 @@ export function mountUI({ root, state, config = {} }) {
       }
       const runtimeInfo = state.get(`runtime.modules.${moduleId}`) || {};
       const dependencies = Array.isArray(runtimeInfo.dependencies) ? runtimeInfo.dependencies : [];
-      updateDependencyDisplay(view, dependencies, { moduleName: runtimeInfo.manifestName || view.moduleName });
+      updateDependencyDisplay(view, dependencies, {
+        moduleName: runtimeInfo.manifestName || view.moduleName,
+      });
     }
 
     prioritySelect.addEventListener('change', () => {
@@ -4860,7 +5201,11 @@ export function mountUI({ root, state, config = {} }) {
         const tone = entry?.tone || 'info';
         const title = block.title || block.id;
         const labelText = entry?.label || 'automatique';
-        logActivity(`Priorité ${labelText} pour ${title}`, { tone, module: block.id, tags: ['organisation', 'priorites'] });
+        logActivity(`Priorité ${labelText} pour ${title}`, {
+          tone,
+          module: block.id,
+          tags: ['organisation', 'priorites'],
+        });
       }
       priorityHint.textContent = getPriorityDescription(normalized || null);
     });
@@ -4891,7 +5236,7 @@ export function mountUI({ root, state, config = {} }) {
           disabledSet.add(block.id);
           setListIfChanged('ui.disabled', Array.from(disabledSet), prefs.disabled);
         }
-        const pinned = prefs.pinned.filter(id => id !== block.id);
+        const pinned = prefs.pinned.filter((id) => id !== block.id);
         setListIfChanged('ui.pinned', pinned, prefs.pinned);
         logActivity(`Module désactivé : ${title}`, { tone: 'toggle' });
       }
@@ -4918,7 +5263,9 @@ export function mountUI({ root, state, config = {} }) {
       if (index === -1) {
         hidden.push(block.id);
         setListIfChanged('ui.hidden', hidden, prefs.hidden);
-        const pinned = Array.isArray(prefs.pinned) ? prefs.pinned.filter(id => id !== block.id) : [];
+        const pinned = Array.isArray(prefs.pinned)
+          ? prefs.pinned.filter((id) => id !== block.id)
+          : [];
         setListIfChanged('ui.pinned', pinned, prefs.pinned);
       } else {
         hidden.splice(index, 1);
@@ -4948,7 +5295,9 @@ export function mountUI({ root, state, config = {} }) {
     function hasDependencyIssue(blockId) {
       const moduleId = blockInfo.get(blockId)?.moduleId || blockId;
       const runtimeEntry = runtimeModules[moduleId] || {};
-      const dependencies = Array.isArray(runtimeEntry.dependencies) ? runtimeEntry.dependencies : [];
+      const dependencies = Array.isArray(runtimeEntry.dependencies)
+        ? runtimeEntry.dependencies
+        : [];
       return dependencies.some((entry) => entry?.status && entry.status !== 'ok');
     }
 
@@ -4958,7 +5307,8 @@ export function mountUI({ root, state, config = {} }) {
       : [...blockIds].sort((a, b) => {
           const depDiff = Number(hasDependencyIssue(b)) - Number(hasDependencyIssue(a));
           if (depDiff !== 0) return depDiff;
-          const diff = getPriorityWeight(validPriorities[a]) - getPriorityWeight(validPriorities[b]);
+          const diff =
+            getPriorityWeight(validPriorities[a]) - getPriorityWeight(validPriorities[b]);
           if (diff !== 0) return diff;
           return (blockIndex.get(a) ?? 0) - (blockIndex.get(b) ?? 0);
         });
@@ -4991,11 +5341,8 @@ export function mountUI({ root, state, config = {} }) {
       const enabled = !manualDisabled && !collectionDisabled;
       const hidden = hiddenSet.has(id);
       const pinned = pinnedSet.has(id);
-      const showItem = currentFilter === 'all'
-        ? true
-        : currentFilter === 'pinned'
-          ? pinned
-          : hidden;
+      const showItem =
+        currentFilter === 'all' ? true : currentFilter === 'pinned' ? pinned : hidden;
       if (showItem) {
         item.hidden = false;
         item.setAttribute('aria-hidden', 'false');
@@ -5045,7 +5392,8 @@ export function mountUI({ root, state, config = {} }) {
       }
       const pinBtn = item.querySelector('[data-admin-action="pin"]');
       if (pinBtn) {
-        const actionLabel = `${pinned ? 'Retirer l’épingle du' : 'Épingler le'} module ${title}`.trim();
+        const actionLabel =
+          `${pinned ? 'Retirer l’épingle du' : 'Épingler le'} module ${title}`.trim();
         pinBtn.setAttribute('aria-pressed', String(pinned));
         pinBtn.classList.toggle('is-active', pinned);
         if (enabled) {
@@ -5057,8 +5405,13 @@ export function mountUI({ root, state, config = {} }) {
           pinBtn.disabled = true;
           pinBtn.setAttribute('aria-disabled', 'true');
           const reason = collectionDisabled ? 'désactivé par une collection' : 'désactivé';
-          pinBtn.setAttribute('aria-label', `Impossible de modifier l’épingle du module ${title} tant qu’il est ${reason}`);
-          pinBtn.title = collectionDisabled ? 'Module désactivé via collection : action indisponible' : 'Module désactivé : action indisponible';
+          pinBtn.setAttribute(
+            'aria-label',
+            `Impossible de modifier l’épingle du module ${title} tant qu’il est ${reason}`
+          );
+          pinBtn.title = collectionDisabled
+            ? 'Module désactivé via collection : action indisponible'
+            : 'Module désactivé : action indisponible';
         }
       }
       const hideBtn = item.querySelector('[data-admin-action="hide"]');
@@ -5081,7 +5434,9 @@ export function mountUI({ root, state, config = {} }) {
     });
     const disabledUnion = new Set([...disabledSet, ...disabledByCollection]);
     if (adminToolbarCounts.active) {
-      adminToolbarCounts.active.textContent = String(Math.max(0, blockIds.length - disabledUnion.size));
+      adminToolbarCounts.active.textContent = String(
+        Math.max(0, blockIds.length - disabledUnion.size)
+      );
     }
     if (adminToolbarCounts.hidden) {
       adminToolbarCounts.hidden.textContent = String(hiddenSet.size);
@@ -5144,9 +5499,10 @@ export function mountUI({ root, state, config = {} }) {
       const existingSr = button.querySelector('.a11ytb-sr-only');
 
       if (blockingAncestorId) {
-        const blockingLabel = collectionById.get(blockingAncestorId)?.label
-          || moduleCollectionsById.get(blockingAncestorId)?.label
-          || blockingAncestorId;
+        const blockingLabel =
+          collectionById.get(blockingAncestorId)?.label ||
+          moduleCollectionsById.get(blockingAncestorId)?.label ||
+          blockingAncestorId;
         const message = `Activez d’abord ${blockingLabel} pour modifier ${label}.`;
         effectiveEnabled = false;
         action = 'Activer';
@@ -5187,7 +5543,10 @@ export function mountUI({ root, state, config = {} }) {
           satisfied = moduleBlocks.every((blockId) => !prefs.disabled.includes(blockId));
         }
         const variant = satisfied ? 'dependency-ok' : 'dependency-missing';
-        view.badge.classList.remove('a11ytb-module-badge--dependency-ok', 'a11ytb-module-badge--dependency-missing');
+        view.badge.classList.remove(
+          'a11ytb-module-badge--dependency-ok',
+          'a11ytb-module-badge--dependency-missing'
+        );
         view.badge.classList.add(`a11ytb-module-badge--${variant}`);
         view.badge.textContent = satisfied ? 'Active' : 'À activer';
         const statusMessage = satisfied
@@ -5207,9 +5566,8 @@ export function mountUI({ root, state, config = {} }) {
     if (collectionsSummary) {
       const total = collectionButtons.size;
       const active = total - disabledSet.size;
-      const suffix = missingRequirements > 0
-        ? ` – ${missingRequirements} dépendance(s) à réactiver`
-        : '';
+      const suffix =
+        missingRequirements > 0 ? ` – ${missingRequirements} dépendance(s) à réactiver` : '';
       collectionsSummary.textContent = `Collections de modules (${active}/${total} actives${suffix})`;
     }
   }
@@ -5232,13 +5590,13 @@ export function mountUI({ root, state, config = {} }) {
       disabled: new Set(prefs.disabled),
       hidden: new Set(prefs.hidden),
       pinned: [...prefs.pinned],
-      collectionsDisabled: new Set(prefs.collections.disabled)
+      collectionsDisabled: new Set(prefs.collections.disabled),
     };
 
     const ensureEnabled = (ids = []) => {
       let changed = false;
       let collectionsChanged = false;
-      ids.forEach(id => {
+      ids.forEach((id) => {
         if (working.disabled.delete(id)) changed = true;
         const moduleId = blockInfo.get(id)?.moduleId;
         if (!moduleId) return;
@@ -5264,7 +5622,7 @@ export function mountUI({ root, state, config = {} }) {
 
     const ensureVisible = (ids = []) => {
       let changed = false;
-      ids.forEach(id => {
+      ids.forEach((id) => {
         if (working.hidden.delete(id)) changed = true;
       });
       if (changed) {
@@ -5278,12 +5636,12 @@ export function mountUI({ root, state, config = {} }) {
       if (!ids?.length) return;
       const ordered = [];
       const seen = new Set();
-      ids.forEach(id => {
+      ids.forEach((id) => {
         if (!allowedIds.has(id) || seen.has(id)) return;
         seen.add(id);
         ordered.push(id);
       });
-      working.pinned.forEach(id => {
+      working.pinned.forEach((id) => {
         if (seen.has(id)) return;
         seen.add(id);
         ordered.push(id);
@@ -5312,7 +5670,9 @@ export function mountUI({ root, state, config = {} }) {
     }
     hiddenToggle.setAttribute('aria-pressed', String(prefs.showHidden));
     hiddenToggle.classList.toggle('is-active', prefs.showHidden);
-    hiddenToggle.textContent = prefs.showHidden ? 'Masquer les modules cachés' : 'Afficher les modules masqués';
+    hiddenToggle.textContent = prefs.showHidden
+      ? 'Masquer les modules cachés'
+      : 'Afficher les modules masqués';
     const profileId = profileMap.has(prefs.activeProfile) ? prefs.activeProfile : 'custom';
     if (profileSelect.value !== profileId) profileSelect.value = profileId;
     const profile = profileMap.get(profileId) || profileMap.get('custom');
@@ -5353,9 +5713,12 @@ export function mountUI({ root, state, config = {} }) {
         if (releaseFlyoutInert) {
           releaseFlyoutInert();
         }
-        releaseFlyoutInert = applyInertToSiblings(flyoutOverlay, { exclusions: [flyoutOverlay, flyoutScrim] });
+        releaseFlyoutInert = applyInertToSiblings(flyoutOverlay, {
+          exclusions: [flyoutOverlay, flyoutScrim],
+        });
         if (!flyoutOverlay.contains(document.activeElement)) {
-          lastFlyoutFocus = document.activeElement instanceof HTMLElement ? document.activeElement : flyoutLauncher;
+          lastFlyoutFocus =
+            document.activeElement instanceof HTMLElement ? document.activeElement : flyoutLauncher;
           const focusables = collectFocusable(flyoutOverlay);
           const target = focusables[0] || flyoutClose;
           if (target && typeof target.focus === 'function') {
@@ -5376,7 +5739,8 @@ export function mountUI({ root, state, config = {} }) {
           releaseFlyoutInert();
           releaseFlyoutInert = null;
         }
-        const returnTarget = lastFlyoutFocus instanceof HTMLElement ? lastFlyoutFocus : flyoutLauncher;
+        const returnTarget =
+          lastFlyoutFocus instanceof HTMLElement ? lastFlyoutFocus : flyoutLauncher;
         lastFlyoutFocus = null;
         if (returnTarget && typeof returnTarget.focus === 'function') {
           requestAnimationFrame(() => {
@@ -5410,15 +5774,18 @@ export function mountUI({ root, state, config = {} }) {
     const drafts = prefs.drafts && typeof prefs.drafts === 'object' ? prefs.drafts : {};
     return {
       activeCollectionId: prefs.activeCollectionId || '',
-      drafts
+      drafts,
     };
   }
 
   function saveBuilderPrefs(updates = {}) {
     const current = getBuilderPrefs();
     const next = {
-      activeCollectionId: updates.activeCollectionId !== undefined ? updates.activeCollectionId : current.activeCollectionId,
-      drafts: updates.drafts !== undefined ? updates.drafts : current.drafts
+      activeCollectionId:
+        updates.activeCollectionId !== undefined
+          ? updates.activeCollectionId
+          : current.activeCollectionId,
+      drafts: updates.drafts !== undefined ? updates.drafts : current.drafts,
     };
     if (JSON.stringify(current) !== JSON.stringify(next)) {
       state.set('ui.collections.builder', next);
@@ -5432,10 +5799,16 @@ export function mountUI({ root, state, config = {} }) {
     if (preferredId && (collectionById.has(preferredId) || drafts[preferredId])) {
       return preferredId;
     }
-    if (builderState.activeId && (collectionById.has(builderState.activeId) || drafts[builderState.activeId])) {
+    if (
+      builderState.activeId &&
+      (collectionById.has(builderState.activeId) || drafts[builderState.activeId])
+    ) {
       return builderState.activeId;
     }
-    if (prefs.activeCollectionId && (collectionById.has(prefs.activeCollectionId) || drafts[prefs.activeCollectionId])) {
+    if (
+      prefs.activeCollectionId &&
+      (collectionById.has(prefs.activeCollectionId) || drafts[prefs.activeCollectionId])
+    ) {
       return prefs.activeCollectionId;
     }
     if (collectionDefinitions.length) {
@@ -5462,10 +5835,12 @@ export function mountUI({ root, state, config = {} }) {
     const drafts = prefs.drafts || {};
     const draft = drafts[id];
     const definition = collectionById.get(id);
-    const modules = Array.isArray(draft?.modules) ? draft.modules : (definition?.modules || []);
+    const modules = Array.isArray(draft?.modules) ? draft.modules : definition?.modules || [];
     builderState.workingModules = Array.from(new Set(modules.filter(Boolean)));
-    builderState.label = typeof draft?.label === 'string' && draft.label ? draft.label : (definition?.label || id);
-    builderState.description = typeof draft?.description === 'string' ? draft.description : (definition?.description || '');
+    builderState.label =
+      typeof draft?.label === 'string' && draft.label ? draft.label : definition?.label || id;
+    builderState.description =
+      typeof draft?.description === 'string' ? draft.description : definition?.description || '';
     if (prefs.activeCollectionId !== id) {
       saveBuilderPrefs({ activeCollectionId: id, drafts });
     }
@@ -5478,7 +5853,7 @@ export function mountUI({ root, state, config = {} }) {
     drafts[builderState.activeId] = {
       modules: builderState.workingModules.slice(),
       label: builderState.label,
-      description: builderState.description
+      description: builderState.description,
     };
     saveBuilderPrefs({ activeCollectionId: builderState.activeId, drafts });
   }
@@ -5488,7 +5863,10 @@ export function mountUI({ root, state, config = {} }) {
     const drafts = { ...prefs.drafts };
     if (drafts[id]) {
       delete drafts[id];
-      saveBuilderPrefs({ activeCollectionId: prefs.activeCollectionId === id ? '' : prefs.activeCollectionId, drafts });
+      saveBuilderPrefs({
+        activeCollectionId: prefs.activeCollectionId === id ? '' : prefs.activeCollectionId,
+        drafts,
+      });
     }
   }
 
@@ -5530,7 +5908,7 @@ export function mountUI({ root, state, config = {} }) {
       options.push({
         id: definition.id,
         label: definition.label || definition.id,
-        description: definition.description || ''
+        description: definition.description || '',
       });
       seen.add(definition.id);
     });
@@ -5539,7 +5917,7 @@ export function mountUI({ root, state, config = {} }) {
       options.push({
         id,
         label: draft?.label || id,
-        description: draft?.description || ''
+        description: draft?.description || '',
       });
       seen.add(id);
     });
@@ -5620,16 +5998,20 @@ export function mountUI({ root, state, config = {} }) {
     }
     builderDragState = {
       moduleId: item.dataset.builderModule,
-      source: list.dataset.builderList
+      source: list.dataset.builderList,
     };
     item.classList.add('is-dragging');
   }
 
   function clearBuilderDropIndicators() {
     if (!builderElements.selectionList) return;
-    builderElements.selectionList.querySelectorAll('.is-drop-target').forEach((node) => node.classList.remove('is-drop-target'));
+    builderElements.selectionList
+      .querySelectorAll('.is-drop-target')
+      .forEach((node) => node.classList.remove('is-drop-target'));
     if (builderElements.catalogList) {
-      builderElements.catalogList.querySelectorAll('.is-drop-target').forEach((node) => node.classList.remove('is-drop-target'));
+      builderElements.catalogList
+        .querySelectorAll('.is-drop-target')
+        .forEach((node) => node.classList.remove('is-drop-target'));
     }
   }
 
@@ -5699,7 +6081,8 @@ export function mountUI({ root, state, config = {} }) {
       if (block?.category) {
         const badge = document.createElement('span');
         badge.className = 'a11ytb-builder-preview-tag';
-        badge.textContent = categories.find((cat) => cat.id === block.category)?.label || block.category;
+        badge.textContent =
+          categories.find((cat) => cat.id === block.category)?.label || block.category;
         item.append(badge);
       }
       builderElements.previewList.append(item);
@@ -5714,7 +6097,7 @@ export function mountUI({ root, state, config = {} }) {
     const knownModules = new Set([
       ...catalogModuleIds,
       ...Array.from(selectionSet),
-      ...collectionDefinitions.flatMap((definition) => definition.modules || [])
+      ...collectionDefinitions.flatMap((definition) => definition.modules || []),
     ]);
     const available = Array.from(knownModules)
       .filter((moduleId) => !selectionSet.has(moduleId))
@@ -5794,7 +6177,12 @@ export function mountUI({ root, state, config = {} }) {
   }
 
   function renderBuilder() {
-    if (!builderElements.section || !builderElements.catalogList || !builderElements.selectionList || !builderElements.previewList) {
+    if (
+      !builderElements.section ||
+      !builderElements.catalogList ||
+      !builderElements.selectionList ||
+      !builderElements.previewList
+    ) {
       return;
     }
     const options = computeBuilderOptions();
@@ -5877,7 +6265,9 @@ export function mountUI({ root, state, config = {} }) {
 
       const members = document.createElement('ul');
       members.className = 'a11ytb-collection-members';
-      const moduleLabels = (collection.modules || []).map((moduleId) => getModuleLabel(moduleId)).filter(Boolean);
+      const moduleLabels = (collection.modules || [])
+        .map((moduleId) => getModuleLabel(moduleId))
+        .filter(Boolean);
       if (moduleLabels.length) {
         moduleLabels.forEach((label) => {
           const li = document.createElement('li');
@@ -5908,7 +6298,9 @@ export function mountUI({ root, state, config = {} }) {
           item.dataset.requirementId = requirement.id;
           item.dataset.requirementType = requirement.type || 'collection';
           item.dataset.status = 'unknown';
-          const statusBadge = createBadge('Active', 'dependency-ok', { title: 'Statut de la dépendance' });
+          const statusBadge = createBadge('Active', 'dependency-ok', {
+            title: 'Statut de la dépendance',
+          });
           statusBadge.classList.add('a11ytb-collection-requirement-badge');
           const content = document.createElement('div');
           content.className = 'a11ytb-collection-requirement-content';
@@ -5951,7 +6343,9 @@ export function mountUI({ root, state, config = {} }) {
       toggle.textContent = `Désactiver ${collection.label || collection.id}`;
       toggle.addEventListener('click', () => {
         const prefs = getPreferences();
-        const disabledList = Array.isArray(prefs.collections?.disabled) ? prefs.collections.disabled : [];
+        const disabledList = Array.isArray(prefs.collections?.disabled)
+          ? prefs.collections.disabled
+          : [];
         const disabledSet = new Set(disabledList);
         const info = collectionById.get(collection.id);
         const descendants = Array.isArray(info?.descendants) ? info.descendants : [];
@@ -6016,9 +6410,11 @@ export function mountUI({ root, state, config = {} }) {
             : `${actionLabel} : ${collectionDisplay}`;
           logActivity(message, {
             tone: wasDisabled ? 'confirm' : 'toggle',
-            tags: ['organisation', 'collections']
+            tags: ['organisation', 'collections'],
           });
-          const modulesText = moduleLabels.length ? ` Modules concernés : ${moduleLabels.join(', ')}.` : '';
+          const modulesText = moduleLabels.length
+            ? ` Modules concernés : ${moduleLabels.join(', ')}.`
+            : '';
           const srParts = [];
           if (!wasDisabled && cascadedCollections.length) {
             const cascadedLabels = cascadedCollections.map((id) => getCollectionLabel(id));
@@ -6030,7 +6426,9 @@ export function mountUI({ root, state, config = {} }) {
           }
           if (wasDisabled && reactivatedCollections.length) {
             const reactivatedLabels = reactivatedCollections.map((id) => getCollectionLabel(id));
-            srParts.push(`Collections réactivées automatiquement : ${reactivatedLabels.join(', ')}`);
+            srParts.push(
+              `Collections réactivées automatiquement : ${reactivatedLabels.join(', ')}`
+            );
           }
           const announceMessage = [`${actionLabel} : ${collectionDisplay}.`, ...srParts].join(' ');
           announceOrganize(`${announceMessage}${modulesText}`.trim());
@@ -6051,10 +6449,13 @@ export function mountUI({ root, state, config = {} }) {
     next[builderState.activeId] = {
       modules: builderState.workingModules.slice(),
       label: builderState.label,
-      description: builderState.description
+      description: builderState.description,
     };
     state.set('ui.collections.presets', next);
-    logActivity(`Collection enregistrée : ${builderState.label}`, { tone: 'confirm', tags: ['collections'] });
+    logActivity(`Collection enregistrée : ${builderState.label}`, {
+      tone: 'confirm',
+      tags: ['collections'],
+    });
     deleteBuilderDraft(builderState.activeId);
     loadBuilderState(builderState.activeId);
     renderBuilder();
@@ -6072,7 +6473,10 @@ export function mountUI({ root, state, config = {} }) {
     deleteBuilderDraft(builderState.activeId);
     if (changed) {
       state.set('ui.collections.presets', next);
-      logActivity(`Collection réinitialisée : ${builderState.label}`, { tone: 'info', tags: ['collections'] });
+      logActivity(`Collection réinitialisée : ${builderState.label}`, {
+        tone: 'info',
+        tags: ['collections'],
+      });
     } else {
       loadBuilderState(builderState.activeId);
       renderBuilder();
@@ -6085,7 +6489,7 @@ export function mountUI({ root, state, config = {} }) {
     const prefs = getBuilderPrefs();
     const taken = new Set([
       ...collectionDefinitions.map((definition) => definition.id),
-      ...Object.keys(prefs.drafts || {})
+      ...Object.keys(prefs.drafts || {}),
     ]);
     let candidate = baseId;
     let counter = 1;
@@ -6097,7 +6501,7 @@ export function mountUI({ root, state, config = {} }) {
     drafts[candidate] = {
       modules: [],
       label: counter === 1 ? baseLabel : `${baseLabel} ${counter}`,
-      description: ''
+      description: '',
     };
     saveBuilderPrefs({ activeCollectionId: candidate, drafts });
     loadBuilderState(candidate);
@@ -6118,8 +6522,9 @@ export function mountUI({ root, state, config = {} }) {
     if (!moduleElement) return;
     const active = document.activeElement;
     if (!active || !moduleElement.contains(active)) return;
-    const focusables = getFocusableElements()
-      .filter((el) => el !== active && !moduleElement.contains(el));
+    const focusables = getFocusableElements().filter(
+      (el) => el !== active && !moduleElement.contains(el)
+    );
     const fallback = focusables[0];
     if (fallback && typeof fallback.focus === 'function') {
       fallback.focus();
@@ -6151,17 +6556,13 @@ export function mountUI({ root, state, config = {} }) {
       return (blockIndex.get(a) ?? 0) - (blockIndex.get(b) ?? 0);
     };
 
-    const baseOrder = hasCustomOrder
-      ? prefs.moduleOrder
-      : [...blockIds].sort(comparator);
-    const orderedPinned = (hasCustomOrder ? prefs.pinned : [...prefs.pinned].sort(comparator))
-      .filter(id => moduleElements.has(id));
-    const ordered = [
-      ...orderedPinned,
-      ...baseOrder.filter(id => !pinnedSet.has(id))
-    ];
+    const baseOrder = hasCustomOrder ? prefs.moduleOrder : [...blockIds].sort(comparator);
+    const orderedPinned = (
+      hasCustomOrder ? prefs.pinned : [...prefs.pinned].sort(comparator)
+    ).filter((id) => moduleElements.has(id));
+    const ordered = [...orderedPinned, ...baseOrder.filter((id) => !pinnedSet.has(id))];
 
-    ordered.forEach(id => {
+    ordered.forEach((id) => {
       const el = moduleElements.get(id);
       if (el) modulesContainer.append(el);
     });
@@ -6196,7 +6597,8 @@ export function mountUI({ root, state, config = {} }) {
       const isHidden = hiddenSet.has(id);
       const isDisabledByCollection = disabledByCollection.has(id);
       const isDisabled = disabledSet.has(id) || isDisabledByCollection;
-      const shouldShow = matchesCategory && matchesSearch && (!isHidden && !isDisabled || prefs.showHidden);
+      const shouldShow =
+        matchesCategory && matchesSearch && ((!isHidden && !isDisabled) || prefs.showHidden);
       const isActiveForCount = !isHidden && !isDisabled;
       if (isActiveForCount) {
         const targetCategory = categories.some((cat) => cat.id === el.dataset.category)
@@ -6232,19 +6634,27 @@ export function mountUI({ root, state, config = {} }) {
       if (pinBtn) {
         const pinned = pinnedSet.has(id);
         pinBtn.setAttribute('aria-pressed', String(pinned));
-        pinBtn.setAttribute('aria-label', `${pinned ? 'Retirer l’épingle du' : 'Épingler le'} module ${title}`.trim());
+        pinBtn.setAttribute(
+          'aria-label',
+          `${pinned ? 'Retirer l’épingle du' : 'Épingler le'} module ${title}`.trim()
+        );
       }
       if (hideBtn) {
         const hidden = hiddenSet.has(id);
         hideBtn.setAttribute('aria-pressed', String(hidden));
-        hideBtn.setAttribute('aria-label', `${hidden ? 'Afficher' : 'Masquer'} le module ${title}`.trim());
+        hideBtn.setAttribute(
+          'aria-label',
+          `${hidden ? 'Afficher' : 'Masquer'} le module ${title}`.trim()
+        );
       }
       const overlay = el.querySelector('.a11ytb-module-overlay');
       const content = el.querySelector('.a11ytb-module-content');
       if (overlay) {
         if (isDisabled && shouldShow) {
           overlay.hidden = false;
-          const reason = isDisabledByCollection ? 'Module désactivé par collection' : 'Module désactivé';
+          const reason = isDisabledByCollection
+            ? 'Module désactivé par collection'
+            : 'Module désactivé';
           const message = overlay.querySelector('.a11ytb-module-overlay-inner span:last-child');
           if (message) {
             message.textContent = reason;
@@ -6277,9 +6687,10 @@ export function mountUI({ root, state, config = {} }) {
   function focusFirstInOptions() {
     const focusables = collectFocusable(optionsView);
     const toggle = viewButtons.get('options');
-    const target = (lastOptionsFocus && optionsView.contains(lastOptionsFocus))
-      ? lastOptionsFocus
-      : (focusables[0] || toggle || optionsView);
+    const target =
+      lastOptionsFocus && optionsView.contains(lastOptionsFocus)
+        ? lastOptionsFocus
+        : focusables[0] || toggle || optionsView;
     if (target && typeof target.focus === 'function') {
       requestAnimationFrame(() => {
         target.focus();
@@ -6374,10 +6785,10 @@ export function mountUI({ root, state, config = {} }) {
     const nextViewElement = viewElements.get(currentView);
     const previousViewElement = activeViewId ? viewElements.get(activeViewId) : null;
     let shouldRefocus = Boolean(
-      focusedElement
-      && previousViewElement
-      && previousViewElement !== nextViewElement
-      && previousViewElement.contains(focusedElement)
+      focusedElement &&
+        previousViewElement &&
+        previousViewElement !== nextViewElement &&
+        previousViewElement.contains(focusedElement)
     );
 
     viewElements.forEach((element, id) => {
@@ -6617,7 +7028,7 @@ export function mountUI({ root, state, config = {} }) {
       activityList.append(empty);
       return;
     }
-    entries.slice(0, 6).forEach(entry => {
+    entries.slice(0, 6).forEach((entry) => {
       const li = document.createElement('li');
       const date = new Date(entry.timestamp || Date.now());
       const line = document.createElement('div');
@@ -6646,8 +7057,10 @@ export function mountUI({ root, state, config = {} }) {
         moduleTag.textContent = `Module : ${entry.module}`;
         meta.append(moduleTag);
       }
-      const tags = normalizeTags(entry.tags, entry.module).filter(tag => !tag.startsWith('module:'));
-      tags.forEach(tag => {
+      const tags = normalizeTags(entry.tags, entry.module).filter(
+        (tag) => !tag.startsWith('module:')
+      );
+      tags.forEach((tag) => {
         const tagEl = document.createElement('span');
         tagEl.className = 'a11ytb-activity-badge';
         tagEl.textContent = tag;
@@ -6669,8 +7082,11 @@ export function mountUI({ root, state, config = {} }) {
           const parts = [];
           if (critical > 0) parts.push(`${critical} critique${critical > 1 ? 's' : ''}`);
           if (serious > 0) parts.push(`${serious} majeure${serious > 1 ? 's' : ''}`);
-          if (recommendations > 0) parts.push(`${recommendations} recommandation${recommendations > 1 ? 's' : ''}`);
-          detailLine.textContent = parts.length ? `Violations : ${parts.join(' • ')}` : 'Aucune violation détectée.';
+          if (recommendations > 0)
+            parts.push(`${recommendations} recommandation${recommendations > 1 ? 's' : ''}`);
+          detailLine.textContent = parts.length
+            ? `Violations : ${parts.join(' • ')}`
+            : 'Aucune violation détectée.';
         }
         li.append(detailLine);
 
@@ -6709,8 +7125,11 @@ export function mountUI({ root, state, config = {} }) {
 
       const status = document.createElement('span');
       status.className = `a11ytb-activity-connector-status ${connector.enabled ? 'a11ytb-activity-connector-status--enabled' : 'a11ytb-activity-connector-status--disabled'}`;
-      status.textContent = connector.enabled ? 'Actif' : (connector.status || 'Inactif');
-      status.setAttribute('aria-label', `Statut connecteur ${connector.label} : ${status.textContent}`);
+      status.textContent = connector.enabled ? 'Actif' : connector.status || 'Inactif';
+      status.setAttribute(
+        'aria-label',
+        `Statut connecteur ${connector.label} : ${status.textContent}`
+      );
 
       const help = document.createElement('p');
       help.className = 'a11ytb-activity-connector-help';
@@ -6758,7 +7177,7 @@ export function mountUI({ root, state, config = {} }) {
     if (!event) return;
     pushCollaborationItem('collaboration.syncs', {
       ...event,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
@@ -6766,7 +7185,7 @@ export function mountUI({ root, state, config = {} }) {
     if (!event) return;
     pushCollaborationItem('collaboration.exports', {
       ...event,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
@@ -6779,13 +7198,15 @@ export function mountUI({ root, state, config = {} }) {
       module: 'activity',
       tags: uniqueTags,
       payload: options.payload ?? null,
-      skipSync: true
+      skipSync: true,
     });
   }
 
   function triggerManualSyncSend() {
     if (!activitySync) {
-      appendIntegrationFeedback('Aucun connecteur de synchronisation configuré.', { tone: 'warning' });
+      appendIntegrationFeedback('Aucun connecteur de synchronisation configuré.', {
+        tone: 'warning',
+      });
       return;
     }
     const entries = getActivityEntries();
@@ -6809,7 +7230,7 @@ export function mountUI({ root, state, config = {} }) {
       severity,
       module: moduleId,
       tags,
-      payload: options.payload || null
+      payload: options.payload || null,
     };
     const next = [entry, ...current].slice(0, 50);
     state.set('ui.activity', next);
@@ -6859,27 +7280,30 @@ export function mountUI({ root, state, config = {} }) {
     onConnectorsChange() {
       renderActivityConnectors();
       updateManualSendAvailability();
-    }
+    },
   });
   renderActivityConnectors();
   updateManualSendAvailability();
 
-
   function serializeActivityToJSON(entries) {
-    return JSON.stringify(entries.map(entry => ({
-      id: entry.id,
-      message: entry.message,
-      timestamp: entry.timestamp,
-      module: entry.module,
-      severity: entry.severity,
-      tone: entry.tone,
-      tags: entry.tags,
-      payload: entry.payload || null
-    })), null, 2);
+    return JSON.stringify(
+      entries.map((entry) => ({
+        id: entry.id,
+        message: entry.message,
+        timestamp: entry.timestamp,
+        module: entry.module,
+        severity: entry.severity,
+        tone: entry.tone,
+        tags: entry.tags,
+        payload: entry.payload || null,
+      })),
+      null,
+      2
+    );
   }
 
   function escapeCsvValue(value) {
-    const stringValue = Array.isArray(value) ? value.join('|') : value ?? '';
+    const stringValue = Array.isArray(value) ? value.join('|') : (value ?? '');
     const text = String(stringValue);
     if (text.includes('"') || text.includes(',') || text.includes('\n')) {
       return `"${text.replace(/"/g, '""')}"`;
@@ -6889,16 +7313,16 @@ export function mountUI({ root, state, config = {} }) {
 
   function serializeActivityToCSV(entries) {
     const header = ['timestamp', 'message', 'module', 'severity', 'tone', 'tags', 'payload'];
-    const rows = entries.map(entry => [
+    const rows = entries.map((entry) => [
       new Date(entry.timestamp || Date.now()).toISOString(),
       entry.message,
       entry.module || '',
       entry.severity || '',
       entry.tone || '',
       Array.isArray(entry.tags) ? entry.tags.join('|') : '',
-      entry.payload ? JSON.stringify(entry.payload) : ''
+      entry.payload ? JSON.stringify(entry.payload) : '',
     ]);
-    return [header.join(','), ...rows.map(row => row.map(escapeCsvValue).join(','))].join('\n');
+    return [header.join(','), ...rows.map((row) => row.map(escapeCsvValue).join(','))].join('\n');
   }
 
   function downloadText(filename, text, mime = 'text/plain') {
@@ -6927,12 +7351,12 @@ export function mountUI({ root, state, config = {} }) {
   if (!window.a11ytb) window.a11ytb = {};
   window.a11ytb.logActivity = logActivity;
   window.a11ytb.activity = {
-    getEntries: () => getActivityEntries().map(entry => ({ ...entry })),
+    getEntries: () => getActivityEntries().map((entry) => ({ ...entry })),
     toJSON: () => serializeActivityToJSON(getActivityEntries()),
-    toCSV: () => serializeActivityToCSV(getActivityEntries())
+    toCSV: () => serializeActivityToCSV(getActivityEntries()),
   };
 
-  root.append(overlay, fab, panel);
+  root.append(overlay, fab, panel, notificationsContainer);
 
   let lastFocusedElement = null;
   let releaseOutsideInert = null;
@@ -6971,10 +7395,11 @@ export function mountUI({ root, state, config = {} }) {
       }
       const target = event.target;
       const optionsToggle = viewButtons?.get ? viewButtons.get('options') : null;
-      if (releaseOptionsFocusTrap && (
-        (optionsView && optionsView.contains(target))
-        || (optionsToggle && optionsToggle.contains?.(target))
-      )) {
+      if (
+        releaseOptionsFocusTrap &&
+        ((optionsView && optionsView.contains(target)) ||
+          (optionsToggle && optionsToggle.contains?.(target)))
+      ) {
         return;
       }
       const cycle = getCycle();
@@ -7044,9 +7469,10 @@ export function mountUI({ root, state, config = {} }) {
       if (fullscreenIcon) {
         fullscreenIcon.innerHTML = fullscreen ? fullscreenIcons.collapse : fullscreenIcons.expand;
       }
-      fullscreenToggle.setAttribute('title', fullscreen
-        ? i18n.t('toolbar.fullscreenExitTitle')
-        : i18n.t('toolbar.fullscreenEnterTitle'));
+      fullscreenToggle.setAttribute(
+        'title',
+        fullscreen ? i18n.t('toolbar.fullscreenExitTitle') : i18n.t('toolbar.fullscreenEnterTitle')
+      );
     }
   }
 
@@ -7090,7 +7516,10 @@ export function mountUI({ root, state, config = {} }) {
         teardownOptionsFocusTrap();
       }
       stopShortcutRecording();
-      const target = (lastFocusedElement && typeof lastFocusedElement.focus === 'function') ? lastFocusedElement : fab;
+      const target =
+        lastFocusedElement && typeof lastFocusedElement.focus === 'function'
+          ? lastFocusedElement
+          : fab;
       target.focus();
       lastFocusedElement = null;
     }
@@ -7193,20 +7622,47 @@ export function mountUI({ root, state, config = {} }) {
       const payload = serializeActivityToJSON(entries);
       const copied = await copyToClipboard(payload);
       if (copied) {
-        logActivity('Journal copié au presse-papiers (JSON)', { tone: 'confirm', module: 'activity', tags: ['export', 'json'] });
-        recordExportTimeline({ format: 'json', mode: 'clipboard', status: 'success', count: entries.length });
+        logActivity('Journal copié au presse-papiers (JSON)', {
+          tone: 'confirm',
+          module: 'activity',
+          tags: ['export', 'json'],
+        });
+        recordExportTimeline({
+          format: 'json',
+          mode: 'clipboard',
+          status: 'success',
+          count: entries.length,
+        });
       } else {
         downloadText('a11ytb-activity.json', payload, 'application/json');
-        logActivity('Journal téléchargé (JSON)', { tone: 'warning', module: 'activity', tags: ['export', 'json'] });
-        recordExportTimeline({ format: 'json', mode: 'download', status: 'success', count: entries.length });
+        logActivity('Journal téléchargé (JSON)', {
+          tone: 'warning',
+          module: 'activity',
+          tags: ['export', 'json'],
+        });
+        recordExportTimeline({
+          format: 'json',
+          mode: 'download',
+          status: 'success',
+          count: entries.length,
+        });
       }
     } else if (action.dataset.action === 'activity-export-csv') {
       const entries = getActivityEntries();
       if (!entries.length) return;
       const payload = serializeActivityToCSV(entries);
       downloadText('a11ytb-activity.csv', payload, 'text/csv');
-      logActivity('Journal exporté (CSV)', { tone: 'confirm', module: 'activity', tags: ['export', 'csv'] });
-      recordExportTimeline({ format: 'csv', mode: 'download', status: 'success', count: entries.length });
+      logActivity('Journal exporté (CSV)', {
+        tone: 'confirm',
+        module: 'activity',
+        tags: ['export', 'csv'],
+      });
+      recordExportTimeline({
+        format: 'csv',
+        mode: 'download',
+        status: 'success',
+        count: entries.length,
+      });
     } else if (action.dataset.action === 'activity-send-sync') {
       triggerManualSyncSend();
     } else if (action.dataset.action === 'activity-open-audit') {
@@ -7250,7 +7706,7 @@ export function mountUI({ root, state, config = {} }) {
       if (index === -1) {
         hidden.push(id);
         state.set('ui.hidden', hidden);
-        const pinned = Array.isArray(prefs.pinned) ? prefs.pinned.filter(x => x !== id) : [];
+        const pinned = Array.isArray(prefs.pinned) ? prefs.pinned.filter((x) => x !== id) : [];
         state.set('ui.pinned', pinned);
         logActivity(`Module masqué : ${title}`, { tone: 'toggle' });
       } else {
@@ -7277,11 +7733,15 @@ export function mountUI({ root, state, config = {} }) {
 
   Object.defineProperty(window, 'sttStatus', {
     configurable: true,
-    get() { return state.get('stt.status'); }
+    get() {
+      return state.get('stt.status');
+    },
   });
   Object.defineProperty(window, 'brailleOut', {
     configurable: true,
-    get() { return state.get('braille.output'); }
+    get() {
+      return state.get('braille.output');
+    },
   });
 
   state.on((snapshot) => {

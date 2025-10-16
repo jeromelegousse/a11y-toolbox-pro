@@ -2,7 +2,6 @@ import { readFile } from 'node:fs/promises';
 import { createSign } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import { resolve } from 'node:path';
-import { Buffer } from 'node:buffer';
 import { fetchWithRetry, parseJson } from '../http-client.js';
 import { getGoogleCredentials } from '../../../scripts/integrations/env.js';
 

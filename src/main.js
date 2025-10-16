@@ -9,14 +9,21 @@ import { setupModuleRuntime } from './module-runtime.js';
 import { createMetricsSyncService } from './status-center.js';
 import { moduleCollections } from './module-collections.js';
 import { setupAudioFeedback } from './audio-feedback.js';
-import { buildAuditStatusText, renderAuditStats, renderAuditViolations } from './modules/audit-view.js';
+import {
+  buildAuditStatusText,
+  renderAuditStats,
+  renderAuditViolations,
+} from './modules/audit-view.js';
 import { resolveLocale } from '../languages/index.js';
+import { createI18nService } from './i18n-service.js';
+import { createNotificationCenter } from './notifications.js';
 
 const profilePresets = {
   'vision-basse': {
     name: 'Vision basse',
     summary: 'Renforce le contraste et augmente les espacements pour limiter la fatigue visuelle.',
-    description: 'Active le thème à fort contraste, agrandit l’interlignage et ralentit légèrement la lecture vocale.',
+    description:
+      'Active le thème à fort contraste, agrandit l’interlignage et ralentit légèrement la lecture vocale.',
     tags: ['Vision', 'Lecture'],
     tone: 'confirm',
     activity: 'Profil Vision basse appliqué',
@@ -34,13 +41,14 @@ const profilePresets = {
       'audio.events.alert.sound': 'alert',
       'audio.events.warning.sound': 'warning',
       'audio.events.success.sound': 'success',
-      'audio.events.info.sound': 'toggle'
-    }
+      'audio.events.info.sound': 'toggle',
+    },
   },
   dyslexie: {
     name: 'Confort dyslexie',
     summary: 'Espacements accentués et rythme vocal apaisé pour la lecture suivie.',
-    description: 'Optimise les espacements et réduit la vitesse TTS afin de faciliter le décodage des mots.',
+    description:
+      'Optimise les espacements et réduit la vitesse TTS afin de faciliter le décodage des mots.',
     tags: ['Lecture', 'Focus'],
     tone: 'confirm',
     activity: 'Profil Confort dyslexie appliqué',
@@ -58,13 +66,14 @@ const profilePresets = {
       'audio.events.alert.enabled': false,
       'audio.events.warning.sound': 'warning',
       'audio.events.success.sound': 'confirm',
-      'audio.events.info.sound': 'toggle'
-    }
+      'audio.events.info.sound': 'toggle',
+    },
   },
   'lecture-rapide': {
     name: 'Lecture vocale rapide',
     summary: 'Accélère légèrement la voix pour survoler les contenus textuels.',
-    description: 'Ajuste la vitesse de lecture, garde un espacement confortable et conserve la mise en page d’origine.',
+    description:
+      'Ajuste la vitesse de lecture, garde un espacement confortable et conserve la mise en page d’origine.',
     tags: ['Voix', 'Productivité'],
     tone: 'confirm',
     activity: 'Profil Lecture vocale rapide appliqué',
@@ -82,22 +91,24 @@ const profilePresets = {
       'audio.events.alert.sound': 'alert',
       'audio.events.warning.sound': 'confirm',
       'audio.events.success.sound': 'success',
-      'audio.events.info.sound': 'info'
-    }
-  }
+      'audio.events.info.sound': 'info',
+    },
+  },
 };
 
 const initialCollectionId = moduleCollections[0]?.id ?? null;
 
 const normalizedManifests = [
   registerModuleManifest(audioManifest, audioManifest.id),
-  ...moduleCatalog.map(({ id, manifest }) => registerModuleManifest(manifest, id))
+  ...moduleCatalog.map(({ id, manifest }) => registerModuleManifest(manifest, id)),
 ];
 
 const pluginConfig = window.a11ytbPluginConfig || {};
 const resolvedDefaultLocale = resolveLocale(
-  pluginConfig?.defaults?.locale
-    || (typeof navigator !== 'undefined' && typeof navigator.language === 'string' ? navigator.language : undefined)
+  pluginConfig?.defaults?.locale ||
+    (typeof navigator !== 'undefined' && typeof navigator.language === 'string'
+      ? navigator.language
+      : undefined)
 );
 
 const baseInitial = {
@@ -118,11 +129,11 @@ const baseInitial = {
     availableModules: {
       profile: 'all',
       collection: 'all',
-      compatibility: 'all'
+      compatibility: 'all',
     },
     statusFilters: {
       profile: 'all',
-      collection: 'all'
+      collection: 'all',
     },
     activity: [],
     view: 'modules',
@@ -130,25 +141,26 @@ const baseInitial = {
     guides: {
       completedSteps: {},
       selectedScenario: null,
-      cursors: {}
+      cursors: {},
     },
     collections: {
       disabled: [],
       presets: {},
       builder: {
         activeCollectionId: initialCollectionId,
-        drafts: {}
-      }
+        drafts: {},
+      },
     },
     shortcuts: {
       overrides: {},
-      lastRecorded: null
+      lastRecorded: null,
     },
-    locale: resolvedDefaultLocale
+    locale: resolvedDefaultLocale,
   },
   profiles: profilePresets,
   runtime: {
-    modules: {}
+    modules: {},
+    notifications: [],
   },
   collaboration: {
     accounts: [],
@@ -159,28 +171,38 @@ const baseInitial = {
         draft: {
           label: 'Brouillon',
           description: 'Préparation interne en attente de revue.',
-          roles: ['owner', 'editor']
+          roles: ['owner', 'editor'],
         },
         review: {
           label: 'Revue',
           description: 'Validation par un pair ou un référent accessibilité.',
-          roles: ['reviewer', 'owner']
+          roles: ['reviewer', 'owner'],
         },
         published: {
           label: 'Publication',
           description: 'Workflow validé et visible par l’équipe élargie.',
-          roles: ['owner', 'admin']
-        }
+          roles: ['owner', 'admin'],
+        },
       },
       transitions: [
         { from: 'draft', to: 'review', label: 'Envoyer en revue', roles: ['owner', 'editor'] },
-        { from: 'review', to: 'draft', label: 'Retourner en brouillon', roles: ['reviewer', 'owner'] },
-        { from: 'review', to: 'published', label: 'Approuver & publier', roles: ['reviewer', 'owner'] }
-      ]
+        {
+          from: 'review',
+          to: 'draft',
+          label: 'Retourner en brouillon',
+          roles: ['reviewer', 'owner'],
+        },
+        {
+          from: 'review',
+          to: 'published',
+          label: 'Approuver & publier',
+          roles: ['reviewer', 'owner'],
+        },
+      ],
     },
     syncs: [],
-    exports: []
-  }
+    exports: [],
+  },
 };
 
 const initial = normalizedManifests.reduce(
@@ -193,12 +215,10 @@ const allowedDocks = new Set(['left', 'right', 'bottom']);
 const allowedViews = new Set(['modules', 'options', 'organize', 'guides', 'shortcuts']);
 
 const metricsIntegration = pluginConfig?.integrations?.metrics || {};
-const metricsEndpoint = typeof metricsIntegration.endpoint === 'string'
-  ? metricsIntegration.endpoint.trim()
-  : '';
-const metricsAuthToken = typeof metricsIntegration.authToken === 'string'
-  ? metricsIntegration.authToken
-  : '';
+const metricsEndpoint =
+  typeof metricsIntegration.endpoint === 'string' ? metricsIntegration.endpoint.trim() : '';
+const metricsAuthToken =
+  typeof metricsIntegration.authToken === 'string' ? metricsIntegration.authToken : '';
 const metricsWindowMs = Number(metricsIntegration.windowMs);
 const metricsFlushMs = Number(metricsIntegration.flushMs);
 const metricsTimeoutMs = Number(metricsIntegration.timeoutMs);
@@ -209,9 +229,9 @@ if (metricsEndpoint && typeof fetch === 'function') {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(metricsAuthToken ? { Authorization: `Bearer ${metricsAuthToken}` } : {})
+        ...(metricsAuthToken ? { Authorization: `Bearer ${metricsAuthToken}` } : {}),
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -240,7 +260,7 @@ if (typeof window !== 'undefined' && window.localStorage) {
       } catch (error) {
         console.warn('a11ytb: impossible d’enregistrer la file métriques.', error);
       }
-    }
+    },
   };
 }
 
@@ -257,12 +277,15 @@ if (defaultConfig?.view && allowedViews.has(defaultConfig.view)) {
 }
 
 const moduleIcons = {
-  audit: '<svg viewBox="0 0 24 24" focusable="false"><path d="M3 5a2 2 0 012-2h10a2 2 0 012 2v3h3v13h-8v-3h-2v3H3zm2 2v11h4v-3h6v3h4V10h-3V7H5zm9 1V5H5v3z"/></svg>',
+  audit:
+    '<svg viewBox="0 0 24 24" focusable="false"><path d="M3 5a2 2 0 012-2h10a2 2 0 012 2v3h3v13h-8v-3h-2v3H3zm2 2v11h4v-3h6v3h4V10h-3V7H5zm9 1V5H5v3z"/></svg>',
   tts: '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 9v6h3l4 4V5L7 9H4zm13 3a3 3 0 00-3-3v6a3 3 0 003-3zm-3-6.9v2.07a5 5 0 010 9.66V18a7 7 0 000-13.9z"/></svg>',
   stt: '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3zm5-3a1 1 0 012 0 7 7 0 01-6 6.92V21h3v1H8v-1h3v-3.08A7 7 0 015 11a1 1 0 012 0 5 5 0 0010 0z"/></svg>',
-  braille: '<svg viewBox="0 0 24 24" focusable="false"><path d="M6 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4zm12-14a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4z"/></svg>',
+  braille:
+    '<svg viewBox="0 0 24 24" focusable="false"><path d="M6 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4zm12-14a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4z"/></svg>',
   contrast: '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 2a10 10 0 100 20V2z"/></svg>',
-  spacing: '<svg viewBox="0 0 24 24" focusable="false"><path d="M7 4h10v2H7V4zm-2 5h14v2H5V9zm3 5h8v2H8v-2zm-3 5h14v2H5v-2z"/></svg>'
+  spacing:
+    '<svg viewBox="0 0 24 24" focusable="false"><path d="M7 4h10v2H7V4zm-2 5h14v2H5V9zm3 5h8v2H8v-2zm-3 5h14v2H5v-2z"/></svg>',
 };
 
 function downloadTextFile(filename, text, mime = 'text/plain') {
@@ -298,20 +321,15 @@ function buildAuditCsv(report = {}) {
       impact: violation.impact || 'unknown',
       id: violation.id || '',
       description: violation.description || violation.help || '',
-      helpUrl: violation.helpUrl || ''
+      helpUrl: violation.helpUrl || '',
     };
-    const nodes = Array.isArray(violation.nodes) && violation.nodes.length
-      ? violation.nodes
-      : [{ target: [''], failureSummary: '' }];
+    const nodes =
+      Array.isArray(violation.nodes) && violation.nodes.length
+        ? violation.nodes
+        : [{ target: [''], failureSummary: '' }];
     nodes.forEach((node) => {
       const target = Array.isArray(node.target) ? node.target.join(' | ') : '';
-      rows.push([
-        base.impact,
-        base.id,
-        base.description,
-        target,
-        base.helpUrl
-      ]);
+      rows.push([base.impact, base.id, base.description, target, base.helpUrl]);
     });
   });
   if (!rows.length) {
@@ -332,15 +350,34 @@ function ttsStatusMessage(status) {
 }
 
 const state = createStore('a11ytb/v1', initial);
+const i18n = createI18nService({ state, initialLocale: resolvedDefaultLocale });
+const notifications = createNotificationCenter({ state, i18n });
+
+if (typeof window !== 'undefined') {
+  const target = window.a11ytb || (window.a11ytb = {});
+  target.i18n = {
+    t: (...args) => i18n.t(...args),
+    translate: (...args) => i18n.translate(...args),
+    setLocale: (locale) => i18n.setLocale(locale),
+    getLocale: () => i18n.getLocale(),
+    use: (locale) => i18n.use(locale),
+  };
+  target.notifications = {
+    notify: (payload) => notifications.notify(payload),
+    dismiss: (id) => notifications.dismiss(id),
+    clear: () => notifications.clear(),
+    subscribe: (fn) => notifications.subscribe(fn),
+  };
+}
 const feedback = createFeedback({
   initialConfig: state.get('audio'),
-  subscribe: (listener) => state.on((snapshot) => listener?.(snapshot.audio))
+  subscribe: (listener) => state.on((snapshot) => listener?.(snapshot.audio)),
 });
 
 const metricsOptions = {
   state,
   transport: metricsTransport,
-  storage: metricsStorage
+  storage: metricsStorage,
 };
 if (Number.isFinite(metricsWindowMs) && metricsWindowMs > 0) {
   metricsOptions.windowDuration = metricsWindowMs;
@@ -397,20 +434,22 @@ const ensureDefaults = [
   ['audit', initial.audit],
   ['runtime.modules', initial.runtime.modules],
   ['tts.progress', initial.tts.progress],
-  ['collaboration', initial.collaboration]
+  ['collaboration', initial.collaboration],
 ];
 
 ensureDefaults.forEach(([path, fallback]) => {
   if (state.get(path) === undefined) {
     const clone = Array.isArray(fallback)
       ? [...fallback]
-      : (typeof fallback === 'object' && fallback !== null ? structuredClone(fallback) : fallback);
+      : typeof fallback === 'object' && fallback !== null
+        ? structuredClone(fallback)
+        : fallback;
     state.set(path, clone);
   }
 });
 setupAudioFeedback({ state, feedback });
 document.documentElement.dataset.dock = state.get('ui.dock') || 'right';
-state.on(s => {
+state.on((s) => {
   if (s.ui?.dock) document.documentElement.dataset.dock = s.ui.dock;
 });
 
@@ -475,18 +514,22 @@ registerBlock({
       const lastRun = state.get('audit.lastRun') || Date.now();
       const timestamp = new Date(lastRun).toISOString().replace(/[:.]/g, '-');
       if (format === 'json') {
-        downloadTextFile(`audit-axe-core-${timestamp}.json`, JSON.stringify(report, null, 2), 'application/json');
+        downloadTextFile(
+          `audit-axe-core-${timestamp}.json`,
+          JSON.stringify(report, null, 2),
+          'application/json'
+        );
         window.a11ytb?.logActivity?.('Rapport axe-core exporté (JSON)', {
           module: 'audit',
           tone: 'info',
-          tags: ['audit', 'export', 'json']
+          tags: ['audit', 'export', 'json'],
         });
       } else if (format === 'csv') {
         downloadTextFile(`audit-axe-core-${timestamp}.csv`, buildAuditCsv(report), 'text/csv');
         window.a11ytb?.logActivity?.('Rapport axe-core exporté (CSV)', {
           module: 'audit',
           tone: 'info',
-          tags: ['audit', 'export', 'csv']
+          tags: ['audit', 'export', 'csv'],
         });
       }
     }
@@ -499,7 +542,10 @@ registerBlock({
       const { label, detail } = buildAuditStatusText(audit);
       if (statusNode) statusNode.textContent = label;
       if (detailNode) detailNode.textContent = detail;
-      if (statsNode) statsNode.innerHTML = renderAuditStats(audit.summary, { schedule: audit.preferences?.schedule });
+      if (statsNode)
+        statsNode.innerHTML = renderAuditStats(audit.summary, {
+          schedule: audit.preferences?.schedule,
+        });
       if (violationsNode) violationsNode.innerHTML = renderAuditViolations(audit.lastReport);
       const running = audit.status === 'running';
       if (runBtn) {
@@ -519,7 +565,7 @@ registerBlock({
 
     update(state.get());
     state.on(update);
-  }
+  },
 });
 
 registerBlock({
@@ -535,7 +581,9 @@ registerBlock({
     const percent = Math.round((s.tts.progress || 0) * 100);
     const voices = s.tts?.availableVoices ?? [];
     const selectedVoice = voices.find((voice) => voice.voiceURI === s.tts.voice);
-    const voiceLabel = selectedVoice ? `${selectedVoice.name} (${selectedVoice.lang})` : 'Voix du navigateur';
+    const voiceLabel = selectedVoice
+      ? `${selectedVoice.name} (${selectedVoice.lang})`
+      : 'Voix du navigateur';
     return `
       <div class="a11ytb-row">
         <button class="a11ytb-button" data-action="speak-selection">Lire la sélection</button>
@@ -572,9 +620,15 @@ registerBlock({
     `;
   },
   wire: ({ root, state }) => {
-    root.querySelector('[data-action="speak-selection"]').addEventListener('click', () => window.speakSelection());
-    root.querySelector('[data-action="speak-page"]').addEventListener('click', () => window.speakPage());
-    root.querySelector('[data-action="stop"]').addEventListener('click', () => window.stopSpeaking());
+    root
+      .querySelector('[data-action="speak-selection"]')
+      .addEventListener('click', () => window.speakSelection());
+    root
+      .querySelector('[data-action="speak-page"]')
+      .addEventListener('click', () => window.speakPage());
+    root
+      .querySelector('[data-action="stop"]')
+      .addEventListener('click', () => window.stopSpeaking());
     const statusNode = root.querySelector('[data-ref="status"]');
     const badge = root.querySelector('[data-ref="badge"]');
     const progress = root.querySelector('[data-ref="progress"]');
@@ -584,7 +638,7 @@ registerBlock({
     const pitchNode = root.querySelector('[data-ref="pitch"]');
     const volumeNode = root.querySelector('[data-ref="volume"]');
     if (statusNode) {
-      state.on(s => {
+      state.on((s) => {
         const message = ttsStatusMessage(s.tts.status);
         statusNode.textContent = message;
         if (message) {
@@ -594,7 +648,7 @@ registerBlock({
         }
       });
     }
-    state.on(s => {
+    state.on((s) => {
       const speaking = s.tts.status === 'speaking';
       const percent = Math.round((s.tts.progress || 0) * 100);
       if (badge) {
@@ -626,13 +680,15 @@ registerBlock({
       if (voiceNode) {
         const voices = s.tts?.availableVoices ?? [];
         const selectedVoice = voices.find((voice) => voice.voiceURI === s.tts.voice);
-        voiceNode.textContent = selectedVoice ? `${selectedVoice.name} (${selectedVoice.lang})` : 'Voix du navigateur';
+        voiceNode.textContent = selectedVoice
+          ? `${selectedVoice.name} (${selectedVoice.lang})`
+          : 'Voix du navigateur';
       }
       if (rateNode) rateNode.textContent = `${(s.tts.rate ?? 1).toFixed(1)}×`;
       if (pitchNode) pitchNode.textContent = `${(s.tts.pitch ?? 1).toFixed(1)}`;
       if (volumeNode) volumeNode.textContent = `${Math.round((s.tts.volume ?? 1) * 100)} %`;
     });
-  }
+  },
 });
 
 registerBlock({
@@ -660,9 +716,13 @@ registerBlock({
     const txt = root.querySelector('[data-ref="txt"]');
     const statusEl = root.querySelector('[data-ref="status"]');
     const badge = root.querySelector('[data-ref="badge"]');
-    root.querySelector('[data-action="start"]').addEventListener('click', () => window.a11ytb?.stt?.start?.());
-    root.querySelector('[data-action="stop"]').addEventListener('click', () => window.a11ytb?.stt?.stop?.());
-    state.on(s => {
+    root
+      .querySelector('[data-action="start"]')
+      .addEventListener('click', () => window.a11ytb?.stt?.start?.());
+    root
+      .querySelector('[data-action="stop"]')
+      .addEventListener('click', () => window.a11ytb?.stt?.stop?.());
+    state.on((s) => {
       txt.value = s.stt.transcript || '';
       if (statusEl) statusEl.textContent = s.stt.status;
       if (badge) {
@@ -673,7 +733,7 @@ registerBlock({
         }
       }
     });
-  }
+  },
 });
 
 registerBlock({
@@ -700,9 +760,13 @@ registerBlock({
   wire: ({ root, state }) => {
     const out = root.querySelector('[data-ref="out"]');
     const badge = root.querySelector('[data-ref="badge"]');
-    root.querySelector('[data-action="sel"]').addEventListener('click', () => window.brailleSelection());
-    root.querySelector('[data-action="clear"]').addEventListener('click', () => window.clearBraille());
-    state.on(s => {
+    root
+      .querySelector('[data-action="sel"]')
+      .addEventListener('click', () => window.brailleSelection());
+    root
+      .querySelector('[data-action="clear"]')
+      .addEventListener('click', () => window.clearBraille());
+    state.on((s) => {
       out.value = s.braille.output || '';
       if (badge) {
         if (s.braille.output) {
@@ -712,7 +776,7 @@ registerBlock({
         }
       }
     });
-  }
+  },
 });
 
 registerBlock({
@@ -731,13 +795,13 @@ registerBlock({
   wire: ({ root, state }) => {
     const btn = root.querySelector('[data-action="toggle"]');
     btn.addEventListener('click', () => {
-      const enabled = !(state.get('contrast.enabled'));
+      const enabled = !state.get('contrast.enabled');
       state.set('contrast.enabled', enabled);
       markProfileCustom();
       window.a11ytb?.feedback?.play('toggle');
       window.a11ytb?.logActivity?.(`Contraste élevé ${enabled ? 'activé' : 'désactivé'}`);
     });
-    state.on(s => {
+    state.on((s) => {
       const enabled = !!s.contrast.enabled;
       document.documentElement.classList.toggle('a11ytb-contrast', enabled);
       btn.textContent = enabled ? 'Désactiver' : 'Activer';
@@ -747,7 +811,7 @@ registerBlock({
     document.documentElement.classList.toggle('a11ytb-contrast', initial);
     btn.textContent = initial ? 'Désactiver' : 'Activer';
     btn.setAttribute('aria-pressed', String(initial));
-  }
+  },
 });
 
 registerBlock({
@@ -778,30 +842,38 @@ registerBlock({
     const lineNode = root.querySelector('[data-ref="lineHeight"]');
     const letterNode = root.querySelector('[data-ref="letterSpacing"]');
     function applyToDocument(spacingState) {
-      document.documentElement.style.setProperty('--a11ytb-lh', String(spacingState.spacing.lineHeight));
-      document.documentElement.style.setProperty('--a11ytb-ls', String(spacingState.spacing.letterSpacing) + 'em');
+      document.documentElement.style.setProperty(
+        '--a11ytb-lh',
+        String(spacingState.spacing.lineHeight)
+      );
+      document.documentElement.style.setProperty(
+        '--a11ytb-ls',
+        String(spacingState.spacing.letterSpacing) + 'em'
+      );
       document.documentElement.classList.add('a11ytb-spacing-ready');
     }
     function updateSummary(spacingState) {
-      if (lineNode) lineNode.textContent = `${(spacingState.spacing.lineHeight ?? 1.5).toFixed(1)}×`;
-      if (letterNode) letterNode.textContent = `${Math.round((spacingState.spacing.letterSpacing ?? 0) * 100)} %`;
+      if (lineNode)
+        lineNode.textContent = `${(spacingState.spacing.lineHeight ?? 1.5).toFixed(1)}×`;
+      if (letterNode)
+        letterNode.textContent = `${Math.round((spacingState.spacing.letterSpacing ?? 0) * 100)} %`;
     }
     const initial = state.get();
     applyToDocument(initial);
     updateSummary(initial);
-    state.on(s => {
+    state.on((s) => {
       applyToDocument(s);
       updateSummary(s);
     });
-  }
+  },
 });
 
 setupModuleRuntime({
   state,
   catalog: moduleCatalog,
   collections: moduleCollections,
-  onMetricsUpdate: (sample) => metricsSync.ingest(sample)
+  onMetricsUpdate: (sample) => metricsSync.ingest(sample),
 });
 
 const root = document.getElementById('a11ytb-root');
-mountUI({ root, state, config: pluginConfig });
+mountUI({ root, state, config: pluginConfig, i18n, notifications });
