@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import dotenv from 'dotenv';
 
@@ -35,6 +35,33 @@ export function requireEnv(key) {
     throw new Error(`Variable d'environnement manquante : ${key}`);
   }
   return value;
+}
+
+let cachedGoogleCredentials;
+
+export function getGoogleCredentials() {
+  if (cachedGoogleCredentials) {
+    return cachedGoogleCredentials;
+  }
+
+  const credentialsPath = requireEnv('GOOGLE_APPLICATION_CREDENTIALS');
+  const absolutePath = resolve(credentialsPath);
+
+  if (!existsSync(absolutePath)) {
+    throw new Error(`Fichier de credentials Google introuvable : ${absolutePath}`);
+  }
+
+  try {
+    const raw = readFileSync(absolutePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    cachedGoogleCredentials = {
+      path: absolutePath,
+      data: parsed
+    };
+    return cachedGoogleCredentials;
+  } catch (error) {
+    throw new Error(`Impossible de charger les credentials Google : ${error.message}`);
+  }
 }
 
 // Charge automatiquement les fichiers si ce module est importé directement

@@ -15,13 +15,13 @@ function ensureFilePath(filePath) {
 
 export const openAiWhisperEngine = {
   id: 'openai-whisper',
-  async transcribe({ filePath, language } = {}) {
+  async transcribe({ filePath, language, model } = {}) {
     const absolutePath = ensureFilePath(filePath);
     const apiKey = requireEnv('OPENAI_API_KEY');
 
     const createPayload = () => {
       const formData = new FormData();
-      formData.append('model', DEFAULT_MODEL);
+      formData.append('model', model ?? DEFAULT_MODEL);
       formData.append('file', createReadStream(absolutePath), basename(absolutePath));
 
       if (language) {
