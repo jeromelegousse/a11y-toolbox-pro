@@ -1,3 +1,4 @@
+import process from 'node:process';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
