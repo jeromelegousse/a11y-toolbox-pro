@@ -88,17 +88,20 @@ function safeClone(value) {
   return cloneWithFallback(value);
 }
 
-export function createStore(key, initial) {
-  const subs = new Set();
-  const loaded = load();
-  let state = safeClone(initial);
-  if (loaded && typeof loaded === 'object') {
-    state = { ...state, ...loaded };
-  }
+export function createStore(key, initial, options = {}) {
+  const { storage: providedStorage, global: providedGlobal } = options;
+  const storage = providedStorage
+    ?? (typeof globalScope?.localStorage !== 'undefined' ? globalScope.localStorage : null);
+  const hasStorage = Boolean(
+    storage && typeof storage.getItem === 'function' && typeof storage.setItem === 'function'
+  );
 
   function load() {
+    if (!hasStorage) {
+      return null;
+    }
     try {
-      const raw = localStorage.getItem(key);
+      const raw = storage.getItem(key);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
@@ -110,7 +113,11 @@ export function createStore(key, initial) {
       return null;
     }
   }
+
   function persist() {
+    if (!hasStorage) {
+      return;
+    }
     try {
       const snapshot = safeClone(state);
       if (snapshot && typeof snapshot === 'object') {
@@ -120,10 +127,17 @@ export function createStore(key, initial) {
           delete snapshot.runtime;
         }
       }
-      localStorage.setItem(key, JSON.stringify(snapshot));
+      storage.setItem(key, JSON.stringify(snapshot));
     } catch (error) {
       console.warn('a11ytb: impossible d’enregistrer l’état.', error);
     }
+  }
+
+  const subs = new Set();
+  const loaded = load();
+  let state = safeClone(initial);
+  if (loaded && typeof loaded === 'object') {
+    state = { ...state, ...loaded };
   }
 
   const api = {
@@ -156,7 +170,19 @@ export function createStore(key, initial) {
     reset() { state = safeClone(initial); persist(); subs.forEach(fn => fn(safeClone(state))); },
     serialize() { return JSON.stringify(state, null, 2); }
   };
-  if (!window.a11ytb) window.a11ytb = {};
-  window.a11ytb.state = api;
+
+  const exposeTargets = [
+    providedGlobal,
+    typeof window !== 'undefined' ? window : null,
+    globalScope && typeof globalScope.window === 'object' ? globalScope.window : null
+  ];
+  const target = exposeTargets.find(candidate => candidate && typeof candidate === 'object');
+  if (target) {
+    if (!target.a11ytb || typeof target.a11ytb !== 'object') {
+      target.a11ytb = {};
+    }
+    target.a11ytb.state = api;
+  }
+
   return api;
 }
