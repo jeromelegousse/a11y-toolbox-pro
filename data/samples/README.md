@@ -11,6 +11,15 @@ Déposez dans ce dossier quelques fichiers audio (10–30 secondes) et des ima
 
 ## Utilisation rapide
 
+### Échantillons recommandés par moteur
+
+- **OpenAI Whisper / Deepgram** : courts extraits vocaux (mono ou stéréo) avec ou sans bruit de fond.
+- **AssemblyAI** : conversation de 30 secondes pour tester la diarisation.
+- **Google Cloud STT** : réunion avec plusieurs canaux (`--channels=2`) et échantillonnage élevé (`--sampleRate=44100`).
+- **Azure Speech** : appel centre de contacts avec accents variés pour valider `--diarize`.
+
+Ajoutez éventuellement un fichier `README.txt` décrivant l'origine des données (anonymisées) et les paramètres utilisés.
+
 Une fois vos fichiers déposés, lancez par exemple :
 
 ```bash
