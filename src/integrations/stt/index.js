@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import process from 'node:process';
 import { openAiWhisperEngine } from './openai-whisper.js';
 
 const projectRoot = dirname(dirname(dirname(fileURLToPath(new URL('.', import.meta.url)))));
