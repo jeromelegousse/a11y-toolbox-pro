@@ -88,10 +88,20 @@ function safeClone(value) {
   return cloneWithFallback(value);
 }
 
+function getDefaultStorage() {
+  if (!globalScope) {
+    return null;
+  }
+  try {
+    return typeof globalScope.localStorage !== 'undefined' ? globalScope.localStorage : null;
+  } catch (error) {
+    return null;
+  }
+}
+
 export function createStore(key, initial, options = {}) {
   const { storage: providedStorage, global: providedGlobal } = options;
-  const storage = providedStorage
-    ?? (typeof globalScope?.localStorage !== 'undefined' ? globalScope.localStorage : null);
+  const storage = providedStorage ?? getDefaultStorage();
   const hasStorage = Boolean(
     storage && typeof storage.getItem === 'function' && typeof storage.setItem === 'function'
   );
