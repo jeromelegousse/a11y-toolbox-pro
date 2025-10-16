@@ -12,7 +12,9 @@ test.describe('Organisation — dépendances', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    const fab = page.locator('.a11ytb-fab');
+    const fab = page.getByRole('button', {
+      name: 'Open the accessibility toolbox',
+    });
     await expect(fab).toBeVisible();
     await fab.click();
     await expect(page.locator('.a11ytb-panel')).toHaveAttribute('data-open', 'true');
