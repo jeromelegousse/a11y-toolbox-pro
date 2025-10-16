@@ -72,6 +72,13 @@ function a11ytb_initialize_options(): void
         'a11ytb_gemini_api_key' => '',
         'a11ytb_activity_webhook_url' => '',
         'a11ytb_activity_webhook_token' => '',
+        'a11ytb_activity_jira_base_url' => '',
+        'a11ytb_activity_jira_project_key' => '',
+        'a11ytb_activity_jira_token' => '',
+        'a11ytb_activity_jira_issue_type' => '',
+        'a11ytb_activity_linear_api_key' => '',
+        'a11ytb_activity_linear_team_id' => '',
+        'a11ytb_activity_slack_webhook_url' => '',
     ];
 
     foreach ($defaults as $key => $value) {
@@ -856,16 +863,872 @@ function a11ytb_get_activity_integration_config(): array
     $url = get_option('a11ytb_activity_webhook_url', '');
     $normalized_url = is_string($url) ? trim($url) : '';
     $stored_token = get_option('a11ytb_activity_webhook_token', '');
-    $decrypted_token = $stored_token === '' ? '' : a11ytb_decrypt_secret($stored_token);
-    $token = ($decrypted_token === null) ? '' : (string) $decrypted_token;
+    $has_token = false;
+
+    if ($stored_token !== '' && $stored_token !== null) {
+        $decrypted_token = a11ytb_decrypt_secret((string) $stored_token);
+        $has_token = is_string($decrypted_token) && $decrypted_token !== '';
+    }
 
     return [
         'enabled' => $normalized_url !== '',
         'webhookUrl' => $normalized_url,
-        'authToken' => $token,
-        'hasAuthToken' => $token !== '',
+        'hasAuthToken' => $has_token,
+        'proxyUrl' => a11ytb_get_activity_proxy_url(),
     ];
 }
+
+/**
+ * Retourne l’URL du proxy de synchronisation d’activité.
+ */
+function a11ytb_get_activity_proxy_url(): string
+{
+    if (function_exists('rest_url')) {
+        return rest_url('a11ytb/v1/activity/sync');
+    }
+
+    if (function_exists('home_url')) {
+        return home_url('/wp-json/a11ytb/v1/activity/sync');
+    }
+
+    return '/wp-json/a11ytb/v1/activity/sync';
+}
+
+/**
+ * Récupère et déchiffre un secret stocké en base d’options.
+ */
+function a11ytb_get_decrypted_option_value(string $option_name): string
+{
+    $stored = get_option($option_name, '');
+
+    if ($stored === '' || $stored === null) {
+        return '';
+    }
+
+    $decrypted = a11ytb_decrypt_secret((string) $stored);
+
+    if (!is_string($decrypted) || $decrypted === '') {
+        return '';
+    }
+
+    return trim((string) $decrypted);
+}
+
+/**
+ * Construit la configuration des connecteurs d’activité avec secrets déchiffrés.
+ */
+function a11ytb_get_activity_connector_settings(): array
+{
+    $settings = [
+        'webhook' => [
+            'url' => trim((string) get_option('a11ytb_activity_webhook_url', '')),
+            'token' => a11ytb_get_decrypted_option_value('a11ytb_activity_webhook_token'),
+        ],
+        'jira' => [
+            'baseUrl' => trim((string) get_option('a11ytb_activity_jira_base_url', '')),
+            'projectKey' => trim((string) get_option('a11ytb_activity_jira_project_key', '')),
+            'token' => a11ytb_get_decrypted_option_value('a11ytb_activity_jira_token'),
+            'issueType' => trim((string) get_option('a11ytb_activity_jira_issue_type', '')),
+        ],
+        'linear' => [
+            'apiKey' => a11ytb_get_decrypted_option_value('a11ytb_activity_linear_api_key'),
+            'teamId' => trim((string) get_option('a11ytb_activity_linear_team_id', '')),
+        ],
+        'slack' => [
+            'webhookUrl' => a11ytb_get_decrypted_option_value('a11ytb_activity_slack_webhook_url'),
+        ],
+    ];
+
+    $filtered = apply_filters('a11ytb/activity_connector_settings', $settings);
+
+    return is_array($filtered) ? $filtered : $settings;
+}
+
+/**
+ * Définit la métadonnée statique des connecteurs disponibles.
+ *
+ * @return array<int, array{id:string,label:string,help:string,fields:array<int,array{id:string,label:string,description?:string}>,supportsBulk?:bool}>
+ */
+function a11ytb_get_activity_connector_definitions(): array
+{
+    return [
+        [
+            'id' => 'webhook',
+            'label' => 'Webhook générique',
+            'help' => 'Envoi POST JSON vers un endpoint HTTPS externe avec jeton optionnel.',
+            'fields' => [
+                [
+                    'id' => 'webhookUrl',
+                    'label' => 'URL du webhook',
+                    'description' => 'Endpoint HTTPS recevant les notifications activité.',
+                ],
+                [
+                    'id' => 'authToken',
+                    'label' => 'Jeton Bearer (facultatif)',
+                    'description' => 'Transmis dans l’en-tête Authorization pour sécuriser le webhook.',
+                ],
+            ],
+            'supportsBulk' => true,
+        ],
+        [
+            'id' => 'jira',
+            'label' => 'Jira (REST)',
+            'help' => 'Crée une demande dans un projet Jira Cloud via l’API REST v3.',
+            'fields' => [
+                [
+                    'id' => 'jiraBaseUrl',
+                    'label' => 'URL de base Jira',
+                    'description' => 'Ex. https://votre-instance.atlassian.net',
+                ],
+                [
+                    'id' => 'jiraProjectKey',
+                    'label' => 'Clé projet',
+                    'description' => 'Identifiant court du projet cible (ex. A11Y).',
+                ],
+                [
+                    'id' => 'jiraToken',
+                    'label' => 'Jeton API',
+                    'description' => 'Encodé en Basic Auth (email:token) pour authentifier la requête.',
+                ],
+                [
+                    'id' => 'jiraIssueType',
+                    'label' => 'Type de ticket',
+                    'description' => 'Nom du type (ex. Bug, Task). Défaut : Task.',
+                ],
+            ],
+        ],
+        [
+            'id' => 'linear',
+            'label' => 'Linear (REST)',
+            'help' => 'Enregistre un ticket Linear via l’API REST stable.',
+            'fields' => [
+                [
+                    'id' => 'linearApiKey',
+                    'label' => 'Clé API Linear',
+                    'description' => 'Clé personnelle avec accès écriture (format lin_api_…).',
+                ],
+                [
+                    'id' => 'linearTeamId',
+                    'label' => 'Identifiant équipe',
+                    'description' => 'Identifiant unique de l’équipe cible (ex. team_123).',
+                ],
+            ],
+        ],
+        [
+            'id' => 'slack',
+            'label' => 'Slack (Webhook)',
+            'help' => 'Publie un message formaté dans un canal Slack via un webhook entrant.',
+            'fields' => [
+                [
+                    'id' => 'slackWebhookUrl',
+                    'label' => 'URL du webhook Slack',
+                    'description' => 'URL fournie par l’intégration « Incoming Webhook ».',
+                ],
+            ],
+            'supportsBulk' => true,
+        ],
+    ];
+}
+
+/**
+ * Prépare les connecteurs disponibles pour l’exécution et retourne métadonnées + callbacks.
+ *
+ * @param array $settings
+ * @return array<int, array{meta:array{id:string,label:string,help:string,fields:array,supportsBulk:bool,enabled:bool,status:string},dispatch:(callable|null)}>
+ */
+function a11ytb_prepare_activity_connectors(array $settings): array
+{
+    $definitions = a11ytb_get_activity_connector_definitions();
+    $connectors = [];
+
+    foreach ($definitions as $definition) {
+        $meta = [
+            'id' => $definition['id'],
+            'label' => $definition['label'],
+            'help' => $definition['help'],
+            'fields' => $definition['fields'],
+            'supportsBulk' => !empty($definition['supportsBulk']),
+            'enabled' => false,
+            'status' => 'configuration manquante',
+        ];
+
+        $dispatch = null;
+
+        switch ($definition['id']) {
+            case 'webhook':
+                $url = isset($settings['webhook']['url']) ? trim((string) $settings['webhook']['url']) : '';
+                $token = isset($settings['webhook']['token']) ? trim((string) $settings['webhook']['token']) : '';
+
+                if ($url !== '') {
+                    $meta['enabled'] = true;
+                    $meta['status'] = 'prêt';
+                    $dispatch = static function (array $job, array $context) use ($url, $token) {
+                        return a11ytb_dispatch_activity_webhook($job, $context, [
+                            'url' => $url,
+                            'token' => $token,
+                        ]);
+                    };
+                }
+                break;
+
+            case 'jira':
+                $base_url = isset($settings['jira']['baseUrl']) ? trim((string) $settings['jira']['baseUrl']) : '';
+                $project_key = isset($settings['jira']['projectKey']) ? trim((string) $settings['jira']['projectKey']) : '';
+                $token = isset($settings['jira']['token']) ? trim((string) $settings['jira']['token']) : '';
+                $issue_type = isset($settings['jira']['issueType']) ? trim((string) $settings['jira']['issueType']) : '';
+                $meta['status'] = 'configuration incomplète';
+
+                if ($base_url !== '' && $project_key !== '' && $token !== '') {
+                    $meta['enabled'] = true;
+                    $meta['status'] = 'prêt';
+                    $dispatch = static function (array $job, array $context) use ($base_url, $project_key, $token, $issue_type) {
+                        return a11ytb_dispatch_activity_jira($job, $context, [
+                            'baseUrl' => $base_url,
+                            'projectKey' => $project_key,
+                            'token' => $token,
+                            'issueType' => $issue_type,
+                        ]);
+                    };
+                }
+                break;
+
+            case 'linear':
+                $api_key = isset($settings['linear']['apiKey']) ? trim((string) $settings['linear']['apiKey']) : '';
+                $team_id = isset($settings['linear']['teamId']) ? trim((string) $settings['linear']['teamId']) : '';
+                $meta['status'] = 'configuration incomplète';
+
+                if ($api_key !== '' && $team_id !== '') {
+                    $meta['enabled'] = true;
+                    $meta['status'] = 'prêt';
+                    $dispatch = static function (array $job) use ($api_key, $team_id) {
+                        return a11ytb_dispatch_activity_linear($job, [
+                            'apiKey' => $api_key,
+                            'teamId' => $team_id,
+                        ]);
+                    };
+                }
+                break;
+
+            case 'slack':
+                $webhook_url = isset($settings['slack']['webhookUrl']) ? trim((string) $settings['slack']['webhookUrl']) : '';
+
+                if ($webhook_url !== '') {
+                    $meta['enabled'] = true;
+                    $meta['status'] = 'prêt';
+                    $dispatch = static function (array $job) use ($webhook_url) {
+                        return a11ytb_dispatch_activity_slack($job, $webhook_url);
+                    };
+                }
+                break;
+        }
+
+        $connectors[] = [
+            'meta' => $meta,
+            'dispatch' => $dispatch,
+        ];
+    }
+
+    return $connectors;
+}
+
+/**
+ * Clone en profondeur une charge utile potentiellement complexe.
+ *
+ * @param mixed $value
+ * @return mixed
+ */
+function a11ytb_clone_activity_payload($value)
+{
+    if ($value === null) {
+        return null;
+    }
+
+    $encode = function_exists('wp_json_encode') ? 'wp_json_encode' : 'json_encode';
+    $encoded = $encode($value);
+
+    if (!is_string($encoded) || $encoded === '') {
+        return is_scalar($value) ? ['type' => 'text', 'value' => (string) $value] : null;
+    }
+
+    $decoded = json_decode($encoded, true);
+
+    if (json_last_error() === JSON_ERROR_NONE) {
+        return $decoded;
+    }
+
+    if (is_scalar($value)) {
+        return ['type' => 'text', 'value' => (string) $value];
+    }
+
+    return null;
+}
+
+/**
+ * Nettoie une entrée de journal d’activité.
+ *
+ * @param mixed $entry
+ */
+function a11ytb_sanitize_activity_entry($entry): ?array
+{
+    if (!is_array($entry)) {
+        return null;
+    }
+
+    $message = isset($entry['message']) ? (string) $entry['message'] : '';
+    if ($message !== '') {
+        if (function_exists('sanitize_textarea_field')) {
+            $message = sanitize_textarea_field($message);
+        } else {
+            $message = trim(strip_tags($message));
+        }
+    }
+
+    if ($message === '') {
+        return null;
+    }
+
+    $id = isset($entry['id']) ? (string) $entry['id'] : '';
+    if ($id !== '') {
+        if (function_exists('sanitize_text_field')) {
+            $id = sanitize_text_field($id);
+        } else {
+            $id = preg_replace('/[^a-zA-Z0-9_-]/', '', $id);
+        }
+    }
+
+    if ($id === '') {
+        $id = uniqid('a11ytb_', true);
+    }
+
+    $timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
+    if ($timestamp <= 0) {
+        $timestamp = (int) (microtime(true) * 1000);
+    }
+
+    $module = isset($entry['module']) ? (string) $entry['module'] : '';
+    if ($module !== '') {
+        if (function_exists('sanitize_key')) {
+            $module = sanitize_key($module);
+        } else {
+            $module = strtolower(preg_replace('/[^a-z0-9_-]/', '', $module));
+        }
+    }
+    $module = $module !== '' ? $module : null;
+
+    $severity = isset($entry['severity']) ? (string) $entry['severity'] : '';
+    if ($severity !== '' && function_exists('sanitize_text_field')) {
+        $severity = sanitize_text_field($severity);
+    }
+    $severity = $severity !== '' ? $severity : null;
+
+    $tone = isset($entry['tone']) ? (string) $entry['tone'] : '';
+    if ($tone !== '' && function_exists('sanitize_text_field')) {
+        $tone = sanitize_text_field($tone);
+    }
+    $tone = $tone !== '' ? $tone : null;
+
+    $tags = [];
+    if (!empty($entry['tags']) && is_array($entry['tags'])) {
+        foreach ($entry['tags'] as $tag) {
+            $tag_value = (string) $tag;
+            if ($tag_value === '') {
+                continue;
+            }
+            if (function_exists('sanitize_text_field')) {
+                $tag_value = sanitize_text_field($tag_value);
+            }
+            if ($tag_value !== '') {
+                $tags[] = $tag_value;
+            }
+        }
+    }
+
+    $payload = array_key_exists('payload', $entry) ? $entry['payload'] : null;
+    $cloned_payload = a11ytb_clone_activity_payload($payload);
+
+    return [
+        'id' => $id,
+        'message' => $message,
+        'timestamp' => $timestamp,
+        'module' => $module,
+        'severity' => $severity,
+        'tone' => $tone,
+        'tags' => $tags,
+        'payload' => $cloned_payload,
+    ];
+}
+
+/**
+ * Normalise la structure du job envoyé au proxy.
+ *
+ * @param mixed $job
+ * @return array|WP_Error
+ */
+function a11ytb_normalize_activity_job($job)
+{
+    if (!is_array($job)) {
+        return new WP_Error('a11ytb_invalid_job', __('Requête invalide : champ « job » manquant.', 'a11ytb'), ['status' => 400]);
+    }
+
+    $type = isset($job['type']) ? strtolower((string) $job['type']) : 'single';
+
+    if ($type === 'bulk') {
+        $entries_raw = isset($job['entries']) && is_array($job['entries']) ? $job['entries'] : [];
+        $entries = [];
+        foreach ($entries_raw as $entry) {
+            $sanitized = a11ytb_sanitize_activity_entry($entry);
+            if ($sanitized !== null) {
+                $entries[] = $sanitized;
+            }
+        }
+
+        if (!$entries) {
+            return new WP_Error('a11ytb_invalid_job', __('Aucune entrée valide fournie pour la synchronisation.', 'a11ytb'), ['status' => 400]);
+        }
+
+        return [
+            'type' => 'bulk',
+            'entries' => $entries,
+        ];
+    }
+
+    $entry = a11ytb_sanitize_activity_entry($job['entry'] ?? null);
+    if ($entry === null) {
+        return new WP_Error('a11ytb_invalid_job', __('Entrée de journal d’activité invalide.', 'a11ytb'), ['status' => 400]);
+    }
+
+    return [
+        'type' => 'single',
+        'entry' => $entry,
+    ];
+}
+
+/**
+ * Nettoie le contexte transmis par le client.
+ *
+ * @param mixed $context
+ */
+function a11ytb_normalize_activity_context($context): array
+{
+    $page = null;
+
+    if (is_array($context) && isset($context['page'])) {
+        $candidate = is_string($context['page']) ? trim($context['page']) : '';
+        if ($candidate !== '') {
+            if (function_exists('esc_url_raw')) {
+                $candidate = esc_url_raw($candidate);
+            }
+            $page = $candidate;
+        }
+    }
+
+    return [
+        'page' => $page,
+    ];
+}
+
+/**
+ * Construit l’enveloppe JSON envoyée aux connecteurs HTTP.
+ */
+function a11ytb_build_activity_envelope(array $job, array $context): array
+{
+    $envelope = [
+        'source' => 'a11y-toolbox-pro',
+        'sentAt' => gmdate('c'),
+    ];
+
+    if (!empty($context['page'])) {
+        $envelope['page'] = $context['page'];
+    }
+
+    if ($job['type'] === 'bulk') {
+        $envelope['event'] = 'a11ytb.activity.bulk';
+        $envelope['entries'] = $job['entries'];
+    } else {
+        $envelope['event'] = 'a11ytb.activity.entry';
+        $envelope['entry'] = $job['entry'];
+    }
+
+    return $envelope;
+}
+
+/**
+ * Retourne l’entrée principale à utiliser pour les connecteurs unitaires.
+ */
+function a11ytb_extract_primary_activity_entry(array $job): ?array
+{
+    if ($job['type'] === 'bulk') {
+        return $job['entries'][0] ?? null;
+    }
+
+    return $job['entry'] ?? null;
+}
+
+/**
+ * Déclenche l’envoi via le webhook générique.
+ */
+function a11ytb_dispatch_activity_webhook(array $job, array $context, array $config)
+{
+    $url = isset($config['url']) ? (string) $config['url'] : '';
+    if ($url === '') {
+        return new WP_Error('a11ytb_webhook_missing', __('Webhook d’activité non configuré.', 'a11ytb'));
+    }
+
+    $headers = [
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json',
+    ];
+
+    if (!empty($config['token'])) {
+        $headers['Authorization'] = 'Bearer ' . $config['token'];
+    }
+
+    $body = (function_exists('wp_json_encode') ? wp_json_encode(a11ytb_build_activity_envelope($job, $context)) : json_encode(a11ytb_build_activity_envelope($job, $context)));
+
+    $response = wp_remote_post($url, [
+        'headers' => $headers,
+        'body' => $body,
+        'timeout' => 15,
+    ]);
+
+    return a11ytb_validate_http_response($response, 'webhook');
+}
+
+/**
+ * Déclenche l’envoi vers Jira.
+ */
+function a11ytb_dispatch_activity_jira(array $job, array $context, array $config)
+{
+    $entry = a11ytb_extract_primary_activity_entry($job);
+    if (!$entry) {
+        return true;
+    }
+
+    $base_url = isset($config['baseUrl']) ? rtrim((string) $config['baseUrl'], '/') : '';
+    $project_key = isset($config['projectKey']) ? (string) $config['projectKey'] : '';
+    $token = isset($config['token']) ? (string) $config['token'] : '';
+    $issue_type = isset($config['issueType']) && $config['issueType'] !== '' ? (string) $config['issueType'] : 'Task';
+
+    if ($base_url === '' || $project_key === '' || $token === '') {
+        return new WP_Error('a11ytb_jira_config', __('Configuration Jira incomplète.', 'a11ytb'));
+    }
+
+    $description_parts = [$entry['message']];
+    if ($entry['payload'] !== null) {
+        $description_parts[] = '---';
+        $description_parts[] = (function_exists('wp_json_encode') ? wp_json_encode($entry['payload'], JSON_PRETTY_PRINT) : json_encode($entry['payload'], JSON_PRETTY_PRINT));
+    }
+    if (!empty($entry['tags'])) {
+        $description_parts[] = 'Tags : ' . implode(', ', $entry['tags']);
+    }
+
+    $summary = mb_substr($entry['message'], 0, 240);
+    if ($summary === '') {
+        $summary = __('Observation accessibilité', 'a11ytb');
+    }
+
+    $body = [
+        'fields' => [
+            'project' => ['key' => $project_key],
+            'summary' => $summary,
+            'description' => implode("\n", $description_parts),
+            'issuetype' => ['name' => $issue_type],
+        ],
+    ];
+
+    $endpoint = $base_url . '/rest/api/3/issue';
+
+    $response = wp_remote_post($endpoint, [
+        'headers' => [
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Basic ' . $token,
+        ],
+        'body' => (function_exists('wp_json_encode') ? wp_json_encode($body) : json_encode($body)),
+        'timeout' => 15,
+    ]);
+
+    return a11ytb_validate_http_response($response, 'jira');
+}
+
+/**
+ * Déclenche l’envoi vers Linear.
+ */
+function a11ytb_dispatch_activity_linear(array $job, array $config)
+{
+    $entry = a11ytb_extract_primary_activity_entry($job);
+    if (!$entry) {
+        return true;
+    }
+
+    $api_key = isset($config['apiKey']) ? (string) $config['apiKey'] : '';
+    $team_id = isset($config['teamId']) ? (string) $config['teamId'] : '';
+
+    if ($api_key === '' || $team_id === '') {
+        return new WP_Error('a11ytb_linear_config', __('Configuration Linear incomplète.', 'a11ytb'));
+    }
+
+    $payload = [
+        'teamId' => $team_id,
+        'title' => (mb_substr($entry['message'], 0, 240) ?: __('Observation accessibilité', 'a11ytb')),
+        'description' => (function_exists('wp_json_encode') ? wp_json_encode($entry, JSON_PRETTY_PRINT) : json_encode($entry, JSON_PRETTY_PRINT)),
+    ];
+
+    $response = wp_remote_post('https://api.linear.app/rest/issues', [
+        'headers' => [
+            'Content-Type' => 'application/json',
+            'Authorization' => $api_key,
+        ],
+        'body' => (function_exists('wp_json_encode') ? wp_json_encode($payload) : json_encode($payload)),
+        'timeout' => 15,
+    ]);
+
+    return a11ytb_validate_http_response($response, 'linear');
+}
+
+/**
+ * Déclenche l’envoi vers Slack.
+ */
+function a11ytb_dispatch_activity_slack(array $job, string $webhook_url)
+{
+    $entry = a11ytb_extract_primary_activity_entry($job);
+    if (!$entry) {
+        return true;
+    }
+
+    $blocks = [
+        [
+            'type' => 'section',
+            'text' => ['type' => 'mrkdwn', 'text' => '*' . $entry['message'] . '*'],
+        ],
+        [
+            'type' => 'context',
+            'elements' => [
+                ['type' => 'mrkdwn', 'text' => 'Module : ' . ($entry['module'] ?? 'activité')],
+                ['type' => 'mrkdwn', 'text' => 'Niveau : ' . ($entry['severity'] ?? $entry['tone'] ?? 'info')],
+            ],
+        ],
+    ];
+
+    if (!empty($entry['tags'])) {
+        $blocks[] = [
+            'type' => 'context',
+            'elements' => [
+                ['type' => 'mrkdwn', 'text' => '*Tags* : ' . implode(', ', $entry['tags'])],
+            ],
+        ];
+    }
+
+    if ($entry['payload'] !== null) {
+        $blocks[] = [
+            'type' => 'section',
+            'text' => [
+                'type' => 'mrkdwn',
+                'text' => '```' . (function_exists('wp_json_encode') ? wp_json_encode($entry['payload'], JSON_PRETTY_PRINT) : json_encode($entry['payload'], JSON_PRETTY_PRINT)) . '```',
+            ],
+        ];
+    }
+
+    $payload = [
+        'text' => $entry['message'],
+        'blocks' => $blocks,
+    ];
+
+    $response = wp_remote_post($webhook_url, [
+        'headers' => ['Content-Type' => 'application/json'],
+        'body' => (function_exists('wp_json_encode') ? wp_json_encode($payload) : json_encode($payload)),
+        'timeout' => 15,
+    ]);
+
+    return a11ytb_validate_http_response($response, 'slack');
+}
+
+/**
+ * Extrait le code de réponse HTTP en préservant la compatibilité.
+ */
+function a11ytb_get_http_response_code($response): int
+{
+    if (function_exists('wp_remote_retrieve_response_code')) {
+        return (int) wp_remote_retrieve_response_code($response);
+    }
+
+    if (is_array($response) && isset($response['response']['code'])) {
+        return (int) $response['response']['code'];
+    }
+
+    return 0;
+}
+
+/**
+ * Extrait le corps de réponse HTTP.
+ */
+function a11ytb_get_http_response_body($response): string
+{
+    if (function_exists('wp_remote_retrieve_body')) {
+        $body = wp_remote_retrieve_body($response);
+        if (is_string($body)) {
+            return $body;
+        }
+    }
+
+    if (is_array($response) && isset($response['body'])) {
+        return (string) $response['body'];
+    }
+
+    return '';
+}
+
+/**
+ * Valide une réponse HTTP et retourne WP_Error en cas d’échec.
+ */
+function a11ytb_validate_http_response($response, string $connector_id)
+{
+    if (is_wp_error($response)) {
+        return new WP_Error('a11ytb_http_error', $response->get_error_message(), ['connector' => $connector_id]);
+    }
+
+    $code = a11ytb_get_http_response_code($response);
+    if ($code < 200 || $code >= 300) {
+        $body = a11ytb_get_http_response_body($response);
+        $snippet = $body !== '' ? mb_substr($body, 0, 200) : '';
+        $message = $snippet !== '' ? sprintf('HTTP %1$d – %2$s', $code, $snippet) : sprintf('HTTP %d', $code);
+
+        return new WP_Error('a11ytb_http_error', $message, [
+            'connector' => $connector_id,
+            'status' => $code,
+        ]);
+    }
+
+    return true;
+}
+
+/**
+ * Traite la requête proxy et déclenche les connecteurs.
+ *
+ * @param array $payload
+ * @return array|WP_Error
+ */
+function a11ytb_process_activity_proxy_payload(array $payload)
+{
+    $job = a11ytb_normalize_activity_job($payload['job'] ?? null);
+    if (is_wp_error($job)) {
+        return $job;
+    }
+
+    $context = a11ytb_normalize_activity_context($payload['context'] ?? []);
+
+    $settings = a11ytb_get_activity_connector_settings();
+    $connectors = a11ytb_prepare_activity_connectors($settings);
+
+    $active = array_filter($connectors, static function ($connector) {
+        return $connector['meta']['enabled'] && is_callable($connector['dispatch']);
+    });
+
+    if (!$active) {
+        return new WP_Error('a11ytb_no_connectors', __('Aucun connecteur de synchronisation configuré.', 'a11ytb'), ['status' => 400]);
+    }
+
+    foreach ($active as $connector) {
+        $result = call_user_func($connector['dispatch'], $job, $context);
+        if (is_wp_error($result)) {
+            if (method_exists($result, 'add_data')) {
+                $result->add_data(['connector' => $connector['meta']['id']]);
+            }
+            return $result;
+        }
+    }
+
+    $metadata = array_map(static function ($connector) {
+        return $connector['meta'];
+    }, $connectors);
+
+    return [
+        'success' => true,
+        'jobType' => $job['type'],
+        'count' => $job['type'] === 'bulk' ? count($job['entries']) : 1,
+        'connectors' => $metadata,
+        'results' => array_map(static function ($connector) {
+            return [
+                'id' => $connector['meta']['id'],
+                'status' => 'success',
+            ];
+        }, $active),
+    ];
+}
+
+/**
+ * Callback REST API gérant GET/POST sur le proxy d’activité.
+ *
+ * @param WP_REST_Request|array $request
+ * @return WP_REST_Response|array|WP_Error
+ */
+function a11ytb_handle_activity_proxy_request($request)
+{
+    $method = 'GET';
+    if (is_object($request) && method_exists($request, 'get_method')) {
+        $method = strtoupper($request->get_method());
+    }
+
+    if ($method === 'GET') {
+        $metadata = array_map(static function ($connector) {
+            return $connector['meta'];
+        }, a11ytb_prepare_activity_connectors(a11ytb_get_activity_connector_settings()));
+
+        return rest_ensure_response([
+            'success' => true,
+            'connectors' => $metadata,
+        ]);
+    }
+
+    $params = [];
+    if (is_object($request)) {
+        if (method_exists($request, 'get_json_params')) {
+            $params = $request->get_json_params();
+        } elseif (method_exists($request, 'get_body')) {
+            $params = json_decode((string) $request->get_body(), true);
+        }
+    } elseif (is_array($request)) {
+        $params = $request;
+    }
+
+    if (!is_array($params)) {
+        $params = [];
+    }
+
+    $result = a11ytb_process_activity_proxy_payload($params);
+
+    if (is_wp_error($result)) {
+        return $result;
+    }
+
+    return rest_ensure_response($result);
+}
+
+/**
+ * Enregistre la route REST API dédiée au proxy d’activité.
+ */
+function a11ytb_register_activity_proxy_route(): void
+{
+    $readable = defined('WP_REST_Server::READABLE') ? WP_REST_Server::READABLE : 'GET';
+    $creatable = defined('WP_REST_Server::CREATABLE') ? WP_REST_Server::CREATABLE : 'POST';
+
+    register_rest_route(
+        'a11ytb/v1',
+        '/activity/sync',
+        [
+            [
+                'methods' => $readable,
+                'callback' => 'a11ytb_handle_activity_proxy_request',
+                'permission_callback' => '__return_true',
+            ],
+            [
+                'methods' => $creatable,
+                'callback' => 'a11ytb_handle_activity_proxy_request',
+                'permission_callback' => '__return_true',
+            ],
+        ]
+    );
+}
+add_action('rest_api_init', 'a11ytb_register_activity_proxy_route');
 
 /**
  * Ajoute le point de montage requis dans le footer.
