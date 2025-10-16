@@ -45,5 +45,3 @@ npm run test
 5. Si besoin, utilisez le filtre `a11ytb/is_enabled` dans votre thème pour conditionner le chargement (par exemple uniquement sur certaines pages).
 
 Une fois l’extension activée, un menu **A11y Toolbox Pro** apparaît dans l’administration WordPress. Vous y trouverez un guide rapide, les raccourcis clavier principaux ainsi qu’un aperçu interactif pour tester la barre latérale sans quitter l’admin.
-
-

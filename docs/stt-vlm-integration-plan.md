@@ -16,37 +16,40 @@ Ce plan couvre l'intégration rapide des moteurs de reconnaissance vocale et des
 
 ## 2. Vague 1 — APIs avec quota gratuit
 
-| Fournisseur | Avantages | Quota gratuit | Actions immédiates |
-|-------------|-----------|---------------|--------------------|
-| **OpenAI Whisper API** | Haute précision multilingue | Crédit d'essai (5$) | ✅ Client `openai-whisper` + CLI `npm run demo:stt`.
-| **Google Cloud Speech-to-Text v2** | Streaming + diarisation | 60 min/mois (90 jours) | Utiliser compte d'essai, configurer `GOOGLE_APPLICATION_CREDENTIALS` et wrapper REST (`speech:recognize`).
-| **Deepgram** | Bons SDK + webhooks | 200$ crédit d'accueil | Utiliser SDK JS officiel, test sur échantillon `pre-recorded`.
-| **AssemblyAI** | Fonctionnalités enrichies (résumé) | 3h gratuites | Appel REST `/v2/transcript`, suivre statut asynchrone.
-| **Azure Speech** | Multiplateforme, adaptation vocabulaire | 5h gratuites | SDK JS `@azure/cognitiveservices-speech-sdk`, implémenter transcription simple.
+| Fournisseur                        | Avantages                               | Quota gratuit          | Actions immédiates                                                                                         |
+| ---------------------------------- | --------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **OpenAI Whisper API**             | Haute précision multilingue             | Crédit d'essai (5$)    | ✅ Client `openai-whisper` + CLI `npm run demo:stt`.                                                       |
+| **Google Cloud Speech-to-Text v2** | Streaming + diarisation                 | 60 min/mois (90 jours) | Utiliser compte d'essai, configurer `GOOGLE_APPLICATION_CREDENTIALS` et wrapper REST (`speech:recognize`). |
+| **Deepgram**                       | Bons SDK + webhooks                     | 200$ crédit d'accueil  | Utiliser SDK JS officiel, test sur échantillon `pre-recorded`.                                             |
+| **AssemblyAI**                     | Fonctionnalités enrichies (résumé)      | 3h gratuites           | Appel REST `/v2/transcript`, suivre statut asynchrone.                                                     |
+| **Azure Speech**                   | Multiplateforme, adaptation vocabulaire | 5h gratuites           | SDK JS `@azure/cognitiveservices-speech-sdk`, implémenter transcription simple.                            |
 
 **Étapes d'intégration**
+
 1. Implémenter les clients un par un en respectant l'interface `SpeechEngine`.
 2. Ajouter un `script npm` (`npm run demo:stt -- --engine=openai --file=...`).
 3. Stocker les résultats JSON dans `reports/stt/YYYYMMDD/` pour comparaison rapide.
 
 ## 3. Vague 2 — Solutions locales sans Docker
 
-| Modèle | Méthode | Étapes |
-|--------|---------|--------|
-| **faster-whisper** | Python + bindings CTranslate2 | Ajouter script `python scripts/whisper_local.py --model=medium --input=...`.
-| **Vosk** | Packages Python précompilés | Script Node `vosk-transcribe.ts` via `vosk` npm (fonctionne CPU).
-| **NVIDIA NeMo Parakeet** | Installation pip (`nemo_toolkit[asr]`) | Lancer notebook/CLI `python scripts/parakeet.py`. GPU recommandé mais fonctionne en CPU pour petits tests.
+| Modèle                   | Méthode                                | Étapes                                                                                                     |
+| ------------------------ | -------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **faster-whisper**       | Python + bindings CTranslate2          | Ajouter script `python scripts/whisper_local.py --model=medium --input=...`.                               |
+| **Vosk**                 | Packages Python précompilés            | Script Node `vosk-transcribe.ts` via `vosk` npm (fonctionne CPU).                                          |
+| **NVIDIA NeMo Parakeet** | Installation pip (`nemo_toolkit[asr]`) | Lancer notebook/CLI `python scripts/parakeet.py`. GPU recommandé mais fonctionne en CPU pour petits tests. |
 
 Prévoir un README dédié dans `scripts/` expliquant l'installation (requirements, commandes).
 
 ## 4. Modèles Vision-Language (VLM)
 
 ### APIs avec quota gratuit
+
 - **OpenAI GPT-4o mini** : crédit d'essai, endpoint `responses`. Implémenter client `vision/openai-gpt4o.ts`.
 - **Google Gemini 1.5 Flash** : 15 requêtes/minute gratuites avec clé API, endpoint `gemini-pro-vision`. Créer client `vision/google-gemini.ts`.
 - **Anthropic Claude 3.5 Haiku (via API gratuite limitée)** : tester si quota disponible, fallback sur plan payant.
 
 ### Modèles locaux faciles
+
 - **Moondream** : dispo sur Hugging Face, poids < 1.8 Go. Installer via `pip install moondream`. Script `python scripts/moondream_qa.py`.
 - **LLaVA 1.5 HF Inference** : utiliser `transformers` + `AutoProcessor`.
 

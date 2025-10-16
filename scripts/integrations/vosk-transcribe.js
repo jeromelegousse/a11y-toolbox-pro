@@ -49,7 +49,7 @@ function parseWaveHeader(buffer) {
         audioFormat: buffer.readUInt16LE(chunkStart),
         channels: buffer.readUInt16LE(chunkStart + 2),
         sampleRate: buffer.readUInt32LE(chunkStart + 4),
-        bitsPerSample: buffer.readUInt16LE(chunkStart + 14)
+        bitsPerSample: buffer.readUInt16LE(chunkStart + 14),
       };
     } else if (chunkId === 'data') {
       data = buffer.slice(chunkStart, chunkStart + chunkSize);
@@ -73,7 +73,7 @@ function parseWaveHeader(buffer) {
   return {
     sampleRate: fmt.sampleRate,
     channels: fmt.channels,
-    buffer: data
+    buffer: data,
   };
 }
 
@@ -97,7 +97,7 @@ async function transcribe({ filePath, language }) {
       engine: 'vosk',
       file: filePath,
       text: mockText,
-      language
+      language,
     };
   }
 
@@ -105,7 +105,9 @@ async function transcribe({ filePath, language }) {
   const modelPath = process.env.VOSK_MODEL_PATH;
 
   if (!modelPath) {
-    throw new Error('Définissez la variable d\'environnement VOSK_MODEL_PATH vers le dossier du modèle.');
+    throw new Error(
+      "Définissez la variable d'environnement VOSK_MODEL_PATH vers le dossier du modèle."
+    );
   }
 
   const audioBuffer = readFileSync(filePath);
@@ -115,7 +117,9 @@ async function transcribe({ filePath, language }) {
   const KaldiRecognizer = vosk.KaldiRecognizer || vosk.Recognizer || vosk.KaldiRecognizer;
 
   if (!Model || !KaldiRecognizer) {
-    throw new Error('Le module vosk ne fournit pas les classes attendues (Model, KaldiRecognizer).');
+    throw new Error(
+      'Le module vosk ne fournit pas les classes attendues (Model, KaldiRecognizer).'
+    );
   }
 
   const model = new Model(modelPath);
@@ -140,7 +144,7 @@ async function transcribe({ filePath, language }) {
       file: filePath,
       text: '',
       language,
-      sampleRate
+      sampleRate,
     };
   }
 
@@ -157,7 +161,7 @@ async function transcribe({ filePath, language }) {
     text: payload.text || '',
     language,
     result: payload,
-    sampleRate
+    sampleRate,
   };
 }
 

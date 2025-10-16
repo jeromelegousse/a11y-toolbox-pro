@@ -50,14 +50,14 @@ export const deepgramEngine = {
         method: 'POST',
         headers: {
           Authorization: `Token ${apiKey}`,
-          'Content-Type': DEFAULT_MIME_TYPE
+          'Content-Type': DEFAULT_MIME_TYPE,
         },
         body: audioBuffer,
-        timeout: 45000
+        timeout: 45000,
       },
       {
         retries: 2,
-        retryDelayMs: 1000
+        retryDelayMs: 1000,
       }
     );
 
@@ -70,9 +70,9 @@ export const deepgramEngine = {
 
     return {
       text: transcript,
-      raw: payload
+      raw: payload,
     };
-  }
+  },
 };
 
 export default deepgramEngine;

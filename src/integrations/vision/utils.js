@@ -9,7 +9,7 @@ const MIME_TYPES = new Map([
   ['.webp', 'image/webp'],
   ['.bmp', 'image/bmp'],
   ['.heic', 'image/heic'],
-  ['.heif', 'image/heif']
+  ['.heif', 'image/heif'],
 ]);
 
 function guessMimeType(filePath) {
@@ -24,7 +24,7 @@ function guessMimeType(filePath) {
  */
 export async function loadImageAsBase64(filePath) {
   if (!filePath) {
-    throw new Error('Le chemin de l\'image est requis.');
+    throw new Error("Le chemin de l'image est requis.");
   }
 
   const absolutePath = resolve(filePath);
@@ -35,7 +35,7 @@ export async function loadImageAsBase64(filePath) {
     mimeType: guessMimeType(absolutePath),
     size: buffer.byteLength,
     filename: basename(absolutePath),
-    absolutePath
+    absolutePath,
   };
 }
 

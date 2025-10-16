@@ -29,7 +29,7 @@ function createTestState(initial = {}) {
     on(fn) {
       listeners.add(fn);
       return () => listeners.delete(fn);
-    }
+    },
   };
 }
 
@@ -49,7 +49,7 @@ function createDefaultState() {
       lastProfile: null,
       priorities: {},
       guides: { completedSteps: {} },
-      collections: { disabled: [] }
+      collections: { disabled: [] },
     },
     profiles: {},
     runtime: { modules: {} },
@@ -63,13 +63,13 @@ function createDefaultState() {
         states: {
           draft: { label: 'Brouillon', roles: ['owner'] },
           review: { label: 'Revue', roles: ['reviewer'] },
-          published: { label: 'Publication', roles: ['owner'] }
+          published: { label: 'Publication', roles: ['owner'] },
         },
-        transitions: []
+        transitions: [],
       },
       syncs: [],
-      exports: []
-    }
+      exports: [],
+    },
   };
 }
 
@@ -85,7 +85,7 @@ describe('intégrations activité', () => {
       fields: [],
       supportsBulk: true,
       enabled: true,
-      status: 'prêt'
+      status: 'prêt',
     },
     {
       id: 'jira',
@@ -94,7 +94,7 @@ describe('intégrations activité', () => {
       fields: [],
       supportsBulk: false,
       enabled: true,
-      status: 'prêt'
+      status: 'prêt',
     },
     {
       id: 'linear',
@@ -103,7 +103,7 @@ describe('intégrations activité', () => {
       fields: [],
       supportsBulk: false,
       enabled: true,
-      status: 'prêt'
+      status: 'prêt',
     },
     {
       id: 'slack',
@@ -112,8 +112,8 @@ describe('intégrations activité', () => {
       fields: [],
       supportsBulk: true,
       enabled: true,
-      status: 'prêt'
-    }
+      status: 'prêt',
+    },
   ];
 
   beforeEach(() => {
@@ -145,14 +145,23 @@ describe('intégrations activité', () => {
     fetchMock = vi.fn(async (url, options = {}) => {
       const method = (options?.method || 'GET').toUpperCase();
       if (url === proxyUrl && method === 'GET') {
-        return { ok: true, status: 200, json: async () => ({ success: true, connectors: serverConnectors }) };
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true, connectors: serverConnectors }),
+        };
       }
       if (url === proxyUrl && method === 'POST') {
         postPayloads.push(JSON.parse(options.body));
         return {
           ok: true,
           status: 200,
-          json: async () => ({ success: true, connectors: serverConnectors, jobType: 'single', count: 1 })
+          json: async () => ({
+            success: true,
+            connectors: serverConnectors,
+            jobType: 'single',
+            count: 1,
+          }),
         };
       }
       throw new Error(`unexpected url ${url} ${method}`);
@@ -168,10 +177,10 @@ describe('intégrations activité', () => {
             enabled: true,
             webhookUrl: 'https://example.test/hook',
             hasAuthToken: true,
-            proxyUrl
-          }
-        }
-      }
+            proxyUrl,
+          },
+        },
+      },
     });
 
     window.a11ytb.logActivity('Essai proxy', { module: 'activity' });
@@ -198,32 +207,49 @@ describe('intégrations activité', () => {
   it('journalise les échecs et relance via le bouton manuel', async () => {
     const responses = [
       () => Promise.reject(new Error('network down')),
-      () => Promise.resolve({
-        ok: true,
-        status: 200,
-        json: async () => ({ success: true, connectors: serverConnectors, jobType: 'single', count: 1 })
-      }),
-      () => Promise.resolve({
-        ok: true,
-        status: 200,
-        json: async () => ({ success: true, connectors: serverConnectors, jobType: 'bulk', count: 2 })
-      })
+      () =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            success: true,
+            connectors: serverConnectors,
+            jobType: 'single',
+            count: 1,
+          }),
+        }),
+      () =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            success: true,
+            connectors: serverConnectors,
+            jobType: 'bulk',
+            count: 2,
+          }),
+        }),
     ];
     const postPayloads = [];
 
     fetchMock = vi.fn((url, options = {}) => {
       const method = (options?.method || 'GET').toUpperCase();
       if (url === proxyUrl && method === 'GET') {
-        return Promise.resolve({ ok: true, status: 200, json: async () => ({ success: true, connectors: serverConnectors }) });
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true, connectors: serverConnectors }),
+        });
       }
       if (url === proxyUrl && method === 'POST') {
         postPayloads.push(JSON.parse(options.body));
         const factory = responses.shift();
-        const fallback = () => Promise.resolve({
-          ok: true,
-          status: 200,
-          json: async () => ({ success: true, connectors: serverConnectors })
-        });
+        const fallback = () =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ success: true, connectors: serverConnectors }),
+          });
         return (factory || fallback)();
       }
       throw new Error(`unexpected url ${url} ${method}`);
@@ -243,10 +269,10 @@ describe('intégrations activité', () => {
             enabled: true,
             webhookUrl: 'https://example.test/hook',
             hasAuthToken: true,
-            proxyUrl
-          }
-        }
-      }
+            proxyUrl,
+          },
+        },
+      },
     });
 
     window.a11ytb.logActivity('Première entrée', { module: 'activity' });
@@ -257,7 +283,9 @@ describe('intégrations activité', () => {
 
     await vi.waitFor(() => {
       const entries = state.get('ui.activity');
-      expect(entries.some((entry) => entry.message.includes('Échec d’envoi de la synchronisation'))).toBe(true);
+      expect(
+        entries.some((entry) => entry.message.includes('Échec d’envoi de la synchronisation'))
+      ).toBe(true);
       const syncs = state.get('collaboration.syncs');
       expect(syncs.some((entry) => entry.status === 'error')).toBe(true);
     });

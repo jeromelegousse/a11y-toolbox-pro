@@ -10,25 +10,28 @@ export const manifest = {
   license: 'MIT',
   authors: [
     { name: 'Équipe Accessibilité', email: 'accessibilite@a11ytoolbox.test' },
-    { name: 'Nora Belaïd', email: 'n.belaid@a11ytoolbox.test' }
+    { name: 'Nora Belaïd', email: 'n.belaid@a11ytoolbox.test' },
   ],
   guides: [
     {
       id: 'tts-onboarding',
       title: 'Lecture vocale opérationnelle',
-      description: 'Activez la synthèse vocale, vérifiez les voix disponibles et testez la lecture.',
+      description:
+        'Activez la synthèse vocale, vérifiez les voix disponibles et testez la lecture.',
       category: 'services',
       order: 30,
       prerequisites: [{ type: 'module', id: 'tts' }],
       assistance: {
-        microcopy: 'Proposez un test de lecture lors de l’onboarding et ajustez vitesse/timbre selon le profil utilisateur.',
+        microcopy:
+          'Proposez un test de lecture lors de l’onboarding et ajustez vitesse/timbre selon le profil utilisateur.',
         examples: [
           {
             id: 'tts-onboarding-example-1',
             title: 'Astuce',
-            description: 'Conservez une voix de secours (navigateur) si la voix personnalisée disparaît après une mise à jour.'
-          }
-        ]
+            description:
+              'Conservez une voix de secours (navigateur) si la voix personnalisée disparaît après une mise à jour.',
+          },
+        ],
       },
       steps: [
         {
@@ -38,12 +41,15 @@ export const manifest = {
           detail: ({ moduleName, runtime }) => {
             const name = moduleName || 'Synthèse vocale';
             if (!runtime?.enabled) return `${name} est désactivée dans la vue Organisation.`;
-            if (runtime?.state === 'error') return runtime?.error ? `Erreur signalée : ${runtime.error}` : `${name} est en erreur.`;
+            if (runtime?.state === 'error')
+              return runtime?.error
+                ? `Erreur signalée : ${runtime.error}`
+                : `${name} est en erreur.`;
             if (runtime?.state === 'loading') return `${name} se charge…`;
             if (runtime?.state === 'ready') return `${name} est prête.`;
             return `${name} est en attente d’activation.`;
           },
-          check: ({ runtime }) => !!runtime?.enabled && runtime.state === 'ready'
+          check: ({ runtime }) => !!runtime?.enabled && runtime.state === 'ready',
         },
         {
           id: 'tts-voices',
@@ -59,7 +65,7 @@ export const manifest = {
             }
             return `${voices.length} voix détectées. Sélectionnez la plus claire pour l’utilisateur.`;
           },
-          check: ({ snapshot }) => (snapshot?.tts?.availableVoices ?? []).length > 0
+          check: ({ snapshot }) => (snapshot?.tts?.availableVoices ?? []).length > 0,
         },
         {
           id: 'tts-default-voice',
@@ -81,27 +87,28 @@ export const manifest = {
             const selected = snapshot?.tts?.voice;
             if (!voices.length) return false;
             return !!selected;
-          }
+          },
         },
         {
           id: 'tts-test',
           label: 'Tester la lecture d’un extrait',
           mode: 'manual',
-          detail: 'Lancez la lecture d’un paragraphe représentatif et vérifiez le confort d’écoute.',
+          detail:
+            'Lancez la lecture d’un paragraphe représentatif et vérifiez le confort d’écoute.',
           toggleLabels: {
             complete: 'Test effectué',
-            reset: 'Tester à nouveau'
-          }
-        }
-      ]
-    }
+            reset: 'Tester à nouveau',
+          },
+        },
+      ],
+    },
   ],
   runtime: {
-    preload: 'idle'
+    preload: 'idle',
   },
   permissions: ['speechSynthesis'],
   compat: {
-    browsers: ['chrome >= 100', 'edge >= 100', 'safari >= 16']
+    browsers: ['chrome >= 100', 'edge >= 100', 'safari >= 16'],
   },
   defaults: {
     state: {
@@ -114,9 +121,9 @@ export const manifest = {
         availableVoices: [],
         speaking: false,
         status: 'idle',
-        progress: 0
-      }
-    }
+        progress: 0,
+      },
+    },
   },
   config: {
     group: 'Synthèse vocale',
@@ -180,7 +187,7 @@ export const manifest = {
           const lang = value ? value : 'détection automatique';
           window.a11ytb?.logActivity?.(`Langue préférée TTS réglée sur ${lang}`, {
             tone: 'info',
-            tags: ['tts', 'preferences']
+            tags: ['tts', 'preferences'],
           });
           if (!value) return;
           const voices = state.tts?.availableVoices ?? [];
@@ -189,10 +196,10 @@ export const manifest = {
           if (match) {
             window.a11ytb?.logActivity?.(`Voix alignée sur ${match.name} (${match.lang})`, {
               tone: 'confirm',
-              tags: ['tts', 'preferences']
+              tags: ['tts', 'preferences'],
             });
           }
-        }
+        },
       },
       {
         type: 'select',
@@ -204,7 +211,7 @@ export const manifest = {
           const voices = state.tts?.availableVoices ?? [];
           return voices.map((voice) => ({
             value: voice.voiceURI,
-            label: `${voice.name} — ${voice.lang}${voice.default ? ' · Navigateur' : ''}`
+            label: `${voice.name} — ${voice.lang}${voice.default ? ' · Navigateur' : ''}`,
           }));
         },
         onChange: (value, { state }) => {
@@ -212,7 +219,7 @@ export const manifest = {
           const selected = voices.find((voice) => voice.voiceURI === value);
           const label = selected ? `${selected.name} (${selected.lang})` : 'Voix navigateur';
           window.a11ytb?.logActivity?.(`Voix TTS sélectionnée : ${label}`);
-        }
+        },
       },
       {
         type: 'range',
@@ -224,7 +231,7 @@ export const manifest = {
         format: (value) => `${value.toFixed(1)}×`,
         onChange: (value) => {
           window.a11ytb?.logActivity?.(`Vitesse TTS réglée à ${value.toFixed(1)}×`);
-        }
+        },
       },
       {
         type: 'range',
@@ -236,7 +243,7 @@ export const manifest = {
         format: (value) => value.toFixed(1),
         onChange: (value) => {
           window.a11ytb?.logActivity?.(`Timbre TTS réglé à ${value.toFixed(1)}`);
-        }
+        },
       },
       {
         type: 'range',
@@ -248,10 +255,10 @@ export const manifest = {
         format: (value) => `${Math.round(value * 100)} %`,
         onChange: (value) => {
           window.a11ytb?.logActivity?.(`Volume TTS réglé à ${Math.round(value * 100)} %`);
-        }
-      }
-    ]
-  }
+        },
+      },
+    ],
+  },
 };
 
 export default manifest;

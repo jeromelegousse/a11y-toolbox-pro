@@ -19,7 +19,7 @@ const KNOWN_FIELDS = new Set([
   'config',
   'compat',
   'runtime',
-  'guides'
+  'guides',
 ]);
 
 const KNOWN_PRELOAD_STRATEGIES = new Set(['idle', 'visible', 'pointer']);
@@ -29,7 +29,7 @@ const QUALITY_LEVEL_LABELS = Object.freeze({
   AA: 'Avancé',
   A: 'Solide',
   B: 'À renforcer',
-  C: 'Critique'
+  C: 'Critique',
 });
 
 const QUALITY_CHECKS = Object.freeze([
@@ -39,7 +39,7 @@ const QUALITY_CHECKS = Object.freeze([
     dimension: 'documentation',
     weight: 0.75,
     hint: 'Définissez `manifest.name` pour identifier clairement le module dans le catalogue.',
-    evaluate: (manifest) => typeof manifest.name === 'string' && manifest.name.trim().length > 0
+    evaluate: (manifest) => typeof manifest.name === 'string' && manifest.name.trim().length > 0,
   },
   {
     id: 'description',
@@ -50,7 +50,7 @@ const QUALITY_CHECKS = Object.freeze([
     evaluate: (manifest) => {
       if (typeof manifest.description !== 'string') return false;
       return manifest.description.trim().length >= 40;
-    }
+    },
   },
   {
     id: 'category',
@@ -58,7 +58,8 @@ const QUALITY_CHECKS = Object.freeze([
     dimension: 'catalogue',
     weight: 0.5,
     hint: 'Renseignez `category` pour faciliter le tri par thématique.',
-    evaluate: (manifest) => typeof manifest.category === 'string' && manifest.category.trim().length > 0
+    evaluate: (manifest) =>
+      typeof manifest.category === 'string' && manifest.category.trim().length > 0,
   },
   {
     id: 'keywords',
@@ -66,7 +67,7 @@ const QUALITY_CHECKS = Object.freeze([
     dimension: 'catalogue',
     weight: 0.5,
     hint: 'Ajoutez au moins deux `keywords` pour rejoindre l’expérience de filtrage proposée par Stark.',
-    evaluate: (manifest) => Array.isArray(manifest.keywords) && manifest.keywords.length >= 2
+    evaluate: (manifest) => Array.isArray(manifest.keywords) && manifest.keywords.length >= 2,
   },
   {
     id: 'config',
@@ -74,7 +75,8 @@ const QUALITY_CHECKS = Object.freeze([
     dimension: 'expérience',
     weight: 1,
     hint: 'Exposez les réglages clés via `config.fields` afin de rester cohérent avec la console Options & Profils.',
-    evaluate: (manifest) => Array.isArray(manifest.config?.fields) && manifest.config.fields.length > 0
+    evaluate: (manifest) =>
+      Array.isArray(manifest.config?.fields) && manifest.config.fields.length > 0,
   },
   {
     id: 'defaults',
@@ -85,7 +87,7 @@ const QUALITY_CHECKS = Object.freeze([
     evaluate: (manifest) => {
       const state = manifest.defaults?.state;
       return !!state && Object.keys(state).length > 0;
-    }
+    },
   },
   {
     id: 'compat',
@@ -99,7 +101,7 @@ const QUALITY_CHECKS = Object.freeze([
       const hasFeatures = Array.isArray(compat.features) && compat.features.length > 0;
       const hasBrowsers = Array.isArray(compat.browsers) && compat.browsers.length > 0;
       return hasFeatures || hasBrowsers;
-    }
+    },
   },
   {
     id: 'permissions',
@@ -107,7 +109,7 @@ const QUALITY_CHECKS = Object.freeze([
     dimension: 'fiabilité',
     weight: 0.75,
     hint: 'Listez les APIs critiques dans `permissions` pour sécuriser les audits et anticiper les échecs.',
-    evaluate: (manifest) => Array.isArray(manifest.permissions) && manifest.permissions.length > 0
+    evaluate: (manifest) => Array.isArray(manifest.permissions) && manifest.permissions.length > 0,
   },
   {
     id: 'guides',
@@ -115,7 +117,7 @@ const QUALITY_CHECKS = Object.freeze([
     dimension: 'guidage',
     weight: 1.5,
     hint: 'Déclarez des `guides` avec étapes pour rivaliser avec les parcours FastPass d’Accessibility Insights.',
-    evaluate: (manifest) => Array.isArray(manifest.guides) && manifest.guides.length > 0
+    evaluate: (manifest) => Array.isArray(manifest.guides) && manifest.guides.length > 0,
   },
   {
     id: 'authors',
@@ -123,7 +125,7 @@ const QUALITY_CHECKS = Object.freeze([
     dimension: 'gouvernance',
     weight: 0.5,
     hint: 'Ajoutez au moins un `author` pour tracer la responsabilité du module.',
-    evaluate: (manifest) => Array.isArray(manifest.authors) && manifest.authors.length > 0
+    evaluate: (manifest) => Array.isArray(manifest.authors) && manifest.authors.length > 0,
   },
   {
     id: 'license',
@@ -131,8 +133,9 @@ const QUALITY_CHECKS = Object.freeze([
     dimension: 'gouvernance',
     weight: 0.25,
     hint: 'Déclarez la `license` pour harmoniser la gouvernance avec les plateformes concurrentes.',
-    evaluate: (manifest) => typeof manifest.license === 'string' && manifest.license.trim().length > 0
-  }
+    evaluate: (manifest) =>
+      typeof manifest.license === 'string' && manifest.license.trim().length > 0,
+  },
 ]);
 
 function formatList(items = []) {
@@ -159,12 +162,15 @@ export function assessManifestQuality(manifest = {}) {
       dimension: check.dimension,
       passed,
       weight: check.weight,
-      hint: check.hint
+      hint: check.hint,
     });
   });
 
   const totalWeight = evaluations.reduce((acc, entry) => acc + entry.weight, 0);
-  const earnedWeight = evaluations.reduce((acc, entry) => acc + (entry.passed ? entry.weight : 0), 0);
+  const earnedWeight = evaluations.reduce(
+    (acc, entry) => acc + (entry.passed ? entry.weight : 0),
+    0
+  );
   const coverage = totalWeight > 0 ? Math.max(0, Math.min(1, earnedWeight / totalWeight)) : 1;
   const coveragePercent = Math.round(coverage * 100);
 
@@ -199,16 +205,14 @@ export function assessManifestQuality(manifest = {}) {
     detail,
     missing: Object.freeze(missing),
     recommendations: Object.freeze(limitedRecommendations),
-    checks: Object.freeze(evaluations)
+    checks: Object.freeze(evaluations),
   });
 }
 
 function ensureArray(value, mapFn = (x) => x) {
   if (value === undefined) return undefined;
   const arr = Array.isArray(value) ? value : [value];
-  return arr
-    .map(mapFn)
-    .filter((entry) => entry !== undefined && entry !== null);
+  return arr.map(mapFn).filter((entry) => entry !== undefined && entry !== null);
 }
 
 function normalizeGuides(guides, manifestId) {
@@ -318,35 +322,46 @@ function normalizeWorkflow(workflow) {
         id = typeof entry.id === 'string' ? entry.id.trim() : '';
         label = typeof entry.label === 'string' ? entry.label.trim() : '';
         description = typeof entry.description === 'string' ? entry.description.trim() : '';
-        roles = ensureArray(entry.roles, (role) => (typeof role === 'string' ? role.trim() : undefined)).filter(Boolean);
+        roles = ensureArray(entry.roles, (role) =>
+          typeof role === 'string' ? role.trim() : undefined
+        ).filter(Boolean);
       }
       if (!id) {
         console.warn('a11ytb: état de workflow ignoré car sans identifiant.', entry);
         return;
       }
-      states.push(Object.freeze({
-        id,
-        label: label || id,
-        description: description || undefined,
-        roles: roles.length ? Object.freeze(roles) : undefined
-      }));
+      states.push(
+        Object.freeze({
+          id,
+          label: label || id,
+          description: description || undefined,
+          roles: roles.length ? Object.freeze(roles) : undefined,
+        })
+      );
     });
   } else if (workflow.states && typeof workflow.states === 'object') {
     Object.entries(workflow.states).forEach(([key, value]) => {
       if (!key) return;
-      const label = typeof value === 'string' ? value.trim() : (value?.label ? String(value.label).trim() : key);
-      const description = value && typeof value === 'object' && typeof value.description === 'string'
-        ? value.description.trim()
-        : '';
-      const roles = value && typeof value === 'object'
-        ? ensureArray(value.roles, (role) => (typeof role === 'string' ? role.trim() : undefined)).filter(Boolean)
-        : [];
-      states.push(Object.freeze({
-        id: key.trim(),
-        label: label || key.trim(),
-        description: description || undefined,
-        roles: roles.length ? Object.freeze(roles) : undefined
-      }));
+      const label =
+        typeof value === 'string' ? value.trim() : value?.label ? String(value.label).trim() : key;
+      const description =
+        value && typeof value === 'object' && typeof value.description === 'string'
+          ? value.description.trim()
+          : '';
+      const roles =
+        value && typeof value === 'object'
+          ? ensureArray(value.roles, (role) =>
+              typeof role === 'string' ? role.trim() : undefined
+            ).filter(Boolean)
+          : [];
+      states.push(
+        Object.freeze({
+          id: key.trim(),
+          label: label || key.trim(),
+          description: description || undefined,
+          roles: roles.length ? Object.freeze(roles) : undefined,
+        })
+      );
     });
   }
 
@@ -362,26 +377,27 @@ function normalizeWorkflow(workflow) {
     if (!from || !to) return undefined;
     const id = typeof transition.id === 'string' ? transition.id.trim() : '';
     const label = typeof transition.label === 'string' ? transition.label.trim() : '';
-    const roles = ensureArray(transition.roles, (role) => (typeof role === 'string' ? role.trim() : undefined)).filter(Boolean);
+    const roles = ensureArray(transition.roles, (role) =>
+      typeof role === 'string' ? role.trim() : undefined
+    ).filter(Boolean);
     return Object.freeze({
       id: id || undefined,
       from,
       to,
       label: label || undefined,
-      roles: roles.length ? Object.freeze(roles) : undefined
+      roles: roles.length ? Object.freeze(roles) : undefined,
     });
   }).filter(Boolean);
 
-  const defaultState = typeof workflow.defaultState === 'string'
-    ? workflow.defaultState.trim()
-    : states[0].id;
+  const defaultState =
+    typeof workflow.defaultState === 'string' ? workflow.defaultState.trim() : states[0].id;
   const normalizedDefault = states.some((state) => state.id === defaultState)
     ? defaultState
     : states[0].id;
 
   const normalized = {
     defaultState: normalizedDefault,
-    states: Object.freeze(states)
+    states: Object.freeze(states),
   };
   if (transitions.length) {
     normalized.transitions = Object.freeze(transitions);
@@ -398,7 +414,7 @@ function normalizeWorkflow(workflow) {
 
   return {
     definition: Object.freeze(normalized),
-    permissions: Array.from(derivedPermissions)
+    permissions: Array.from(derivedPermissions),
   };
 }
 
@@ -462,7 +478,9 @@ function normalizeConfig(config, manifestId) {
     const type = typeof field.type === 'string' ? field.type.trim() : '';
     const path = typeof field.path === 'string' ? field.path.trim() : '';
     if (!type || !path) {
-      console.warn(`a11ytb: champ de configuration invalide pour "${manifestId}" (index ${index}).`);
+      console.warn(
+        `a11ytb: champ de configuration invalide pour "${manifestId}" (index ${index}).`
+      );
       return;
     }
 
@@ -543,7 +561,9 @@ function normalizeConfig(config, manifestId) {
         break;
       }
       default: {
-        console.warn(`a11ytb: type de champ de configuration inconnu "${type}" pour "${manifestId}".`);
+        console.warn(
+          `a11ytb: type de champ de configuration inconnu "${type}" pour "${manifestId}".`
+        );
         return;
       }
     }
@@ -563,19 +583,26 @@ export function validateModuleManifest(manifest, moduleId) {
 
   const unknownKeys = Object.keys(manifest).filter((key) => !KNOWN_FIELDS.has(key));
   if (unknownKeys.length) {
-    console.warn(`a11ytb: champs manifest non reconnus pour "${moduleId ?? manifest.id}": ${unknownKeys.join(', ')}`);
+    console.warn(
+      `a11ytb: champs manifest non reconnus pour "${moduleId ?? manifest.id}": ${unknownKeys.join(', ')}`
+    );
   }
 
   const normalized = {};
-  const id = typeof manifest.id === 'string' && manifest.id.trim()
-    ? manifest.id.trim()
-    : (typeof moduleId === 'string' && moduleId.trim() ? moduleId.trim() : null);
+  const id =
+    typeof manifest.id === 'string' && manifest.id.trim()
+      ? manifest.id.trim()
+      : typeof moduleId === 'string' && moduleId.trim()
+        ? moduleId.trim()
+        : null;
 
   if (!id) {
     throw new Error('Module manifest requires an "id".');
   }
   if (moduleId && id !== moduleId) {
-    throw new Error(`Module manifest id "${id}" does not match module definition id "${moduleId}".`);
+    throw new Error(
+      `Module manifest id "${id}" does not match module definition id "${moduleId}".`
+    );
   }
 
   normalized.id = id;

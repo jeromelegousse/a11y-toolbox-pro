@@ -30,26 +30,26 @@ export const moondreamVisionEngine = {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
-          Accept: 'application/json'
+          Accept: 'application/json',
         },
         body: JSON.stringify({
           model: DEFAULT_MODEL,
           messages: [
             {
               role: 'user',
-              content: preparedPrompt
-            }
+              content: preparedPrompt,
+            },
           ],
           image: {
             mime_type: mimeType,
-            data
-          }
+            data,
+          },
         }),
-        timeout: 30000
+        timeout: 30000,
       },
       {
         retries: 1,
-        retryDelayMs: 1000
+        retryDelayMs: 1000,
       }
     );
 
@@ -62,9 +62,9 @@ export const moondreamVisionEngine = {
 
     return {
       text,
-      raw: payload
+      raw: payload,
     };
-  }
+  },
 };
 
 export default moondreamVisionEngine;

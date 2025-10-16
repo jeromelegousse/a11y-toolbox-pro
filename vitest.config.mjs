@@ -4,6 +4,6 @@ export default defineConfig({
   test: {
     exclude: [...configDefaults.exclude, 'tests/visual/**'],
     environment: 'jsdom',
-    setupFiles: ['tests/setup/vitest-polyfills.js']
-  }
+    setupFiles: ['tests/setup/vitest-polyfills.js'],
+  },
 });

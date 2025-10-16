@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { JSDOM } from 'jsdom';
-import { summarizeDependencyLiveMessage, updateDependencyDisplay } from '../src/utils/dependency-display.js';
+import {
+  summarizeDependencyLiveMessage,
+  updateDependencyDisplay,
+} from '../src/utils/dependency-display.js';
 
 describe('dependency display helpers', () => {
   const createView = () => {
@@ -35,7 +38,7 @@ describe('dependency display helpers', () => {
         status: 'ok',
         statusLabel: 'OK',
         message: 'Module disponible.',
-        aria: 'Dépendance Synthèse vocale disponible.'
+        aria: 'Dépendance Synthèse vocale disponible.',
       },
       {
         id: 'stt',
@@ -43,8 +46,8 @@ describe('dependency display helpers', () => {
         status: 'incompatible',
         statusLabel: 'Version incompatible',
         message: 'Version détectée 0.5.0 (minimum 1.0.0).',
-        aria: 'Dépendance Reconnaissance vocale incompatible.'
-      }
+        aria: 'Dépendance Reconnaissance vocale incompatible.',
+      },
     ];
 
     const { summary: summaryText, live: liveText } = updateDependencyDisplay(
@@ -55,7 +58,9 @@ describe('dependency display helpers', () => {
 
     expect(list.children.length).toBe(2);
     const second = list.children[1];
-    expect(second.querySelector('.a11ytb-admin-dependency-badge').textContent).toContain('Version incompatible');
+    expect(second.querySelector('.a11ytb-admin-dependency-badge').textContent).toContain(
+      'Version incompatible'
+    );
     expect(summaryText).toContain('Version détectée 0.5.0');
     expect(liveText).toContain('Reconnaissance vocale');
   });
@@ -63,7 +68,7 @@ describe('dependency display helpers', () => {
   it('synthétise correctement les messages live pour plusieurs conflits', () => {
     const dependencies = [
       { id: 'a', status: 'missing', aria: 'Dépendance A manquante.' },
-      { id: 'b', status: 'incompatible', aria: 'Dépendance B incompatible.' }
+      { id: 'b', status: 'incompatible', aria: 'Dépendance B incompatible.' },
     ];
     const message = summarizeDependencyLiveMessage(dependencies, 'Module Démo');
     expect(message).toContain('Module Démo');

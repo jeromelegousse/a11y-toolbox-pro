@@ -27,13 +27,21 @@ export const azureSpeechEngine = {
   /**
    * @param {{ filePath: string, language?: string, channels?: number, diarize?: boolean, region?: string }} options
    */
-  async transcribe({ filePath, language = DEFAULT_LANGUAGE, channels, diarize, region: regionOverride } = {}) {
+  async transcribe({
+    filePath,
+    language = DEFAULT_LANGUAGE,
+    channels,
+    diarize,
+    region: regionOverride,
+  } = {}) {
     const absolutePath = ensureFilePath(filePath);
     const apiKey = requireEnv('AZURE_SPEECH_KEY');
     const region = regionOverride ?? requireEnv('AZURE_SPEECH_REGION');
     const audioBuffer = await readAudio(absolutePath);
 
-    const url = new URL(`https://${region}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1`);
+    const url = new URL(
+      `https://${region}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1`
+    );
     url.searchParams.set('language', language);
     url.searchParams.set('format', DEFAULT_FORMAT);
     if (typeof channels === 'number') {
@@ -49,14 +57,14 @@ export const azureSpeechEngine = {
         method: 'POST',
         headers: {
           'Ocp-Apim-Subscription-Key': apiKey,
-          'Content-Type': DEFAULT_MIME_TYPE
+          'Content-Type': DEFAULT_MIME_TYPE,
         },
         body: audioBuffer,
-        timeout: 45000
+        timeout: 45000,
       },
       {
         retries: 1,
-        retryDelayMs: 1000
+        retryDelayMs: 1000,
       }
     );
 
@@ -69,9 +77,9 @@ export const azureSpeechEngine = {
 
     return {
       text: transcript,
-      raw: payload
+      raw: payload,
     };
-  }
+  },
 };
 
 export default azureSpeechEngine;

@@ -4,7 +4,7 @@ const BASE_EVENT_DEFAULTS = {
   alert: { enabled: true, sound: 'alert' },
   warning: { enabled: true, sound: 'warning' },
   success: { enabled: true, sound: 'success' },
-  info: { enabled: true, sound: 'toggle' }
+  info: { enabled: true, sound: 'toggle' },
 };
 
 export const DEFAULT_AUDIO_VOLUME = 1;
@@ -22,7 +22,7 @@ export function createDefaultAudioState() {
   return {
     volume: DEFAULT_AUDIO_VOLUME,
     theme: DEFAULT_AUDIO_THEME,
-    events: createDefaultAudioEvents()
+    events: createDefaultAudioEvents(),
   };
 }
 
@@ -32,11 +32,12 @@ export function normalizeAudioEvents(events) {
     const defaults = BASE_EVENT_DEFAULTS[severity] || { enabled: true, sound: 'confirm' };
     const source = events && typeof events === 'object' ? events[severity] : undefined;
     const enabled = typeof source?.enabled === 'boolean' ? source.enabled : defaults.enabled;
-    const sound = typeof source?.sound === 'string' && source.sound.trim()
-      ? source.sound.trim()
-      : (typeof source?.preset === 'string' && source.preset.trim()
-        ? source.preset.trim()
-        : defaults.sound);
+    const sound =
+      typeof source?.sound === 'string' && source.sound.trim()
+        ? source.sound.trim()
+        : typeof source?.preset === 'string' && source.preset.trim()
+          ? source.preset.trim()
+          : defaults.sound;
     normalized[severity] = { enabled, sound };
   });
   return normalized;
@@ -48,7 +49,7 @@ export const AUDIO_PRESET_OPTIONS = [
   { value: 'success', label: 'Succès' },
   { value: 'confirm', label: 'Confirmation' },
   { value: 'toggle', label: 'Bascule' },
-  { value: 'info', label: 'Information' }
+  { value: 'info', label: 'Information' },
 ];
 
 export function getAudioSeverityLabel(severity) {

@@ -6,28 +6,28 @@ const analyzeMock = vi.fn();
 
 vi.mock('../../scripts/integrations/env.js', () => ({
   loadEnvironment: loadEnvironmentMock,
-  requireEnv: vi.fn()
+  requireEnv: vi.fn(),
 }));
 
 vi.mock('../../src/integrations/vision/openai-gpt4o.js', () => ({
   openAiGpt4oEngine: {
     id: 'openai-gpt4o',
-    analyze: analyzeMock
-  }
+    analyze: analyzeMock,
+  },
 }));
 
 vi.mock('../../src/integrations/vision/google-gemini.js', () => ({
   googleGeminiVisionEngine: {
     id: 'google-gemini',
-    analyze: vi.fn()
-  }
+    analyze: vi.fn(),
+  },
 }));
 
 vi.mock('../../src/integrations/vision/moondream.js', () => ({
   moondreamVisionEngine: {
     id: 'moondream',
-    analyze: vi.fn()
-  }
+    analyze: vi.fn(),
+  },
 }));
 
 describe('demo-vlm CLI', () => {
@@ -78,7 +78,7 @@ describe('demo-vlm CLI', () => {
     expect(output).toMatchObject({
       engine: 'openai-gpt4o',
       prompt: 'Bonjour',
-      text: 'Analyse synthétique'
+      text: 'Analyse synthétique',
     });
   });
 });

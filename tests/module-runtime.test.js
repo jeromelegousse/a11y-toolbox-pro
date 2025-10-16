@@ -5,7 +5,7 @@ vi.mock('../src/registry.js', () => {
   let blocks = [
     { id: 'alpha-block', moduleId: 'alpha' },
     { id: 'beta-block', moduleId: 'beta' },
-    { id: 'gamma-block', moduleId: 'gamma' }
+    { id: 'gamma-block', moduleId: 'gamma' },
   ];
   let manifests = [];
   let manifestHistory = [];
@@ -28,7 +28,7 @@ vi.mock('../src/registry.js', () => {
     },
     __setMockManifestHistory(next) {
       manifestHistory = next;
-    }
+    },
   };
 });
 
@@ -37,7 +37,7 @@ import {
   __setMockModule,
   __resetMockModules,
   __setMockManifests,
-  __setMockManifestHistory
+  __setMockManifestHistory,
 } from '../src/registry.js';
 
 function createStateMock(initial = {}) {
@@ -46,7 +46,9 @@ function createStateMock(initial = {}) {
   return {
     get(path) {
       if (!path) return structuredClone(data);
-      return path.split('.').reduce((acc, key) => (acc && typeof acc === 'object' ? acc[key] : undefined), data);
+      return path
+        .split('.')
+        .reduce((acc, key) => (acc && typeof acc === 'object' ? acc[key] : undefined), data);
     },
     set(path, value) {
       if (!path) return;
@@ -66,7 +68,7 @@ function createStateMock(initial = {}) {
     on(fn) {
       listeners.add(fn);
       return () => listeners.delete(fn);
-    }
+    },
   };
 }
 
@@ -92,19 +94,19 @@ describe('setupModuleRuntime — dépendances', () => {
           id: 'alpha',
           name: 'Module Alpha',
           version: '1.0.0',
-          dependencies: [{ id: 'beta', version: '1.0.0' }]
+          dependencies: [{ id: 'beta', version: '1.0.0' }],
         },
-        loader: () => Promise.resolve()
+        loader: () => Promise.resolve(),
       },
       {
         id: 'beta',
         manifest: {
           id: 'beta',
           name: 'Module Beta',
-          version: '1.2.0'
+          version: '1.2.0',
         },
-        loader: () => Promise.resolve()
-      }
+        loader: () => Promise.resolve(),
+      },
     ];
 
     __setMockManifests(catalog.map((entry) => ({ ...entry.manifest })));
@@ -120,8 +122,8 @@ describe('setupModuleRuntime — dépendances', () => {
         status: 'ok',
         statusLabel: 'OK',
         currentVersion: '1.2.0',
-        requiredVersion: '1.0.0'
-      })
+        requiredVersion: '1.0.0',
+      }),
     ]);
     expect(window.a11ytb.logActivity).not.toHaveBeenCalled();
   });
@@ -137,22 +139,19 @@ describe('setupModuleRuntime — dépendances', () => {
           id: 'gamma',
           name: 'Module Gamma',
           version: '2.0.0',
-          dependencies: [
-            { id: 'delta' },
-            { id: 'beta', version: '2.5.0' }
-          ]
+          dependencies: [{ id: 'delta' }, { id: 'beta', version: '2.5.0' }],
         },
-        loader: () => Promise.resolve()
+        loader: () => Promise.resolve(),
       },
       {
         id: 'beta',
         manifest: {
           id: 'beta',
           name: 'Module Beta',
-          version: '1.4.0'
+          version: '1.4.0',
         },
-        loader: () => Promise.resolve()
-      }
+        loader: () => Promise.resolve(),
+      },
     ];
 
     __setMockManifests(catalog.map((entry) => ({ ...entry.manifest })));
@@ -161,7 +160,12 @@ describe('setupModuleRuntime — dépendances', () => {
     const gammaRuntime = state.get('runtime.modules.gamma');
     expect(gammaRuntime.dependencies).toEqual([
       expect.objectContaining({ id: 'delta', status: 'missing' }),
-      expect.objectContaining({ id: 'beta', status: 'incompatible', currentVersion: '1.4.0', requiredVersion: '2.5.0' })
+      expect.objectContaining({
+        id: 'beta',
+        status: 'incompatible',
+        currentVersion: '1.4.0',
+        requiredVersion: '2.5.0',
+      }),
     ]);
     expect(window.a11ytb.logActivity).toHaveBeenCalledWith(
       expect.stringContaining('manquante'),
@@ -176,7 +180,7 @@ describe('setupModuleRuntime — dépendances', () => {
   it('journalise un changement de version lorsque le manifeste évolue', () => {
     const state = createStateMock({
       ui: { disabled: [] },
-      runtime: { modules: { alpha: { manifestVersion: '0.9.0' } } }
+      runtime: { modules: { alpha: { manifestVersion: '0.9.0' } } },
     });
     window.a11ytb.logActivity = vi.fn();
 
@@ -186,10 +190,10 @@ describe('setupModuleRuntime — dépendances', () => {
         manifest: {
           id: 'alpha',
           name: 'Module Alpha',
-          version: '1.0.0'
+          version: '1.0.0',
         },
-        loader: () => Promise.resolve()
-      }
+        loader: () => Promise.resolve(),
+      },
     ];
 
     __setMockManifests(catalog.map((entry) => ({ ...entry.manifest })));

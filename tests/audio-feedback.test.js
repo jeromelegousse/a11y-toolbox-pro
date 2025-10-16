@@ -36,8 +36,8 @@ describe('setupAudioFeedback', () => {
       'audio.events.alert.sound': 'alert',
       'audio.events.warning.sound': 'warning',
       'audio.events.success.sound': 'confirm',
-      'audio.events.info.sound': 'toggle'
-    }
+      'audio.events.info.sound': 'toggle',
+    },
   };
 
   let originalWindow;
@@ -52,8 +52,8 @@ describe('setupAudioFeedback', () => {
     store = createStore(STORE_KEY, {
       audio: createDefaultAudioState(),
       profiles: {
-        raag: RAAG_PROFILE
-      }
+        raag: RAAG_PROFILE,
+      },
     });
     feedback = createFeedback();
     unsubscribe = setupAudioFeedback({ state: store, feedback });

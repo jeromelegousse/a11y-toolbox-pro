@@ -14,17 +14,9 @@ function delay(ms) {
  * @param {{ retries?: number, retryDelayMs?: number }} [retryOptions]
  */
 export async function fetchWithRetry(url, options = {}, retryOptions = {}) {
-  const {
-    timeout = DEFAULT_TIMEOUT_MS,
-    signal,
-    body,
-    ...restOptions
-  } = options;
+  const { timeout = DEFAULT_TIMEOUT_MS, signal, body, ...restOptions } = options;
 
-  const {
-    retries = DEFAULT_RETRIES,
-    retryDelayMs = 750
-  } = retryOptions;
+  const { retries = DEFAULT_RETRIES, retryDelayMs = 750 } = retryOptions;
 
   let attempt = 0;
   let lastError;
@@ -39,7 +31,7 @@ export async function fetchWithRetry(url, options = {}, retryOptions = {}) {
       const response = await fetch(url, {
         ...restOptions,
         body: typeof body === 'function' ? body() : body,
-        signal: signal ?? controller.signal
+        signal: signal ?? controller.signal,
       });
 
       clearTimeout(timeoutId);

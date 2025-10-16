@@ -1438,10 +1438,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     });
   }
 
-  let currentLocale = i18n.getLocale();
-
   i18n.onChange((nextLocale) => {
-    currentLocale = nextLocale;
     if (languageSelect && languageSelect.value !== nextLocale) {
       languageSelect.value = nextLocale;
     }

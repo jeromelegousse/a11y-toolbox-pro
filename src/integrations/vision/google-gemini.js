@@ -2,7 +2,8 @@ import { fetchWithRetry, parseJson } from '../http-client.js';
 import { requireEnv } from '../../../scripts/integrations/env.js';
 import { loadImageAsBase64 } from './utils.js';
 
-const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent';
+const GEMINI_ENDPOINT =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent';
 
 function ensurePrompt(prompt) {
   if (!prompt) {
@@ -15,9 +16,7 @@ function extractText(payload) {
   const candidates = payload?.candidates ?? [];
   for (const candidate of candidates) {
     const parts = candidate?.content?.parts ?? [];
-    const textParts = parts
-      .map((part) => part?.text)
-      .filter(Boolean);
+    const textParts = parts.map((part) => part?.text).filter(Boolean);
     if (textParts.length > 0) {
       return textParts.join('\n');
     }
@@ -38,24 +37,21 @@ export const googleGeminiVisionEngine = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Accept: 'application/json'
+          Accept: 'application/json',
         },
         body: JSON.stringify({
           contents: [
             {
               role: 'user',
-              parts: [
-                { text: preparedPrompt },
-                { inlineData: { mimeType, data } }
-              ]
-            }
-          ]
+              parts: [{ text: preparedPrompt }, { inlineData: { mimeType, data } }],
+            },
+          ],
         }),
-        timeout: 30000
+        timeout: 30000,
       },
       {
         retries: 1,
-        retryDelayMs: 1000
+        retryDelayMs: 1000,
       }
     );
 
@@ -68,9 +64,9 @@ export const googleGeminiVisionEngine = {
 
     return {
       text,
-      raw: payload
+      raw: payload,
     };
-  }
+  },
 };
 
 export default googleGeminiVisionEngine;

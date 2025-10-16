@@ -9,11 +9,13 @@ import { moondreamVisionEngine } from '../../src/integrations/vision/moondream.j
 const ENGINES = new Map([
   [openAiGpt4oEngine.id, openAiGpt4oEngine],
   [googleGeminiVisionEngine.id, googleGeminiVisionEngine],
-  [moondreamVisionEngine.id, moondreamVisionEngine]
+  [moondreamVisionEngine.id, moondreamVisionEngine],
 ]);
 
 function printUsage() {
-  console.log('Usage : npm run demo:vlm -- --image=./capture.png --prompt="Décrire la scène" [--engine=openai-gpt4o]');
+  console.log(
+    'Usage : npm run demo:vlm -- --image=./capture.png --prompt="Décrire la scène" [--engine=openai-gpt4o]'
+  );
 }
 
 function parseArgs(rawArgs) {
@@ -57,15 +59,21 @@ async function main() {
 
   const result = await engine.analyze({
     imagePath: absoluteImage,
-    prompt: args.prompt
+    prompt: args.prompt,
   });
 
-  console.log(JSON.stringify({
-    engine: engine.id,
-    image: absoluteImage,
-    prompt: args.prompt,
-    text: result.text
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        engine: engine.id,
+        image: absoluteImage,
+        prompt: args.prompt,
+        text: result.text,
+      },
+      null,
+      2
+    )
+  );
 }
 
 main().catch((error) => {

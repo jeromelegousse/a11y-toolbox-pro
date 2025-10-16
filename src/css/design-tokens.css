@@ -21,7 +21,7 @@
   --a11ytb-color-border: #334155;
 
   /* Typographie & espacement */
-  --a11ytb-font-family-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --a11ytb-font-family-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --a11ytb-font-size-xs: 12px;
   --a11ytb-font-size-sm: 14px;
   --a11ytb-font-size-base: 16px;

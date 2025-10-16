@@ -86,7 +86,7 @@ const stt = {
           console.warn('a11ytb: impossible d’arrêter la reconnaissance vocale.', error);
           window.a11ytb?.logActivity?.('Échec de l’arrêt STT', { tone: 'alert' });
         }
-      }
+      },
     };
 
     if (!window.a11ytb) window.a11ytb = {};
@@ -101,7 +101,7 @@ const stt = {
   unmount() {
     teardownRecognition();
     store?.set('stt.status', 'idle');
-  }
+  },
 };
 
 registerModule(stt);

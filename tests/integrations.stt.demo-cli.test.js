@@ -7,36 +7,36 @@ const googleTranscribe = vi.fn(async () => ({ text: 'google' }));
 const azureTranscribe = vi.fn(async () => ({ text: 'azure' }));
 
 vi.mock('../src/integrations/stt/openai-whisper.js', () => ({
-  openAiWhisperEngine: { id: 'openai-whisper', transcribe: openAiTranscribe }
+  openAiWhisperEngine: { id: 'openai-whisper', transcribe: openAiTranscribe },
 }));
 
 vi.mock('../src/integrations/stt/deepgram.js', () => ({
-  deepgramEngine: { id: 'deepgram', transcribe: deepgramTranscribe }
+  deepgramEngine: { id: 'deepgram', transcribe: deepgramTranscribe },
 }));
 
 vi.mock('../src/integrations/stt/assemblyai.js', () => ({
-  assemblyAiEngine: { id: 'assemblyai', transcribe: assemblyTranscribe }
+  assemblyAiEngine: { id: 'assemblyai', transcribe: assemblyTranscribe },
 }));
 
 vi.mock('../src/integrations/stt/google-cloud.js', () => ({
-  googleCloudSttEngine: { id: 'google-cloud-stt', transcribe: googleTranscribe }
+  googleCloudSttEngine: { id: 'google-cloud-stt', transcribe: googleTranscribe },
 }));
 
 vi.mock('../src/integrations/stt/azure-speech.js', () => ({
-  azureSpeechEngine: { id: 'azure-speech', transcribe: azureTranscribe }
+  azureSpeechEngine: { id: 'azure-speech', transcribe: azureTranscribe },
 }));
 
 const loadEnvironmentMock = vi.fn();
 
 vi.mock('../scripts/integrations/env.js', () => ({
-  loadEnvironment: loadEnvironmentMock
+  loadEnvironment: loadEnvironmentMock,
 }));
 
 const existsSyncMock = vi.fn(() => true);
 
 vi.mock('node:fs', () => ({
   existsSync: existsSyncMock,
-  default: { existsSync: existsSyncMock }
+  default: { existsSync: existsSyncMock },
 }));
 
 beforeEach(() => {
@@ -64,7 +64,7 @@ describe('demo-stt CLI', () => {
       '--engine=deepgram',
       '--language=fr-FR',
       '--channels=2',
-      '--diarize=true'
+      '--diarize=true',
     ];
 
     await import('../scripts/integrations/demo-stt.js');

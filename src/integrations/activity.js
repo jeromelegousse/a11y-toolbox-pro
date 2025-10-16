@@ -24,7 +24,7 @@ function sanitizeEntry(entry) {
     severity: entry.severity || null,
     tone: entry.tone || null,
     tags: Array.isArray(entry.tags) ? [...entry.tags] : [],
-    payload: clonePayload(entry.payload ?? null)
+    payload: clonePayload(entry.payload ?? null),
   };
 }
 
@@ -59,17 +59,17 @@ const CONNECTOR_DEFINITIONS = new Map([
         {
           id: 'webhookUrl',
           label: 'URL du webhook',
-          description: 'Endpoint HTTPS recevant les notifications activité.'
+          description: 'Endpoint HTTPS recevant les notifications activité.',
         },
         {
           id: 'authToken',
           label: 'Jeton Bearer (facultatif)',
-          description: 'Transmis dans l’en-tête Authorization pour sécuriser le webhook.'
-        }
+          description: 'Transmis dans l’en-tête Authorization pour sécuriser le webhook.',
+        },
       ],
       supportsBulk: true,
-      defaultStatus: 'configuration manquante'
-    }
+      defaultStatus: 'configuration manquante',
+    },
   ],
   [
     'jira',
@@ -81,27 +81,27 @@ const CONNECTOR_DEFINITIONS = new Map([
         {
           id: 'jiraBaseUrl',
           label: 'URL de base Jira',
-          description: 'Ex. https://votre-instance.atlassian.net'
+          description: 'Ex. https://votre-instance.atlassian.net',
         },
         {
           id: 'jiraProjectKey',
           label: 'Clé projet',
-          description: 'Identifiant court du projet cible (ex. A11Y).'
+          description: 'Identifiant court du projet cible (ex. A11Y).',
         },
         {
           id: 'jiraToken',
           label: 'Jeton API',
-          description: 'Encodé en Basic Auth (email:token) pour authentifier la requête.'
+          description: 'Encodé en Basic Auth (email:token) pour authentifier la requête.',
         },
         {
           id: 'jiraIssueType',
           label: 'Type de ticket',
-          description: 'Nom du type (ex. Bug, Task). Défaut : Task.'
-        }
+          description: 'Nom du type (ex. Bug, Task). Défaut : Task.',
+        },
       ],
       supportsBulk: false,
-      defaultStatus: 'configuration incomplète'
-    }
+      defaultStatus: 'configuration incomplète',
+    },
   ],
   [
     'linear',
@@ -113,17 +113,17 @@ const CONNECTOR_DEFINITIONS = new Map([
         {
           id: 'linearApiKey',
           label: 'Clé API Linear',
-          description: 'Clé personnelle avec accès écriture (format lin_api_…).'
+          description: 'Clé personnelle avec accès écriture (format lin_api_…).',
         },
         {
           id: 'linearTeamId',
           label: 'Identifiant équipe',
-          description: 'Identifiant unique de l’équipe cible (ex. team_123).'
-        }
+          description: 'Identifiant unique de l’équipe cible (ex. team_123).',
+        },
       ],
       supportsBulk: false,
-      defaultStatus: 'configuration incomplète'
-    }
+      defaultStatus: 'configuration incomplète',
+    },
   ],
   [
     'slack',
@@ -135,13 +135,13 @@ const CONNECTOR_DEFINITIONS = new Map([
         {
           id: 'slackWebhookUrl',
           label: 'URL du webhook Slack',
-          description: 'URL fournie par l’intégration « Incoming Webhook ».'
-        }
+          description: 'URL fournie par l’intégration « Incoming Webhook ».',
+        },
       ],
       supportsBulk: true,
-      defaultStatus: 'configuration manquante'
-    }
-  ]
+      defaultStatus: 'configuration manquante',
+    },
+  ],
 ]);
 
 function buildConnectorList(statuses = []) {
@@ -155,18 +155,23 @@ function buildConnectorList(statuses = []) {
   return Array.from(CONNECTOR_DEFINITIONS.values()).map((definition) => {
     const status = statusMap.get(definition.id) || {};
     const enabled = status.enabled === true;
-    const computedStatus = typeof status.status === 'string'
-      ? status.status
-      : (enabled ? 'prêt' : definition.defaultStatus || 'inactif');
+    const computedStatus =
+      typeof status.status === 'string'
+        ? status.status
+        : enabled
+          ? 'prêt'
+          : definition.defaultStatus || 'inactif';
 
     return {
       id: definition.id,
       label: definition.label,
       help: definition.help,
-      fields: Array.isArray(definition.fields) ? definition.fields.map((field) => ({ ...field })) : [],
+      fields: Array.isArray(definition.fields)
+        ? definition.fields.map((field) => ({ ...field }))
+        : [],
       supportsBulk: Boolean(definition.supportsBulk),
       enabled,
-      status: computedStatus
+      status: computedStatus,
     };
   });
 }
@@ -192,7 +197,7 @@ async function readErrorResponse(response) {
 function createResultSummary(job) {
   return {
     jobType: job.type,
-    count: job.type === 'bulk' ? job.entries.length : 1
+    count: job.type === 'bulk' ? job.entries.length : 1,
   };
 }
 
@@ -201,11 +206,11 @@ export function listConnectorMetadata(config = {}, fetchFnAvailable = true) {
   if (fetchFnAvailable) {
     return base;
   }
-  return base.map((connector) => (
+  return base.map((connector) =>
     connector.enabled
       ? { ...connector, enabled: false, status: 'API fetch indisponible' }
       : connector
-  ));
+  );
 }
 
 export function createActivityIntegration({
@@ -216,16 +221,21 @@ export function createActivityIntegration({
   onConnectorsChange = () => {},
   retry = {
     initialDelay: DEFAULT_RETRY_INITIAL,
-    maxDelay: DEFAULT_RETRY_MAX
-  }
+    maxDelay: DEFAULT_RETRY_MAX,
+  },
 } = {}) {
-  const proxyUrl = typeof config?.proxyUrl === 'string' && config.proxyUrl.trim()
-    ? config.proxyUrl.trim()
-    : (typeof config?.proxy?.url === 'string' ? config.proxy.url.trim() : '');
+  const proxyUrl =
+    typeof config?.proxyUrl === 'string' && config.proxyUrl.trim()
+      ? config.proxyUrl.trim()
+      : typeof config?.proxy?.url === 'string'
+        ? config.proxy.url.trim()
+        : '';
 
   const retryOptions = {
-    initialDelay: Number.isFinite(retry?.initialDelay) ? Math.max(0, retry.initialDelay) : DEFAULT_RETRY_INITIAL,
-    maxDelay: Number.isFinite(retry?.maxDelay) ? Math.max(0, retry.maxDelay) : DEFAULT_RETRY_MAX
+    initialDelay: Number.isFinite(retry?.initialDelay)
+      ? Math.max(0, retry.initialDelay)
+      : DEFAULT_RETRY_INITIAL,
+    maxDelay: Number.isFinite(retry?.maxDelay) ? Math.max(0, retry.maxDelay) : DEFAULT_RETRY_MAX,
   };
 
   const state = {
@@ -233,7 +243,7 @@ export function createActivityIntegration({
     processing: false,
     retryTimer: null,
     connectors: buildConnectorList(config?.connectors),
-    connectorsFetched: !proxyUrl
+    connectorsFetched: !proxyUrl,
   };
 
   function emitConnectors() {
@@ -255,7 +265,10 @@ export function createActivityIntegration({
     state.connectorsFetched = true;
     emitConnectors();
     if (!activeConnectors().length && state.queue.length) {
-      notify('Aucun connecteur de synchronisation configuré.', { tone: 'warning', tags: ['export'] });
+      notify('Aucun connecteur de synchronisation configuré.', {
+        tone: 'warning',
+        tags: ['export'],
+      });
       state.queue.length = 0;
     } else if (activeConnectors().length && state.queue.length) {
       processQueue(true);
@@ -280,7 +293,7 @@ export function createActivityIntegration({
     try {
       const response = await fetchFn(proxyUrl, {
         method: 'GET',
-        headers: { Accept: 'application/json' }
+        headers: { Accept: 'application/json' },
       });
       if (response?.ok && typeof response.json === 'function') {
         try {
@@ -332,9 +345,9 @@ export function createActivityIntegration({
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Accept: 'application/json'
+              Accept: 'application/json',
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
           });
 
           if (!response || response.ok !== true) {
@@ -359,7 +372,7 @@ export function createActivityIntegration({
             connector: 'all',
             status: 'success',
             jobType: summary.jobType,
-            count: summary.count
+            count: summary.count,
           });
           notify(`Synchronisation envoyée (${summary.count} entrée(s)).`, {
             tone: 'confirm',
@@ -367,30 +380,36 @@ export function createActivityIntegration({
             payload: {
               type: 'activity-sync',
               status: 'success',
-              jobType: summary.jobType
-            }
+              jobType: summary.jobType,
+            },
           });
         } catch (error) {
           job.attempts = (job.attempts || 0) + 1;
-          const delay = Math.min(retryOptions.maxDelay, retryOptions.initialDelay * job.attempts || retryOptions.initialDelay);
+          const delay = Math.min(
+            retryOptions.maxDelay,
+            retryOptions.initialDelay * job.attempts || retryOptions.initialDelay
+          );
           job.nextAttempt = Date.now() + delay;
-          notify(`Échec d’envoi de la synchronisation, nouvelle tentative dans ${Math.round(delay / 1000)}s.`, {
-            tone: 'warning',
-            tags: ['export'],
-            payload: {
-              type: 'activity-sync',
-              status: 'error',
-              jobType: job.type,
-              retryInMs: delay,
-              attempts: job.attempts,
-              error: error?.message || 'Erreur proxy'
+          notify(
+            `Échec d’envoi de la synchronisation, nouvelle tentative dans ${Math.round(delay / 1000)}s.`,
+            {
+              tone: 'warning',
+              tags: ['export'],
+              payload: {
+                type: 'activity-sync',
+                status: 'error',
+                jobType: job.type,
+                retryInMs: delay,
+                attempts: job.attempts,
+                error: error?.message || 'Erreur proxy',
+              },
             }
-          });
+          );
           onSyncEvent({
             connector: 'all',
             status: 'error',
             jobType: job.type,
-            error: error?.message
+            error: error?.message,
           });
           scheduleRetry(delay);
           break;
@@ -403,7 +422,10 @@ export function createActivityIntegration({
 
   function enqueue(job) {
     if (state.connectorsFetched && !activeConnectors().length) {
-      notify('Aucun connecteur de synchronisation configuré.', { tone: 'warning', tags: ['export'] });
+      notify('Aucun connecteur de synchronisation configuré.', {
+        tone: 'warning',
+        tags: ['export'],
+      });
       return;
     }
     state.queue.push(job);
@@ -431,7 +453,10 @@ export function createActivityIntegration({
     },
     triggerManualSend(entries = []) {
       if (state.connectorsFetched && !activeConnectors().length) {
-        notify('Aucun connecteur de synchronisation configuré.', { tone: 'warning', tags: ['export'] });
+        notify('Aucun connecteur de synchronisation configuré.', {
+          tone: 'warning',
+          tags: ['export'],
+        });
         return;
       }
       const sanitized = (Array.isArray(entries) ? entries : [])
@@ -449,18 +474,18 @@ export function createActivityIntegration({
           type: 'activity-sync',
           status: 'queued',
           jobType: 'bulk',
-          count: sanitized.length
-        }
+          count: sanitized.length,
+        },
       });
       onSyncEvent({
         connector: 'all',
         status: 'queued',
         jobType: 'bulk',
-        count: sanitized.length
+        count: sanitized.length,
       });
       processQueue(true);
     },
     processQueue,
-    refreshConnectors: refreshConnectorMetadata
+    refreshConnectors: refreshConnectorMetadata,
   };
 }

@@ -43,7 +43,7 @@ async function createAccessToken(credentials) {
     scope: 'https://www.googleapis.com/auth/cloud-platform',
     aud: GOOGLE_TOKEN_ENDPOINT,
     exp: now + 3600,
-    iat: now
+    iat: now,
   };
 
   const unsigned = `${base64url(header)}.${base64url(claims)}`;
@@ -55,23 +55,23 @@ async function createAccessToken(credentials) {
     {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
         grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        assertion
+        assertion,
       }),
-      timeout: 15000
+      timeout: 15000,
     },
     {
       retries: 1,
-      retryDelayMs: 1000
+      retryDelayMs: 1000,
     }
   );
 
   const payload = await parseJson(response);
   if (!payload?.access_token) {
-    throw new Error('Impossible d\'obtenir un access token Google.');
+    throw new Error("Impossible d'obtenir un access token Google.");
   }
 
   return payload.access_token;
@@ -82,7 +82,14 @@ export const googleCloudSttEngine = {
   /**
    * @param {{ filePath: string, language?: string, channels?: number, diarize?: boolean, sampleRate?: number, encoding?: string }} options
    */
-  async transcribe({ filePath, language = DEFAULT_LANGUAGE, channels, diarize, sampleRate = DEFAULT_SAMPLE_RATE, encoding = DEFAULT_ENCODING } = {}) {
+  async transcribe({
+    filePath,
+    language = DEFAULT_LANGUAGE,
+    channels,
+    diarize,
+    sampleRate = DEFAULT_SAMPLE_RATE,
+    encoding = DEFAULT_ENCODING,
+  } = {}) {
     const absolutePath = ensureFilePath(filePath);
     const { data: credentials } = getGoogleCredentials();
     const audioBuffer = await readAudio(absolutePath);
@@ -103,7 +110,7 @@ export const googleCloudSttEngine = {
       encoding,
       languageCode: language,
       enableAutomaticPunctuation: true,
-      sampleRateHertz: sampleRate
+      sampleRateHertz: sampleRate,
     };
 
     if (typeof channels === 'number') {
@@ -116,8 +123,8 @@ export const googleCloudSttEngine = {
     const body = {
       config,
       audio: {
-        content: audioBuffer.toString('base64')
-      }
+        content: audioBuffer.toString('base64'),
+      },
     };
 
     const response = await fetchWithRetry(
@@ -126,19 +133,23 @@ export const googleCloudSttEngine = {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
-        timeout: 45000
+        timeout: 45000,
       },
       {
         retries: 1,
-        retryDelayMs: 1000
+        retryDelayMs: 1000,
       }
     );
 
     const payload = await parseJson(response);
-    const transcript = payload?.results?.flatMap((result) => result.alternatives ?? [])?.map((alt) => alt.transcript)?.join(' ').trim();
+    const transcript = payload?.results
+      ?.flatMap((result) => result.alternatives ?? [])
+      ?.map((alt) => alt.transcript)
+      ?.join(' ')
+      .trim();
 
     if (!transcript) {
       throw new Error('La réponse Google Cloud Speech-to-Text ne contient pas de transcription.');
@@ -146,9 +157,9 @@ export const googleCloudSttEngine = {
 
     return {
       text: transcript,
-      raw: payload
+      raw: payload,
     };
-  }
+  },
 };
 
 export default googleCloudSttEngine;

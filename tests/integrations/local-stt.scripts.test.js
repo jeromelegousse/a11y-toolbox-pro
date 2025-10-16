@@ -41,14 +41,14 @@ async function createTempWave() {
 async function runPythonScript(scriptName, args = [], env = {}) {
   const commandArgs = [resolve(SCRIPTS_DIR, scriptName), ...args];
   return execFileAsync(process.env.A11Y_TOOLBOX_STT_PYTHON || 'python3', commandArgs, {
-    env: { ...process.env, ...env }
+    env: { ...process.env, ...env },
   });
 }
 
 async function runNodeScript(scriptName, args = [], env = {}) {
   const commandArgs = [resolve(SCRIPTS_DIR, scriptName), ...args];
   return execFileAsync(process.execPath, commandArgs, {
-    env: { ...process.env, ...env }
+    env: { ...process.env, ...env },
   });
 }
 
@@ -72,23 +72,27 @@ describe('scripts/integrations/*', () => {
     it('signale les dépendances manquantes', async () => {
       await expect(
         runPythonScript('whisper_local.py', [`--file=${tempFile}`], {
-          A11Y_TOOLBOX_STT_FORCE_MISSING: '1'
+          A11Y_TOOLBOX_STT_FORCE_MISSING: '1',
         })
       ).rejects.toMatchObject({
-        stderr: expect.stringContaining("Le module 'faster-whisper' est requis")
+        stderr: expect.stringContaining("Le module 'faster-whisper' est requis"),
       });
     });
 
     it('sérialise un résultat JSON en mode mock', async () => {
-      const { stdout } = await runPythonScript('whisper_local.py', [`--file=${tempFile}`, '--language=fr'], {
-        A11Y_TOOLBOX_STT_MOCK_TEXT: 'transcription de test'
-      });
+      const { stdout } = await runPythonScript(
+        'whisper_local.py',
+        [`--file=${tempFile}`, '--language=fr'],
+        {
+          A11Y_TOOLBOX_STT_MOCK_TEXT: 'transcription de test',
+        }
+      );
 
       const payload = JSON.parse(stdout);
       expect(payload).toMatchObject({
         engine: 'faster-whisper',
         text: 'transcription de test',
-        language: 'fr'
+        language: 'fr',
       });
     });
   });
@@ -97,22 +101,22 @@ describe('scripts/integrations/*', () => {
     it('signale les dépendances manquantes', async () => {
       await expect(
         runNodeScript('vosk-transcribe.js', [`--file=${tempFile}`], {
-          A11Y_TOOLBOX_STT_FORCE_MISSING: '1'
+          A11Y_TOOLBOX_STT_FORCE_MISSING: '1',
         })
       ).rejects.toMatchObject({
-        stderr: expect.stringContaining("Le package 'vosk' est requis")
+        stderr: expect.stringContaining("Le package 'vosk' est requis"),
       });
     });
 
     it('retourne un JSON mocké', async () => {
       const { stdout } = await runNodeScript('vosk-transcribe.js', [`--file=${tempFile}`], {
-        A11Y_TOOLBOX_STT_MOCK_TEXT: 'mock vosk'
+        A11Y_TOOLBOX_STT_MOCK_TEXT: 'mock vosk',
       });
 
       const payload = JSON.parse(stdout);
       expect(payload).toMatchObject({
         engine: 'vosk',
-        text: 'mock vosk'
+        text: 'mock vosk',
       });
     });
   });
@@ -121,22 +125,22 @@ describe('scripts/integrations/*', () => {
     it('signale les dépendances manquantes', async () => {
       await expect(
         runPythonScript('parakeet.py', [`--file=${tempFile}`], {
-          A11Y_TOOLBOX_STT_FORCE_MISSING: '1'
+          A11Y_TOOLBOX_STT_FORCE_MISSING: '1',
         })
       ).rejects.toMatchObject({
-        stderr: expect.stringContaining("Le module 'nemo_toolkit[asr]' est requis")
+        stderr: expect.stringContaining("Le module 'nemo_toolkit[asr]' est requis"),
       });
     });
 
     it('retourne un JSON mocké', async () => {
       const { stdout } = await runPythonScript('parakeet.py', [`--file=${tempFile}`], {
-        A11Y_TOOLBOX_STT_MOCK_TEXT: 'mock parakeet'
+        A11Y_TOOLBOX_STT_MOCK_TEXT: 'mock parakeet',
       });
 
       const payload = JSON.parse(stdout);
       expect(payload).toMatchObject({
         engine: 'parakeet',
-        text: 'mock parakeet'
+        text: 'mock parakeet',
       });
     });
   });

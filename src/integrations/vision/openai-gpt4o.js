@@ -21,7 +21,8 @@ function pickFirstText(payload) {
     return payload.output_text;
   }
 
-  const outputText = payload.output?.flatMap((item) => item?.content ?? [])
+  const outputText = payload.output
+    ?.flatMap((item) => item?.content ?? [])
     .map((part) => part?.text)
     .find((value) => Boolean(value));
   if (outputText) {
@@ -45,7 +46,7 @@ export const openAiGpt4oEngine = {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
-          Accept: 'application/json'
+          Accept: 'application/json',
         },
         body: JSON.stringify({
           model: DEFAULT_MODEL,
@@ -54,16 +55,16 @@ export const openAiGpt4oEngine = {
               role: 'user',
               content: [
                 { type: 'input_text', text: preparedPrompt },
-                { type: 'input_image', mime_type: mimeType, image_base64: data }
-              ]
-            }
-          ]
+                { type: 'input_image', mime_type: mimeType, image_base64: data },
+              ],
+            },
+          ],
         }),
-        timeout: 30000
+        timeout: 30000,
       },
       {
         retries: 1,
-        retryDelayMs: 1000
+        retryDelayMs: 1000,
       }
     );
 
@@ -76,9 +77,9 @@ export const openAiGpt4oEngine = {
 
     return {
       text,
-      raw: payload
+      raw: payload,
     };
-  }
+  },
 };
 
 export default openAiGpt4oEngine;

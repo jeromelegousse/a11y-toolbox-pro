@@ -10,42 +10,48 @@ export const manifest = {
   license: 'MIT',
   authors: [
     { name: 'Équipe Accessibilité', email: 'accessibilite@a11ytoolbox.test' },
-    { name: 'Laura Pineau', email: 'l.pineau@a11ytoolbox.test' }
+    { name: 'Laura Pineau', email: 'l.pineau@a11ytoolbox.test' },
   ],
   permissions: ['style-injection', 'activity-log'],
   compat: {
     browsers: ['chrome >= 88', 'edge >= 88', 'firefox >= 90', 'safari >= 15'],
-    features: ['CSS.supports']
+    features: ['CSS.supports'],
   },
   guides: [
     {
       id: 'vision-personalization',
       title: 'Personnalisation vision & confort de lecture',
-      description: 'Combinez contraste renforcé, espacements personnalisés et vitesse vocale adaptée.',
+      description:
+        'Combinez contraste renforcé, espacements personnalisés et vitesse vocale adaptée.',
       category: 'vision',
       order: 40,
       prerequisites: [
         { type: 'module', id: 'contrast' },
         { type: 'module', id: 'spacing' },
-        { type: 'module', id: 'tts', optional: true, label: 'Synthèse vocale (optionnel)' }
+        { type: 'module', id: 'tts', optional: true, label: 'Synthèse vocale (optionnel)' },
       ],
       assistance: {
-        microcopy: 'Ajustez progressivement les paramètres et sauvegardez un profil dédié pour le reproduire facilement.',
+        microcopy:
+          'Ajustez progressivement les paramètres et sauvegardez un profil dédié pour le reproduire facilement.',
         examples: [
           {
             id: 'vision-personalization-example-1',
             title: 'Exemple',
-            description: 'Profil Vision basse : interlignage 1,9 · espacement 12 % · vitesse vocale 0,9×.'
-          }
-        ]
+            description:
+              'Profil Vision basse : interlignage 1,9 · espacement 12 % · vitesse vocale 0,9×.',
+          },
+        ],
       },
       steps: [
         {
           id: 'contrast-enabled',
           label: 'Activer le thème à fort contraste',
           mode: 'auto',
-          detail: ({ snapshot }) => snapshot?.contrast?.enabled ? 'Thème haute visibilité actif.' : 'Le thème renforcé est désactivé.',
-          check: ({ snapshot }) => !!snapshot?.contrast?.enabled
+          detail: ({ snapshot }) =>
+            snapshot?.contrast?.enabled
+              ? 'Thème haute visibilité actif.'
+              : 'Le thème renforcé est désactivé.',
+          check: ({ snapshot }) => !!snapshot?.contrast?.enabled,
         },
         {
           id: 'spacing-adjustment',
@@ -54,7 +60,8 @@ export const manifest = {
           detail: ({ snapshot }) => {
             const lineHeight = Number(snapshot?.spacing?.lineHeight ?? 1.5);
             const letterSpacing = Number(snapshot?.spacing?.letterSpacing ?? 0);
-            if (Number.isNaN(lineHeight) || Number.isNaN(letterSpacing)) return 'Valeurs d’espacement non définies.';
+            if (Number.isNaN(lineHeight) || Number.isNaN(letterSpacing))
+              return 'Valeurs d’espacement non définies.';
             if (Math.abs(lineHeight - 1.5) < 0.05 && Math.abs(letterSpacing - 0) < 0.01) {
               return 'Espacements par défaut encore appliqués.';
             }
@@ -65,7 +72,7 @@ export const manifest = {
             const letterSpacing = Number(snapshot?.spacing?.letterSpacing ?? 0);
             if (Number.isNaN(lineHeight) || Number.isNaN(letterSpacing)) return false;
             return Math.abs(lineHeight - 1.5) >= 0.05 || Math.abs(letterSpacing - 0) >= 0.01;
-          }
+          },
         },
         {
           id: 'tts-adjustment',
@@ -84,7 +91,7 @@ export const manifest = {
             const rate = Number(snapshot.tts.rate ?? 1);
             if (Number.isNaN(rate)) return false;
             return Math.abs(rate - 1) >= 0.05;
-          }
+          },
         },
         {
           id: 'vision-profile-save',
@@ -93,19 +100,19 @@ export const manifest = {
           detail: 'Enregistrez ou exportez un profil dédié pour partager ces réglages.',
           toggleLabels: {
             complete: 'Profil sauvegardé',
-            reset: 'À revoir'
-          }
-        }
-      ]
-    }
+            reset: 'À revoir',
+          },
+        },
+      ],
+    },
   ],
   runtime: {
-    preload: 'visible'
+    preload: 'visible',
   },
   defaults: {
     state: {
-      spacing: { lineHeight: 1.5, letterSpacing: 0 }
-    }
+      spacing: { lineHeight: 1.5, letterSpacing: 0 },
+    },
   },
   config: {
     group: 'Espacements typographiques',
@@ -121,7 +128,7 @@ export const manifest = {
         format: (value) => `${value.toFixed(1)}`,
         onChange: (value) => {
           window.a11ytb?.logActivity?.(`Interlignage réglé à ${value.toFixed(1)}`);
-        }
+        },
       },
       {
         type: 'range',
@@ -132,11 +139,13 @@ export const manifest = {
         step: 0.01,
         format: (value) => `${Math.round(value * 100)} %`,
         onChange: (value) => {
-          window.a11ytb?.logActivity?.(`Espacement des lettres réglé à ${Math.round(value * 100)} %`);
-        }
-      }
-    ]
-  }
+          window.a11ytb?.logActivity?.(
+            `Espacement des lettres réglé à ${Math.round(value * 100)} %`
+          );
+        },
+      },
+    ],
+  },
 };
 
 export default manifest;

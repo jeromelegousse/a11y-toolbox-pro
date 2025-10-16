@@ -10,12 +10,12 @@ export const manifest = {
   license: 'MIT',
   authors: [
     { name: 'Équipe Accessibilité', email: 'accessibilite@a11ytoolbox.test' },
-    { name: 'Imène Fares', email: 'i.fares@a11ytoolbox.test' }
+    { name: 'Imène Fares', email: 'i.fares@a11ytoolbox.test' },
   ],
   permissions: ['dom-read', 'activity-log'],
   compat: {
     browsers: ['chrome >= 92', 'edge >= 92', 'firefox >= 91', 'safari >= 15'],
-    features: ['document.getSelection']
+    features: ['document.getSelection'],
   },
   guides: [
     {
@@ -26,7 +26,8 @@ export const manifest = {
       order: 60,
       prerequisites: [{ type: 'module', id: 'braille' }],
       assistance: {
-        microcopy: 'Gardez un extrait récurrent (formulaire ou bouton) pour tester rapidement la transcription braille.'
+        microcopy:
+          'Gardez un extrait récurrent (formulaire ou bouton) pour tester rapidement la transcription braille.',
       },
       steps: [
         {
@@ -36,12 +37,15 @@ export const manifest = {
           detail: ({ moduleName, runtime }) => {
             const name = moduleName || 'Transcription braille';
             if (!runtime?.enabled) return `${name} est désactivée.`;
-            if (runtime?.state === 'error') return runtime?.error ? `Erreur signalée : ${runtime.error}` : `${name} est en erreur.`;
+            if (runtime?.state === 'error')
+              return runtime?.error
+                ? `Erreur signalée : ${runtime.error}`
+                : `${name} est en erreur.`;
             if (runtime?.state === 'loading') return `${name} se charge…`;
             if (runtime?.state === 'ready') return `${name} est prête.`;
             return `${name} est en attente d’activation.`;
           },
-          check: ({ runtime }) => !!runtime?.enabled && runtime.state === 'ready'
+          check: ({ runtime }) => !!runtime?.enabled && runtime.state === 'ready',
         },
         {
           id: 'braille-output',
@@ -49,19 +53,20 @@ export const manifest = {
           mode: 'manual',
           detail: ({ snapshot }) => {
             const output = snapshot?.braille?.output || '';
-            if (!output) return 'Aucune transcription générée : testez avec un texte simple (ex. "Formulaire envoyé").';
+            if (!output)
+              return 'Aucune transcription générée : testez avec un texte simple (ex. "Formulaire envoyé").';
             return `Dernière sortie : ${output.slice(0, 16)}${output.length > 16 ? '…' : ''}`;
           },
           toggleLabels: {
             complete: 'Transcription validée',
-            reset: 'Re-tester'
-          }
-        }
-      ]
-    }
+            reset: 'Re-tester',
+          },
+        },
+      ],
+    },
   ],
   runtime: {
-    preload: 'pointer'
+    preload: 'pointer',
   },
   defaults: {
     state: {
@@ -69,9 +74,9 @@ export const manifest = {
         output: '',
         grade: 'integral',
         exportFormat: 'text',
-        keepSpacing: true
-      }
-    }
+        keepSpacing: true,
+      },
+    },
   },
   config: {
     group: 'Transcription braille',
@@ -83,13 +88,13 @@ export const manifest = {
         label: 'Niveau de transcription',
         options: [
           { value: 'integral', label: 'Intégral (grade 1)' },
-          { value: 'contracted', label: 'Abrégé (grade 2)' }
+          { value: 'contracted', label: 'Abrégé (grade 2)' },
         ],
         onChange: (value) => {
           const labels = { integral: 'Intégral (grade 1)', contracted: 'Abrégé (grade 2)' };
           const label = labels[value] || value;
           window.a11ytb?.logActivity?.(`Mode braille sélectionné : ${label}`);
-        }
+        },
       },
       {
         type: 'toggle',
@@ -98,7 +103,7 @@ export const manifest = {
         description: 'Préserve les séparateurs d’origine lors de la conversion.',
         onChange: (value) => {
           window.a11ytb?.logActivity?.(`Espaces d’origine ${value ? 'conservés' : 'compressés'}`);
-        }
+        },
       },
       {
         type: 'select',
@@ -106,16 +111,16 @@ export const manifest = {
         label: 'Format d’export',
         options: [
           { value: 'text', label: 'Texte brut' },
-          { value: 'unicode', label: 'Unicode (points braille)' }
+          { value: 'unicode', label: 'Unicode (points braille)' },
         ],
         onChange: (value) => {
           const labels = { text: 'Texte brut', unicode: 'Unicode (points braille)' };
           const label = labels[value] || value;
           window.a11ytb?.logActivity?.(`Format braille : ${label}`);
-        }
-      }
-    ]
-  }
+        },
+      },
+    ],
+  },
 };
 
 export default manifest;

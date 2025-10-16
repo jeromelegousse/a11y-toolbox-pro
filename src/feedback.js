@@ -4,7 +4,7 @@ function makeTonePlayer() {
   if (!AudioContext) {
     return {
       play() {},
-      enabled: false
+      enabled: false,
     };
   }
   let ctx = null;
@@ -32,7 +32,7 @@ function makeTonePlayer() {
     play(options) {
       playTone(options);
     },
-    enabled: true
+    enabled: true,
   };
 }
 
@@ -44,14 +44,14 @@ const EVENT_FAMILIES = {
   notice: 'info',
   alert: 'alert',
   error: 'alert',
-  warning: 'warning'
+  warning: 'warning',
 };
 
 const DEFAULT_EVENTS = {
   confirm: true,
   alert: true,
   warning: true,
-  info: true
+  info: true,
 };
 
 const THEMES = {
@@ -60,22 +60,22 @@ const THEMES = {
     toggle: { frequency: 540, duration: 0.1, type: 'sine', volume: 0.14 },
     alert: { frequency: 320, duration: 0.22, type: 'square', volume: 0.2 },
     warning: { frequency: 420, duration: 0.18, type: 'sawtooth', volume: 0.18 },
-    info: { frequency: 700, duration: 0.1, type: 'sine', volume: 0.16 }
+    info: { frequency: 700, duration: 0.1, type: 'sine', volume: 0.16 },
   },
   soft: {
     confirm: { frequency: 640, duration: 0.16, type: 'sine', volume: 0.16 },
     toggle: { frequency: 480, duration: 0.12, type: 'sine', volume: 0.13 },
     alert: { frequency: 360, duration: 0.28, type: 'triangle', volume: 0.18 },
     warning: { frequency: 420, duration: 0.22, type: 'triangle', volume: 0.16 },
-    info: { frequency: 620, duration: 0.14, type: 'sine', volume: 0.14 }
+    info: { frequency: 620, duration: 0.14, type: 'sine', volume: 0.14 },
   },
   digital: {
     confirm: { frequency: 940, duration: 0.1, type: 'square', volume: 0.16 },
     toggle: { frequency: 600, duration: 0.08, type: 'square', volume: 0.14 },
     alert: { frequency: 340, duration: 0.18, type: 'square', volume: 0.22 },
     warning: { frequency: 520, duration: 0.14, type: 'sawtooth', volume: 0.18 },
-    info: { frequency: 760, duration: 0.09, type: 'triangle', volume: 0.15 }
-  }
+    info: { frequency: 760, duration: 0.09, type: 'triangle', volume: 0.15 },
+  },
 };
 
 function normalizeKey(value) {
@@ -99,10 +99,7 @@ function buildPresets(themeName) {
   const resolvedThemeKey = resolveThemeKey(themeName);
   const theme = THEMES[resolvedThemeKey];
   const fallbackTheme = THEMES.classic;
-  const events = new Set([
-    ...Object.keys(EVENT_FAMILIES),
-    ...Object.keys(theme)
-  ]);
+  const events = new Set([...Object.keys(EVENT_FAMILIES), ...Object.keys(theme)]);
   const presets = {};
   events.forEach((eventName) => {
     const normalizedEvent = normalizeKey(eventName);
@@ -149,11 +146,7 @@ export function createFeedback(options = {}) {
   function getPreset(presetName) {
     const normalized = normalizeKey(presetName);
     if (!normalized) return presets.confirm;
-    return (
-      presets[normalized] ||
-      presets[EVENT_FAMILIES[normalized]] ||
-      presets.confirm
-    );
+    return presets[normalized] || presets[EVENT_FAMILIES[normalized]] || presets.confirm;
   }
 
   function shouldPlayEvent(eventName) {
@@ -180,10 +173,7 @@ export function createFeedback(options = {}) {
           : null;
     if (!presetOptions) return;
     const optionsToUse = { ...presetOptions };
-    const baseVolume =
-      typeof presetOptions.volume === 'number'
-        ? presetOptions.volume
-        : 0.15;
+    const baseVolume = typeof presetOptions.volume === 'number' ? presetOptions.volume : 0.15;
     optionsToUse.volume = clampVolume(baseVolume * masterVolume, baseVolume);
     player.play(optionsToUse);
   }
@@ -198,7 +188,7 @@ export function createFeedback(options = {}) {
         presets = nextPresets;
         eventTable = {
           ...createDefaultEventTable(presets),
-          ...eventTable
+          ...eventTable,
         };
       }
     }
@@ -220,7 +210,7 @@ export function createFeedback(options = {}) {
         const previous = nextTable[normalizedSeverity] || { enabled: true, preset: null };
         nextTable[normalizedSeverity] = {
           enabled: entry.enabled !== undefined ? !!entry.enabled : previous.enabled,
-          preset: presetName || previous.preset
+          preset: presetName || previous.preset,
         };
       });
       eventTable = nextTable;
@@ -231,7 +221,7 @@ export function createFeedback(options = {}) {
     return {
       volume: masterVolume,
       events: cloneEventTable(eventTable),
-      theme: currentThemeKey
+      theme: currentThemeKey,
     };
   }
 
@@ -243,6 +233,6 @@ export function createFeedback(options = {}) {
     getConfig,
     get presets() {
       return Object.freeze({ ...presets });
-    }
+    },
   };
 }

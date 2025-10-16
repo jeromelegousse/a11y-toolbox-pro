@@ -13,7 +13,7 @@ const DEFAULT_FILTERS = {
   compatibility: 'all',
   sort: 'alpha',
   search: '',
-  onlyPinned: false
+  onlyPinned: false,
 };
 
 let previewState = null;
@@ -43,7 +43,8 @@ export function initAdminDashboard(mount) {
       const quotaLabel = quota === null ? 'quota non précisé' : `${quota} requête(s)/min`;
       layout.geminiStatus.textContent = `Clé Gemini configurée (${mask}) – ${quotaLabel}.`;
     } else {
-      layout.geminiStatus.textContent = 'Aucune clé Gemini enregistrée. Les intégrations IA restent désactivées.';
+      layout.geminiStatus.textContent =
+        'Aucune clé Gemini enregistrée. Les intégrations IA restent désactivées.';
     }
   }
 
@@ -52,13 +53,13 @@ export function initAdminDashboard(mount) {
     { value: 'full', label: 'Compatibles' },
     { value: 'partial', label: 'À risques' },
     { value: 'unknown', label: 'À vérifier' },
-    { value: 'none', label: 'Non déclarées' }
+    { value: 'none', label: 'Non déclarées' },
   ];
   const sortOptions = [
     { value: 'alpha', label: 'Tri alphabétique' },
     { value: 'status', label: 'Par statut' },
     { value: 'compat', label: 'Par compatibilité' },
-    { value: 'recent', label: 'Plus récents' }
+    { value: 'recent', label: 'Plus récents' },
   ];
 
   updateFilterOptions(layout.filters.compatibility, compatibilityOptions, filters.compatibility);
@@ -74,7 +75,7 @@ export function initAdminDashboard(mount) {
     const { list } = computeProfiles(snapshot);
     const profileOptions = [
       { value: 'all', label: 'Tous les profils' },
-      ...list.map((entry) => ({ value: entry.id, label: entry.label }))
+      ...list.map((entry) => ({ value: entry.id, label: entry.label })),
     ];
     updateFilterOptions(layout.filters.profile, profileOptions, filters.profile);
     filters.profile = layout.filters.profile.value;
@@ -86,9 +87,9 @@ export function initAdminDashboard(mount) {
         return {
           value: collection.id,
           label: `${indent}${collection.label || collection.id}`.trim(),
-          ariaLabel: collection.pathLabel || collection.label || collection.id
+          ariaLabel: collection.pathLabel || collection.label || collection.id,
         };
-      })
+      }),
     ];
     updateFilterOptions(layout.filters.collection, collectionOptions, filters.collection);
     filters.collection = layout.filters.collection.value;
@@ -133,9 +134,8 @@ export function initAdminDashboard(mount) {
 
       const connector = document.createElement('span');
       connector.className = 'a11ytb-admin-sync-connector';
-      connector.textContent = entry.connector === 'all'
-        ? 'Connecteurs activité'
-        : `Connecteur ${entry.connector}`;
+      connector.textContent =
+        entry.connector === 'all' ? 'Connecteurs activité' : `Connecteur ${entry.connector}`;
 
       const badge = document.createElement('span');
       badge.className = 'a11ytb-admin-sync-badge';
@@ -156,7 +156,8 @@ export function initAdminDashboard(mount) {
       const meta = document.createElement('p');
       meta.className = 'a11ytb-admin-sync-meta';
       const count = Number.isFinite(entry.count) ? entry.count : 0;
-      const jobLabel = entry.jobType === 'bulk' ? `${count} entrée${count > 1 ? 's' : ''}` : 'Entrée unique';
+      const jobLabel =
+        entry.jobType === 'bulk' ? `${count} entrée${count > 1 ? 's' : ''}` : 'Entrée unique';
       const timeLabel = formatDateRelative(entry.timestamp);
       meta.textContent = `${jobLabel} • ${timeLabel}`;
 
@@ -264,7 +265,7 @@ export function initAdminDashboard(mount) {
         next = [...blockIds, ...next];
       }
       previewState.set('ui.pinned', next);
-    }
+    },
   };
 
   layout.filters.profile.addEventListener('change', () => {
@@ -296,7 +297,8 @@ export function initAdminDashboard(mount) {
 
   function attemptConnection() {
     if (!previewFrame || !previewFrame.contentWindow) {
-      layout.connectionStatus.textContent = 'Aucun aperçu disponible pour synchroniser les données.';
+      layout.connectionStatus.textContent =
+        'Aucun aperçu disponible pour synchroniser les données.';
       return;
     }
     try {
@@ -317,7 +319,8 @@ export function initAdminDashboard(mount) {
         });
       }
     } catch (error) {
-      layout.connectionStatus.textContent = 'Impossible de lire les données de l’aperçu (origine différente).';
+      layout.connectionStatus.textContent =
+        'Impossible de lire les données de l’aperçu (origine différente).';
     }
   }
 

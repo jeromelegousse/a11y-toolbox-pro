@@ -34,7 +34,6 @@ Il s’appuie sur les pratiques observées chez les suites professionnelles (Deq
 1. Documentez la fonctionnalité dans `docs/comparatif-et-roadmap.md` (section écarts vs solutions pro).
 2. Ajoutez des captures ou démonstrations si l’UX évolue.
 3. Cochez la checklist ci-dessous avant soumission :
-
    - [ ] Manifest validé (`npm run lint:manifests`).
    - [ ] Tests exécutés (`npm run test`).
    - [ ] Documentation mise à jour (`README.md`, `docs/*`).

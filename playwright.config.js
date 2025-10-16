@@ -12,20 +12,20 @@ export default defineConfig({
   expect: {
     toHaveScreenshot: {
       maxDiffPixelRatio: 0.02,
-      threshold: 0.2
-    }
+      threshold: 0.2,
+    },
   },
   use: {
     baseURL,
     trace: 'on-first-retry',
     viewport: { width: 1280, height: 720 },
     headless: true,
-    ...devices['Desktop Chrome']
+    ...devices['Desktop Chrome'],
   },
   webServer: {
     command: 'npx http-server . -p 4173 --silent',
     url: `${baseURL}/index.html`,
     reuseExistingServer: !process.env.CI,
-    timeout: 60_000
-  }
+    timeout: 60_000,
+  },
 });

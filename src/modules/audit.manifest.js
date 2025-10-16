@@ -10,37 +10,41 @@ export const manifest = {
   license: 'MIT',
   authors: [
     { name: 'Équipe Accessibilité', email: 'accessibilite@a11ytoolbox.test' },
-    { name: 'Samira Lefèvre', email: 's.lefevre@a11ytoolbox.test' }
+    { name: 'Samira Lefèvre', email: 's.lefevre@a11ytoolbox.test' },
   ],
   compat: {
     browsers: ['chrome >= 102', 'edge >= 102', 'firefox >= 104'],
-    features: ['axe']
+    features: ['axe'],
   },
   guides: [
     {
       id: 'audit-fastpass',
       title: 'Audit axe-core express',
-      description: 'Préparez, lancez et interprétez un audit axe-core ciblé pour prioriser vos correctifs.',
+      description:
+        'Préparez, lancez et interprétez un audit axe-core ciblé pour prioriser vos correctifs.',
       category: 'diagnostic',
       order: 20,
       prerequisites: [
         { type: 'module', id: 'audit' },
-        { type: 'module', id: 'tts', optional: true, label: 'Synthèse vocale (optionnel)' }
+        { type: 'module', id: 'tts', optional: true, label: 'Synthèse vocale (optionnel)' },
       ],
       assistance: {
-        microcopy: 'Planifiez un audit après chaque livraison majeure et consignez les rapports dans votre outil de suivi.',
+        microcopy:
+          'Planifiez un audit après chaque livraison majeure et consignez les rapports dans votre outil de suivi.',
         examples: [
           {
             id: 'audit-fastpass-example-1',
             title: 'Astuce',
-            description: 'Exportez le CSV depuis le module pour partager rapidement les violations critiques avec les développeurs.'
+            description:
+              'Exportez le CSV depuis le module pour partager rapidement les violations critiques avec les développeurs.',
           },
           {
             id: 'audit-fastpass-example-2',
             title: 'Bonnes pratiques',
-            description: 'Relancez un audit après chaque correction afin de confirmer la résolution des violations majeures.'
-          }
-        ]
+            description:
+              'Relancez un audit après chaque correction afin de confirmer la résolution des violations majeures.',
+          },
+        ],
       },
       steps: [
         {
@@ -50,12 +54,15 @@ export const manifest = {
           detail: ({ moduleName, runtime }) => {
             const name = moduleName || 'Audit';
             if (!runtime?.enabled) return `${name} est désactivé dans la vue Organisation.`;
-            if (runtime?.state === 'error') return runtime?.error ? `Erreur signalée : ${runtime.error}` : `${name} est en erreur.`;
+            if (runtime?.state === 'error')
+              return runtime?.error
+                ? `Erreur signalée : ${runtime.error}`
+                : `${name} est en erreur.`;
             if (runtime?.state === 'loading') return `${name} se charge…`;
             if (runtime?.state === 'ready') return `${name} est prêt à lancer une analyse.`;
             return `${name} est en attente d’activation.`;
           },
-          check: ({ runtime }) => !!runtime?.enabled && runtime.state === 'ready'
+          check: ({ runtime }) => !!runtime?.enabled && runtime.state === 'ready',
         },
         {
           id: 'audit-run',
@@ -69,7 +76,7 @@ export const manifest = {
             const headline = summary?.headline || 'Audit terminé';
             return when ? `${headline} (le ${when}).` : headline;
           },
-          check: ({ snapshot }) => Boolean(snapshot?.audit?.lastRun)
+          check: ({ snapshot }) => Boolean(snapshot?.audit?.lastRun),
         },
         {
           id: 'audit-critical',
@@ -80,31 +87,34 @@ export const manifest = {
             if (!totals) return 'Aucun résultat axe-core à interpréter.';
             const critical = totals.critical ?? 0;
             const serious = totals.serious ?? 0;
-            if (critical > 0) return `${critical} violation${critical > 1 ? 's' : ''} critique${critical > 1 ? 's' : ''} à corriger en priorité.`;
-            if (serious > 0) return `${serious} violation${serious > 1 ? 's' : ''} majeure${serious > 1 ? 's' : ''} restante${serious > 1 ? 's' : ''}.`;
+            if (critical > 0)
+              return `${critical} violation${critical > 1 ? 's' : ''} critique${critical > 1 ? 's' : ''} à corriger en priorité.`;
+            if (serious > 0)
+              return `${serious} violation${serious > 1 ? 's' : ''} majeure${serious > 1 ? 's' : ''} restante${serious > 1 ? 's' : ''}.`;
             return 'Aucune violation critique ou majeure détectée.';
           },
           check: ({ snapshot }) => {
             const totals = snapshot?.audit?.summary?.totals;
             if (!totals) return false;
             return (totals.critical ?? 0) === 0 && (totals.serious ?? 0) === 0;
-          }
+          },
         },
         {
           id: 'audit-share',
           label: 'Partager le rapport et planifier les corrections',
           mode: 'manual',
-          detail: 'Exportez le rapport (CSV ou JSON) et assignez les correctifs aux équipes concernées.',
+          detail:
+            'Exportez le rapport (CSV ou JSON) et assignez les correctifs aux équipes concernées.',
           toggleLabels: {
             complete: 'Marquer comme partagé',
-            reset: 'Marquer à refaire'
-          }
-        }
-      ]
-    }
+            reset: 'Marquer à refaire',
+          },
+        },
+      ],
+    },
   ],
   runtime: {
-    preload: 'pointer'
+    preload: 'pointer',
   },
   permissions: ['dom-inspection', 'activity-log'],
   defaults: {
@@ -120,7 +130,7 @@ export const manifest = {
           tone: 'info',
           severity: 'info',
           headline: 'Audit en attente',
-          detail: ''
+          detail: '',
         },
         error: null,
         preferences: {
@@ -132,14 +142,14 @@ export const manifest = {
             frequency: 'weekly',
             timeWindow: {
               start: '09:00',
-              end: '18:00'
+              end: '18:00',
             },
             lastRunAt: null,
-            nextRunAt: null
-          }
-        }
-      }
-    }
+            nextRunAt: null,
+          },
+        },
+      },
+    },
   },
   config: {
     group: 'Audit axe-core',
@@ -151,8 +161,11 @@ export const manifest = {
         label: 'Lancer un audit à l’ouverture',
         description: 'Démarre automatiquement une analyse axe-core à chaque chargement de page.',
         onChange: (value) => {
-          window.a11ytb?.logActivity?.(`Audit auto au chargement ${value ? 'activé' : 'désactivé'}`, { tags: ['audit'] });
-        }
+          window.a11ytb?.logActivity?.(
+            `Audit auto au chargement ${value ? 'activé' : 'désactivé'}`,
+            { tags: ['audit'] }
+          );
+        },
       },
       {
         type: 'toggle',
@@ -160,26 +173,35 @@ export const manifest = {
         label: 'Inclure les bonnes pratiques',
         description: 'Ajoute les règles de bonnes pratiques axe-core pour un diagnostic élargi.',
         onChange: (value) => {
-          window.a11ytb?.logActivity?.(`Règles best practices ${value ? 'incluses' : 'exclues'}`, { tags: ['audit'] });
-        }
+          window.a11ytb?.logActivity?.(`Règles best practices ${value ? 'incluses' : 'exclues'}`, {
+            tags: ['audit'],
+          });
+        },
       },
       {
         type: 'toggle',
         path: 'audit.preferences.includeExperimental',
         label: 'Tester les règles expérimentales',
-        description: 'Active les règles axe-core en version expérimentale pour détecter les risques émergents.',
+        description:
+          'Active les règles axe-core en version expérimentale pour détecter les risques émergents.',
         onChange: (value) => {
-          window.a11ytb?.logActivity?.(`Règles expérimentales ${value ? 'activées' : 'désactivées'}`, { tags: ['audit'] });
-        }
+          window.a11ytb?.logActivity?.(
+            `Règles expérimentales ${value ? 'activées' : 'désactivées'}`,
+            { tags: ['audit'] }
+          );
+        },
       },
       {
         type: 'toggle',
         path: 'audit.preferences.schedule.enabled',
         label: 'Planifier des audits récurrents',
-        description: 'Active le lancement automatique d’un audit axe-core à la fréquence souhaitée.',
+        description:
+          'Active le lancement automatique d’un audit axe-core à la fréquence souhaitée.',
         onChange: (value) => {
-          window.a11ytb?.logActivity?.(`Audit programmé ${value ? 'activé' : 'désactivé'}`, { tags: ['audit', 'schedule'] });
-        }
+          window.a11ytb?.logActivity?.(`Audit programmé ${value ? 'activé' : 'désactivé'}`, {
+            tags: ['audit', 'schedule'],
+          });
+        },
       },
       {
         type: 'select',
@@ -189,17 +211,19 @@ export const manifest = {
         options: [
           { value: 'hourly', label: 'Toutes les heures' },
           { value: 'daily', label: 'Quotidien' },
-          { value: 'weekly', label: 'Hebdomadaire' }
+          { value: 'weekly', label: 'Hebdomadaire' },
         ],
         onChange: (value) => {
           const labels = {
             hourly: 'toutes les heures',
             daily: 'quotidien',
-            weekly: 'hebdomadaire'
+            weekly: 'hebdomadaire',
           };
           const label = labels[value] || value;
-          window.a11ytb?.logActivity?.(`Fréquence audit programmé : ${label}`, { tags: ['audit', 'schedule'] });
-        }
+          window.a11ytb?.logActivity?.(`Fréquence audit programmé : ${label}`, {
+            tags: ['audit', 'schedule'],
+          });
+        },
       },
       {
         type: 'time',
@@ -207,8 +231,10 @@ export const manifest = {
         label: 'Début de la plage horaire',
         description: 'Heure à partir de laquelle un audit programmé peut démarrer.',
         onChange: (value) => {
-          window.a11ytb?.logActivity?.(`Fenêtre audit – début ajusté à ${value || '00:00'}`, { tags: ['audit', 'schedule'] });
-        }
+          window.a11ytb?.logActivity?.(`Fenêtre audit – début ajusté à ${value || '00:00'}`, {
+            tags: ['audit', 'schedule'],
+          });
+        },
       },
       {
         type: 'time',
@@ -216,11 +242,13 @@ export const manifest = {
         label: 'Fin de la plage horaire',
         description: 'Heure après laquelle aucun audit programmé ne sera lancé.',
         onChange: (value) => {
-          window.a11ytb?.logActivity?.(`Fenêtre audit – fin ajustée à ${value || '00:00'}`, { tags: ['audit', 'schedule'] });
-        }
-      }
-    ]
-  }
+          window.a11ytb?.logActivity?.(`Fenêtre audit – fin ajustée à ${value || '00:00'}`, {
+            tags: ['audit', 'schedule'],
+          });
+        },
+      },
+    ],
+  },
 };
 
 export default manifest;

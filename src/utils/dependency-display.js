@@ -1,14 +1,12 @@
 const STATUS_LABELS = {
   ok: 'OK',
   missing: 'Manquant',
-  incompatible: 'Version incompatible'
+  incompatible: 'Version incompatible',
 };
 
 function normalizeDependencies(list) {
   if (!Array.isArray(list)) return [];
-  return list
-    .filter((entry) => entry && typeof entry === 'object')
-    .map((entry) => ({ ...entry }));
+  return list.filter((entry) => entry && typeof entry === 'object').map((entry) => ({ ...entry }));
 }
 
 export function summarizeDependencyLiveMessage(dependencies = [], moduleName) {
@@ -26,10 +24,15 @@ export function summarizeDependencyLiveMessage(dependencies = [], moduleName) {
   }
   if (conflicts.length === 1) {
     const single = conflicts[0];
-    return single.aria || single.message || `Dépendance à vérifier : ${single.label || single.id || ''}`;
+    return (
+      single.aria || single.message || `Dépendance à vérifier : ${single.label || single.id || ''}`
+    );
   }
   const detail = conflicts
-    .map((entry) => entry.aria || entry.message || `${entry.label || entry.id || 'Dépendance'} en conflit.`)
+    .map(
+      (entry) =>
+        entry.aria || entry.message || `${entry.label || entry.id || 'Dépendance'} en conflit.`
+    )
     .join(' ');
   return moduleName
     ? `Plusieurs dépendances de ${moduleName} sont en conflit. ${detail}`
@@ -90,9 +93,13 @@ export function updateDependencyDisplay(view, dependencies = [], { moduleName } 
     if (!conflicts.length) {
       summaryText = 'Toutes les dépendances sont satisfaites.';
     } else if (conflicts.length === 1) {
-      summaryText = conflicts[0].message || `Dépendance à vérifier : ${conflicts[0].label || conflicts[0].id}`;
+      summaryText =
+        conflicts[0].message || `Dépendance à vérifier : ${conflicts[0].label || conflicts[0].id}`;
     } else {
-      const names = conflicts.map((entry) => entry.label || entry.id).filter(Boolean).join(', ');
+      const names = conflicts
+        .map((entry) => entry.label || entry.id)
+        .filter(Boolean)
+        .join(', ');
       summaryText = `${conflicts.length} dépendances nécessitent une action : ${names}.`;
     }
   }
@@ -110,5 +117,5 @@ export function updateDependencyDisplay(view, dependencies = [], { moduleName } 
 
 export const __TEST_ONLY__ = {
   STATUS_LABELS,
-  normalizeDependencies
+  normalizeDependencies,
 };

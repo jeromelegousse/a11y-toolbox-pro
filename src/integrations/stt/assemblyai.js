@@ -37,14 +37,20 @@ export const assemblyAiEngine = {
   /**
    * @param {{ filePath: string, language?: string, diarize?: boolean, pollIntervalMs?: number, maxPolls?: number }} options
    */
-  async transcribe({ filePath, language, diarize, pollIntervalMs = DEFAULT_POLL_INTERVAL_MS, maxPolls = DEFAULT_MAX_POLLS } = {}) {
+  async transcribe({
+    filePath,
+    language,
+    diarize,
+    pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+    maxPolls = DEFAULT_MAX_POLLS,
+  } = {}) {
     const absolutePath = ensureFilePath(filePath);
     const apiKey = requireEnv('ASSEMBLYAI_API_KEY');
     const audioBuffer = await readAudio(absolutePath);
 
     const headers = {
       Authorization: apiKey,
-      'Content-Type': DEFAULT_MIME_TYPE
+      'Content-Type': DEFAULT_MIME_TYPE,
     };
 
     const uploadResponse = await fetchWithRetry(
@@ -53,11 +59,11 @@ export const assemblyAiEngine = {
         method: 'POST',
         headers,
         body: audioBuffer,
-        timeout: 60000
+        timeout: 60000,
       },
       {
         retries: 1,
-        retryDelayMs: 1000
+        retryDelayMs: 1000,
       }
     );
 
@@ -65,7 +71,7 @@ export const assemblyAiEngine = {
     const uploadUrl = uploadPayload?.upload_url;
 
     if (!uploadUrl) {
-      throw new Error('La réponse AssemblyAI ne contient pas d\'URL de téléversement.');
+      throw new Error("La réponse AssemblyAI ne contient pas d'URL de téléversement.");
     }
 
     const transcriptResponse = await fetchWithRetry(
@@ -74,18 +80,18 @@ export const assemblyAiEngine = {
         method: 'POST',
         headers: {
           Authorization: apiKey,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           audio_url: uploadUrl,
           language_code: language ?? DEFAULT_LANGUAGE,
-          speaker_labels: Boolean(diarize)
+          speaker_labels: Boolean(diarize),
         }),
-        timeout: 15000
+        timeout: 15000,
       },
       {
         retries: 1,
-        retryDelayMs: 1000
+        retryDelayMs: 1000,
       }
     );
 
@@ -102,13 +108,13 @@ export const assemblyAiEngine = {
         {
           method: 'GET',
           headers: {
-            Authorization: apiKey
+            Authorization: apiKey,
           },
-          timeout: 15000
+          timeout: 15000,
         },
         {
           retries: 1,
-          retryDelayMs: 1000
+          retryDelayMs: 1000,
         }
       );
 
@@ -119,19 +125,21 @@ export const assemblyAiEngine = {
         }
         return {
           text: statusPayload.text,
-          raw: statusPayload
+          raw: statusPayload,
         };
       }
 
       if (statusPayload?.status === 'error') {
-        throw new Error(`AssemblyAI a renvoyé une erreur : ${statusPayload.error || 'statut inconnu'}`);
+        throw new Error(
+          `AssemblyAI a renvoyé une erreur : ${statusPayload.error || 'statut inconnu'}`
+        );
       }
 
       await delay(pollIntervalMs);
     }
 
-    throw new Error('AssemblyAI n\'a pas terminé la transcription dans le temps imparti.');
-  }
+    throw new Error("AssemblyAI n'a pas terminé la transcription dans le temps imparti.");
+  },
 };
 
 export default assemblyAiEngine;

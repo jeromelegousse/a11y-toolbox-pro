@@ -2,10 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import dotenv from 'dotenv';
 
-const DEFAULT_ENV_FILES = [
-  '.env.local',
-  '.env'
-];
+const DEFAULT_ENV_FILES = ['.env.local', '.env'];
 
 function loadFile(path) {
   const absolutePath = resolve(path);
@@ -56,7 +53,7 @@ export function getGoogleCredentials() {
     const parsed = JSON.parse(raw);
     cachedGoogleCredentials = {
       path: absolutePath,
-      data: parsed
+      data: parsed,
     };
     return cachedGoogleCredentials;
   } catch (error) {

@@ -26,8 +26,10 @@ function createFakeElement({ inertProp = false } = {}) {
     },
     contains(node) {
       if (node === this) return true;
-      return this.children.some((child) => (typeof child.contains === 'function' ? child.contains(node) : child === node));
-    }
+      return this.children.some((child) =>
+        typeof child.contains === 'function' ? child.contains(node) : child === node
+      );
+    },
   };
 
   if (inertProp) {
@@ -40,7 +42,7 @@ function createFakeElement({ inertProp = false } = {}) {
         value = Boolean(next);
       },
       configurable: true,
-      enumerable: true
+      enumerable: true,
     });
   }
 

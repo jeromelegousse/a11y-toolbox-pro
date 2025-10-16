@@ -78,7 +78,7 @@ const contrast = {
     if (styleElement?.isConnected) {
       styleElement.remove();
     }
-  }
+  },
 };
 
 registerModule(contrast);

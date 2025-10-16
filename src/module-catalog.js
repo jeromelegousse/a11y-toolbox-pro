@@ -10,38 +10,38 @@ export const moduleCatalog = [
   {
     id: auditManifest.id,
     manifest: auditManifest,
-    loader: () => import('./modules/audit.js')
+    loader: () => import('./modules/audit.js'),
   },
   {
     id: audioFeedbackManifest.id,
     manifest: audioFeedbackManifest,
-    loader: () => import('./modules/audio-feedback.js')
+    loader: () => import('./modules/audio-feedback.js'),
   },
   {
     id: ttsManifest.id,
     manifest: ttsManifest,
-    loader: () => import('./modules/tts.js')
+    loader: () => import('./modules/tts.js'),
   },
   {
     id: sttManifest.id,
     manifest: sttManifest,
-    loader: () => import('./modules/stt.js')
+    loader: () => import('./modules/stt.js'),
   },
   {
     id: brailleManifest.id,
     manifest: brailleManifest,
-    loader: () => import('./modules/braille.js')
+    loader: () => import('./modules/braille.js'),
   },
   {
     id: contrastManifest.id,
     manifest: contrastManifest,
-    loader: () => import('./modules/contrast.js')
+    loader: () => import('./modules/contrast.js'),
   },
   {
     id: spacingManifest.id,
     manifest: spacingManifest,
-    loader: () => import('./modules/spacing.js')
-  }
+    loader: () => import('./modules/spacing.js'),
+  },
 ];
 
 export const moduleCatalogById = new Map(moduleCatalog.map((entry) => [entry.id, entry]));

@@ -39,7 +39,7 @@ const spacing = {
     if (styleElement?.isConnected) {
       styleElement.remove();
     }
-  }
+  },
 };
 
 registerModule(spacing);

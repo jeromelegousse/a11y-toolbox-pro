@@ -5,16 +5,15 @@ function setVisibilityMetrics(element, { offsetWidth = 0, offsetHeight = 0, rect
   Object.defineProperty(element, 'offsetWidth', { configurable: true, value: offsetWidth });
   Object.defineProperty(element, 'offsetHeight', { configurable: true, value: offsetHeight });
   const count = rectCount;
-  element.getClientRects = () => (count > 0
-    ? Array.from({ length: count }, () => ({ width: 1, height: 1 }))
-    : []);
+  element.getClientRects = () =>
+    count > 0 ? Array.from({ length: count }, () => ({ width: 1, height: 1 })) : [];
 }
 
 function overrideComputedStyle(element, overrides = {}) {
   Object.defineProperty(element, '__computedStyleOverride', {
     value: overrides,
     configurable: true,
-    writable: true
+    writable: true,
   });
 }
 
@@ -23,7 +22,7 @@ beforeEach(() => {
     const overrides = element?.__computedStyleOverride || {};
     return {
       display: overrides.display ?? 'block',
-      visibility: overrides.visibility ?? 'visible'
+      visibility: overrides.visibility ?? 'visible',
     };
   });
 });

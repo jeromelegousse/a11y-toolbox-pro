@@ -42,7 +42,7 @@ test.describe('Organisation — dépendances', () => {
           status: 'missing',
           statusLabel: 'Manquant',
           message: 'Module requis introuvable.',
-          aria: 'Dépendance Moteur vocal manquante pour Synthèse vocale.'
+          aria: 'Dépendance Moteur vocal manquante pour Synthèse vocale.',
         },
         {
           id: 'audio-core',
@@ -50,8 +50,8 @@ test.describe('Organisation — dépendances', () => {
           status: 'ok',
           statusLabel: 'OK',
           message: 'Module disponible.',
-          aria: 'Dépendance Audio Core disponible pour Synthèse vocale.'
-        }
+          aria: 'Dépendance Audio Core disponible pour Synthèse vocale.',
+        },
       ]);
     });
     await page.waitForTimeout(50);
@@ -60,8 +60,14 @@ test.describe('Organisation — dépendances', () => {
       '.a11ytb-admin-item[data-module-id="tts"] .a11ytb-admin-dependencies'
     );
     await expect(dependencySection).toBeVisible();
-    await expect(dependencySection.locator('.a11ytb-admin-dependency-badge', { hasText: 'Manquant' })).toBeVisible();
-    await expect(dependencySection.locator('.a11ytb-admin-dependency-badge', { hasText: 'OK' })).toBeVisible();
-    await expect(dependencySection.locator('.a11ytb-admin-dependency-message').first()).toContainText('introuvable');
+    await expect(
+      dependencySection.locator('.a11ytb-admin-dependency-badge', { hasText: 'Manquant' })
+    ).toBeVisible();
+    await expect(
+      dependencySection.locator('.a11ytb-admin-dependency-badge', { hasText: 'OK' })
+    ).toBeVisible();
+    await expect(
+      dependencySection.locator('.a11ytb-admin-dependency-message').first()
+    ).toContainText('introuvable');
   });
 });

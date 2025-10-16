@@ -21,9 +21,10 @@ const extractBaselinePayload = (svg) => {
   return match[1];
 };
 
-const BASELINE_SCREENSHOT = shouldUpdateBaseline || !existsSync(BASELINE_PATH)
-  ? null
-  : extractBaselinePayload(readFileSync(BASELINE_PATH, 'utf8'));
+const BASELINE_SCREENSHOT =
+  shouldUpdateBaseline || !existsSync(BASELINE_PATH)
+    ? null
+    : extractBaselinePayload(readFileSync(BASELINE_PATH, 'utf8'));
 
 const BASELINE_DATA = shouldUpdateBaseline ? null : loadBaselineData();
 
@@ -33,7 +34,7 @@ const focusableSelectors = [
   'textarea:not([disabled])',
   'input:not([disabled])',
   'select:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])'
+  '[tabindex]:not([tabindex="-1"])',
 ];
 
 test.describe('Panneau Options & Profils', () => {
@@ -87,7 +88,7 @@ test.describe('Panneau Options & Profils', () => {
       if (!options) return 0;
       const focusables = [
         toggle,
-        ...Array.from(options.querySelectorAll(selectors.join(',')))
+        ...Array.from(options.querySelectorAll(selectors.join(','))),
       ].filter((el) => el && el.offsetParent !== null && !el.hasAttribute('hidden'));
       return focusables.length;
     }, focusableSelectors);
@@ -101,7 +102,7 @@ test.describe('Panneau Options & Profils', () => {
       const options = document.querySelector('.a11ytb-view--options');
       return {
         datasetView: active?.dataset?.view ?? null,
-        insideOptions: !!options?.contains(active)
+        insideOptions: !!options?.contains(active),
       };
     });
 
@@ -114,7 +115,7 @@ test.describe('Panneau Options & Profils', () => {
       const options = document.querySelector('.a11ytb-view--options');
       return {
         datasetView: active?.dataset?.view ?? null,
-        insideOptions: !!options?.contains(active)
+        insideOptions: !!options?.contains(active),
       };
     });
 
@@ -146,7 +147,7 @@ test.describe('Panneau Options & Profils', () => {
     const screenshot = await panel.screenshot({
       animations: 'disabled',
       mask: [page.locator('.a11ytb-activity-list')],
-      maskColor: '#000'
+      maskColor: '#000',
     });
 
     const actual = screenshot.toString('base64');
@@ -158,17 +159,16 @@ test.describe('Panneau Options & Profils', () => {
         `<svg xmlns="http://www.w3.org/2000/svg" width="${pngWidth}" height="${pngHeight}" viewBox="0 0 ${pngWidth} ${pngHeight}">`,
         `  <image width="${pngWidth}" height="${pngHeight}" href="data:image/png;base64,${actual}" />`,
         '</svg>',
-        ''
+        '',
       ].join('\n');
       writeFileSync(BASELINE_PATH, svgPayload, 'utf8');
       test.info().annotations.push({
         type: 'baseline',
-        description: 'options-panel baseline updated (SVG)'
+        description: 'options-panel baseline updated (SVG)',
       });
     } else {
       const { width, height, sha256, buffer } = BASELINE_DATA ?? loadBaselineData();
-      const { width: captureWidth, height: captureHeight } =
-        getPngDimensions(screenshot);
+      const { width: captureWidth, height: captureHeight } = getPngDimensions(screenshot);
       expect(captureWidth).toBe(width);
       expect(captureHeight).toBe(height);
       expect(computeScreenshotHash(screenshot)).toBe(sha256);
@@ -185,9 +185,7 @@ function loadBaselineData() {
   }
 
   if (!BASELINE_SCREENSHOT) {
-    throw new Error(
-      `Le fichier de référence est vide ou corrompu : ${BASELINE_PATH}`
-    );
+    throw new Error(`Le fichier de référence est vide ou corrompu : ${BASELINE_PATH}`);
   }
 
   const buffer = Buffer.from(BASELINE_SCREENSHOT, 'base64');
@@ -197,7 +195,7 @@ function loadBaselineData() {
     width,
     height,
     sha256: computeScreenshotHash(buffer),
-    buffer
+    buffer,
   };
 }
 
@@ -208,7 +206,7 @@ function getPngDimensions(buffer) {
 
   return {
     width: buffer.readUInt32BE(16),
-    height: buffer.readUInt32BE(20)
+    height: buffer.readUInt32BE(20),
   };
 }
 
