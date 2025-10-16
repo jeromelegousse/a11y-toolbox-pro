@@ -12,9 +12,9 @@ test.describe('Organisation — dépendances', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    const fab = page.locator('.a11ytb-fab');
-    await expect(fab).toBeVisible();
-    await fab.click();
+    const panelToggle = page.locator('.a11ytb-fab:not(.a11ytb-fab--status)');
+    await expect(panelToggle).toBeVisible();
+    await panelToggle.click();
     await expect(page.locator('.a11ytb-panel')).toHaveAttribute('data-open', 'true');
 
     const organizeButton = page.getByRole('tab', { name: 'Organisation' });

@@ -13,8 +13,9 @@ test.describe('Activité — connecteurs et synchronisations', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('.a11ytb-fab')).toBeVisible();
-    await page.locator('.a11ytb-fab').click();
+    const panelToggle = page.locator('.a11ytb-fab:not(.a11ytb-fab--status)');
+    await expect(panelToggle).toBeVisible();
+    await panelToggle.click();
     await expect(page.locator('.a11ytb-panel')).toHaveAttribute('data-open', 'true');
     await page.locator('.a11ytb-activity > summary').click();
   });
