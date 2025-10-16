@@ -123,7 +123,9 @@ body {
 .a11ytb-fab--status {
   --a11ytb-status-tone-color: var(--a11ytb-accent);
 
-  bottom: calc(var(--a11ytb-safe-margin) + var(--a11ytb-safe-area-bottom) + var(--a11ytb-size) + 20px);
+  bottom: calc(
+    var(--a11ytb-safe-margin) + var(--a11ytb-safe-area-bottom) + var(--a11ytb-size) + 20px
+  );
   background: color-mix(in srgb, var(--a11ytb-surface) 92%, transparent);
   border: 1px solid color-mix(in srgb, var(--a11ytb-border) 70%, transparent);
   box-shadow: var(--a11ytb-shadow);
@@ -472,8 +474,7 @@ body {
 .a11ytb-panel[data-fullscreen='true'] {
   --a11ytb-fullscreen-gap: clamp(16px, 3vw, 48px);
 
-  inset:
-    calc(var(--a11ytb-safe-area-top) + var(--a11ytb-fullscreen-gap))
+  inset: calc(var(--a11ytb-safe-area-top) + var(--a11ytb-fullscreen-gap))
     calc(var(--a11ytb-safe-area-right) + var(--a11ytb-fullscreen-gap))
     calc(var(--a11ytb-safe-area-bottom) + var(--a11ytb-fullscreen-gap))
     calc(var(--a11ytb-safe-area-left) + var(--a11ytb-fullscreen-gap));
