@@ -2,18 +2,18 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { loadEnvironment } from './env.js';
-import { openAiWhisperEngine } from '../../src/integrations/stt/openai-whisper.js';
+import { speechEngines } from '../../src/integrations/stt/index.js';
 
-const ENGINES = new Map([
-  [openAiWhisperEngine.id, openAiWhisperEngine]
-]);
+const ENGINES = speechEngines;
 
 function printUsage() {
-  console.log(`Usage : npm run demo:stt -- --file=./audio.wav [--engine=openai-whisper] [--language=fr]`);
+  const engineIds = Array.from(ENGINES.keys()).join('|');
+  console.log(`Usage : npm run demo:stt -- --file=./audio.wav [--engine=${engineIds}] [--language=fr]`);
 }
 
 function parseArgs(rawArgs) {
-  const args = { engine: openAiWhisperEngine.id };
+  const [defaultEngine] = ENGINES.keys();
+  const args = { engine: defaultEngine };
 
   for (const token of rawArgs) {
     if (!token.startsWith('--')) {
@@ -57,7 +57,8 @@ async function main() {
   console.log(JSON.stringify({
     engine: engine.id,
     file: absoluteFile,
-    text: result.text
+    text: result.text,
+    raw: result
   }, null, 2));
 }
 
