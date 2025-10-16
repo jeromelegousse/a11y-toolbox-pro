@@ -13,7 +13,7 @@ const ENGINES = new Map([
   [deepgramEngine.id, deepgramEngine],
   [assemblyAiEngine.id, assemblyAiEngine],
   [googleCloudSttEngine.id, googleCloudSttEngine],
-  [azureSpeechEngine.id, azureSpeechEngine]
+  [azureSpeechEngine.id, azureSpeechEngine],
 ]);
 
 function printUsage() {
@@ -92,15 +92,21 @@ async function main() {
   const { engine: _ignoredEngine, file, ...engineOptions } = args;
   const result = await engine.transcribe({
     filePath: absoluteFile,
-    ...engineOptions
+    ...engineOptions,
   });
 
-  console.log(JSON.stringify({
-    engine: engine.id,
-    file: absoluteFile,
-    text: result.text,
-    raw: result
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        engine: engine.id,
+        file: absoluteFile,
+        text: result.text,
+        raw: result,
+      },
+      null,
+      2
+    )
+  );
 }
 
 main().catch((error) => {

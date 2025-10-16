@@ -7,7 +7,9 @@ export { manifest };
 const AXE_CORE_VERSION = '4.11.0';
 const LOCAL_AXE_CORE_SRC = new URL('../../assets/vendor/axe-core/axe.min.js', import.meta.url).href;
 const CDN_AXE_CORE_SRC = `https://cdn.jsdelivr.net/npm/axe-core@${AXE_CORE_VERSION}/axe.min.js`;
+/* prettier-ignore */
 const CDN_AXE_CORE_INTEGRITY = 'sha384-C9AUAqw5Tb7bgiS/Z+U3EGEzD+qn2oE0sJOC4kp0Xu8DcQMLKECMpbVsuWxF+rdh';
+// required on one line for integrity checker regex
 
 let axeLoader = null;
 let axeLocalLoader = null;
@@ -16,13 +18,13 @@ let axeCdnLoader = null;
 const SCHEDULE_INTERVALS = {
   hourly: 60 * 60 * 1000,
   daily: 24 * 60 * 60 * 1000,
-  weekly: 7 * 24 * 60 * 60 * 1000
+  weekly: 7 * 24 * 60 * 60 * 1000,
 };
 
 const SCHEDULE_LABELS = {
   hourly: 'toutes les heures',
   daily: 'quotidien',
-  weekly: 'hebdomadaire'
+  weekly: 'hebdomadaire',
 };
 
 const SCHEDULE_DEFAULTS = manifest?.defaults?.state?.audit?.preferences?.schedule ?? {
@@ -30,7 +32,7 @@ const SCHEDULE_DEFAULTS = manifest?.defaults?.state?.audit?.preferences?.schedul
   frequency: 'weekly',
   timeWindow: { start: '09:00', end: '18:00' },
   lastRunAt: null,
-  nextRunAt: null
+  nextRunAt: null,
 };
 
 let scheduleUnsubscribe = null;
@@ -153,7 +155,7 @@ function ensureAuditState(state) {
       const nextSchedule = { ...defaultSchedule, ...schedule };
       nextSchedule.timeWindow = {
         ...defaultSchedule.timeWindow,
-        ...(schedule.timeWindow || {})
+        ...(schedule.timeWindow || {}),
       };
       let shouldUpdate = false;
       ['enabled', 'frequency', 'lastRunAt', 'nextRunAt'].forEach((key) => {
@@ -223,7 +225,7 @@ function parseTimeToMinutes(value, fallback) {
   }
   const hours = Number.parseInt(match[1], 10);
   const minutes = Number.parseInt(match[2], 10);
-  return (hours * 60) + minutes;
+  return hours * 60 + minutes;
 }
 
 function getWindowMinutes(window) {
@@ -238,26 +240,27 @@ function getWindowMinutes(window) {
     endMinutes = safeStart + 60;
   }
   if (endMinutes <= safeStart) {
-    endMinutes = Math.min((24 * 60), safeStart + 60);
+    endMinutes = Math.min(24 * 60, safeStart + 60);
   }
   return {
     startMinutes: safeStart,
-    endMinutes
+    endMinutes,
   };
 }
 
 function normalizeScheduleState(schedule = {}) {
   const defaults = SCHEDULE_DEFAULTS;
-  const frequency = schedule?.frequency && SCHEDULE_INTERVALS[schedule.frequency]
-    ? schedule.frequency
-    : (defaults.frequency || 'weekly');
+  const frequency =
+    schedule?.frequency && SCHEDULE_INTERVALS[schedule.frequency]
+      ? schedule.frequency
+      : defaults.frequency || 'weekly';
   const window = normalizeScheduleWindow(schedule?.timeWindow ?? defaults.timeWindow ?? {});
   return {
     enabled: !!schedule?.enabled,
     frequency,
     timeWindow: window,
     lastRunAt: safeNumber(schedule?.lastRunAt),
-    nextRunAt: safeNumber(schedule?.nextRunAt)
+    nextRunAt: safeNumber(schedule?.nextRunAt),
   };
 }
 
@@ -267,7 +270,7 @@ function alignWithinWindow(timestamp, frequency, windowMinutes, nowMs) {
   const safeStart = Number.isFinite(startMinutes) ? startMinutes : 9 * 60;
   let safeEnd = Number.isFinite(endMinutes) ? endMinutes : safeStart + 60;
   if (safeEnd <= safeStart) {
-    safeEnd = Math.min((24 * 60), safeStart + 60);
+    safeEnd = Math.min(24 * 60, safeStart + 60);
   }
   const startHours = Math.floor(safeStart / 60);
   const startMins = safeStart % 60;
@@ -281,7 +284,7 @@ function alignWithinWindow(timestamp, frequency, windowMinutes, nowMs) {
       result.setHours(result.getHours() + 1, 0, 0, 0);
     }
     for (let guard = 0; guard < 48; guard += 1) {
-      const minutes = (result.getHours() * 60) + result.getMinutes();
+      const minutes = result.getHours() * 60 + result.getMinutes();
       if (minutes < safeStart) {
         result.setHours(startHours, startMins, 0, 0);
         continue;
@@ -313,9 +316,10 @@ function computeNextRunAt(schedule, nowMs = Date.now()) {
   if (!schedule?.enabled) return null;
   const normalized = normalizeScheduleState(schedule);
   const now = Number.isFinite(nowMs) ? nowMs : Date.now();
-  const frequency = normalized.frequency && SCHEDULE_INTERVALS[normalized.frequency]
-    ? normalized.frequency
-    : SCHEDULE_DEFAULTS.frequency || 'weekly';
+  const frequency =
+    normalized.frequency && SCHEDULE_INTERVALS[normalized.frequency]
+      ? normalized.frequency
+      : SCHEDULE_DEFAULTS.frequency || 'weekly';
   const windowMinutes = getWindowMinutes(normalized.timeWindow);
   const persistedNext = safeNumber(normalized.nextRunAt);
   if (persistedNext && persistedNext > now) {
@@ -382,16 +386,19 @@ function triggerScheduledAudit(state) {
   schedulePendingRun = true;
   clearScheduleTimers();
   const plannedAt = safeNumber(schedule.nextRunAt) ?? Date.now();
-  window.a11ytb?.logActivity?.(`Audit planifié lancé (${formatFrequencyLabel(schedule.frequency)})`, {
-    module: manifest.id,
-    tone: 'info',
-    tags: ['audit', 'schedule'],
-    payload: {
-      type: 'scheduled-audit',
-      frequency: schedule.frequency,
-      plannedAt
+  window.a11ytb?.logActivity?.(
+    `Audit planifié lancé (${formatFrequencyLabel(schedule.frequency)})`,
+    {
+      module: manifest.id,
+      tone: 'info',
+      tags: ['audit', 'schedule'],
+      payload: {
+        type: 'scheduled-audit',
+        frequency: schedule.frequency,
+        plannedAt,
+      },
     }
-  });
+  );
   Promise.resolve()
     .then(() => runAudit({ state }))
     .then((report) => {
@@ -409,8 +416,8 @@ function triggerScheduledAudit(state) {
         payload: {
           type: 'scheduled-audit',
           frequency: schedule.frequency,
-          error: error?.message || 'Échec du run planifié'
-        }
+          error: error?.message || 'Échec du run planifié',
+        },
       });
     })
     .finally(() => {
@@ -494,7 +501,7 @@ async function runAudit({ state }) {
     const axe = await loadAxeCore();
     const raw = await axe.run(document, {
       reporter: 'v2',
-      resultTypes: ['violations', 'incomplete', 'passes']
+      resultTypes: ['violations', 'incomplete', 'passes'],
     });
     const normalized = normalizeAxeReport(raw);
     const summary = summarizeReport(normalized);
@@ -503,7 +510,7 @@ async function runAudit({ state }) {
       lastRun: normalized.timestamp,
       lastReport: normalized,
       summary,
-      error: null
+      error: null,
     });
     window.a11ytb?.logActivity?.(`Audit axe-core : ${summary.logMessage}`, {
       module: manifest.id,
@@ -514,8 +521,8 @@ async function runAudit({ state }) {
         type: 'audit-report',
         runAt: normalized.timestamp,
         totals: summary.totals || {},
-        outcome: summary.outcome
-      }
+        outcome: summary.outcome,
+      },
     });
     return normalized;
   } catch (error) {
@@ -523,9 +530,9 @@ async function runAudit({ state }) {
     updateAuditState(state, {
       status: 'error',
       error: error?.message || 'Échec de l’audit',
-      lastRun: Date.now()
+      lastRun: Date.now(),
     });
-    window.a11ytb?.logActivity?.("Audit axe-core : échec de l’analyse", {
+    window.a11ytb?.logActivity?.('Audit axe-core : échec de l’analyse', {
       module: manifest.id,
       tone: 'alert',
       severity: 'alert',
@@ -533,8 +540,8 @@ async function runAudit({ state }) {
       payload: {
         type: 'audit-report',
         outcome: 'error',
-        error: error?.message || 'Échec de l’audit'
-      }
+        error: error?.message || 'Échec de l’audit',
+      },
     });
     throw error;
   }
@@ -548,7 +555,7 @@ const auditModule = {
     const api = {
       analyze: () => runAudit({ state }),
       getLastReport: () => state.get('audit.lastReport'),
-      getSummary: () => state.get('audit.summary')
+      getSummary: () => state.get('audit.summary'),
     };
     if (!window.a11ytb) window.a11ytb = {};
     window.a11ytb.audit = api;
@@ -573,7 +580,7 @@ const auditModule = {
     clearScheduleTimers();
     schedulePendingRun = false;
     lastScheduleSignature = '';
-  }
+  },
 };
 
 registerModule(auditModule);
@@ -586,5 +593,5 @@ export const __testing = {
   loadAxeFromLocal,
   loadAxeFromCdn,
   loadAxeCore,
-  resetAxeLoaders
+  resetAxeLoaders,
 };

@@ -23,7 +23,7 @@ describe('loadImageAsBase64', () => {
     expect(result).toMatchObject({
       mimeType: 'image/png',
       data: buffer.toString('base64'),
-      filename: 'sample.png'
+      filename: 'sample.png',
     });
     expect(result.size).toBe(buffer.byteLength);
     expect(result.absolutePath).toContain('sample.png');

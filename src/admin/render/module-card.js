@@ -21,7 +21,11 @@ function renderFlags(flags) {
 function renderDependencies(entry) {
   const dependencies = Array.isArray(entry.dependencies) ? entry.dependencies : [];
   const compat = entry.compat || {};
-  if (!dependencies.length && !compat?.missing?.features?.length && !compat?.missing?.browsers?.length) {
+  if (
+    !dependencies.length &&
+    !compat?.missing?.features?.length &&
+    !compat?.missing?.browsers?.length
+  ) {
     return null;
   }
 
@@ -42,7 +46,13 @@ function renderDependencies(entry) {
       const title = document.createElement('span');
       title.className = 'a11ytb-admin-dependency-label';
       title.textContent = dependency.label || dependency.id;
-      const tone = dependency.tone || (dependency.status === 'ok' ? 'confirm' : dependency.status === 'missing' ? 'alert' : 'warning');
+      const tone =
+        dependency.tone ||
+        (dependency.status === 'ok'
+          ? 'confirm'
+          : dependency.status === 'missing'
+            ? 'alert'
+            : 'warning');
       const status = createBadge(dependency.statusLabel || dependency.status || 'Inconnu', tone);
       status.classList.add('a11ytb-admin-dependency-badge');
       status.setAttribute('aria-label', dependency.aria || status.textContent);
@@ -181,7 +191,7 @@ export function createModuleCard(entry, actions) {
     ['Chargements', `${successes}/${attempts}`],
     ['Échecs', failures.toString()],
     ['Temps moyen', formatDuration(entry.metrics.timings?.combinedAverage)],
-    ['Dernière tentative', formatDateRelative(lastAttempt)]
+    ['Dernière tentative', formatDateRelative(lastAttempt)],
   ];
 
   metricsEntries.forEach(([label, value]) => {
@@ -205,7 +215,8 @@ export function createModuleCard(entry, actions) {
   enableButton.setAttribute('aria-pressed', entry.enabled ? 'true' : 'false');
   enableButton.addEventListener('click', () => actions.toggleEnabled(entry));
   if (enableButton.disabled && entry.collectionDisabled) {
-    enableButton.title = 'Désactivation gérée par une collection : ajustez-la depuis le panneau Collections.';
+    enableButton.title =
+      'Désactivation gérée par une collection : ajustez-la depuis le panneau Collections.';
   }
 
   const pinButton = document.createElement('button');

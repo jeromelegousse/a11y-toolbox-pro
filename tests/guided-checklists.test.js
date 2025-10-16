@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildGuidedChecklists, fastPassFlows, toggleManualChecklistStep } from '../src/guided-checklists.js';
+import {
+  buildGuidedChecklists,
+  fastPassFlows,
+  toggleManualChecklistStep,
+} from '../src/guided-checklists.js';
 
 describe('buildGuidedChecklists', () => {
   it('builds a core services overview using runtime metrics', () => {
@@ -8,9 +12,9 @@ describe('buildGuidedChecklists', () => {
         modules: {
           tts: { enabled: true, state: 'ready', metrics: { compat: { status: 'full' } } },
           stt: { enabled: false, state: 'idle' },
-          braille: { enabled: true, state: 'error', error: 'Driver manquant' }
-        }
-      }
+          braille: { enabled: true, state: 'error', error: 'Driver manquant' },
+        },
+      },
     };
     const [coreServices] = buildGuidedChecklists(snapshot);
     expect(coreServices.id).toBe('core-services');
@@ -25,19 +29,19 @@ describe('buildGuidedChecklists', () => {
       ui: {
         guides: {
           completedSteps: {
-            'audit-fastpass:audit-share': true
-          }
-        }
+            'audit-fastpass:audit-share': true,
+          },
+        },
       },
       runtime: {
         modules: {
-          audit: { enabled: true, state: 'ready' }
-        }
+          audit: { enabled: true, state: 'ready' },
+        },
       },
       audit: {
         lastRun: Date.now(),
-        summary: { totals: { critical: 0, serious: 0, moderate: 0, minor: 0 } }
-      }
+        summary: { totals: { critical: 0, serious: 0, moderate: 0, minor: 0 } },
+      },
     };
     const scenarios = buildGuidedChecklists(snapshot);
     const auditScenario = scenarios.find((scenario) => scenario.id === 'audit-fastpass');
@@ -53,22 +57,20 @@ describe('buildGuidedChecklists', () => {
       runtime: {
         modules: {
           tts: { enabled: true, state: 'ready' },
-          audit: { enabled: true, state: 'ready', metrics: { compat: { status: 'full' } } }
-        }
+          audit: { enabled: true, state: 'ready', metrics: { compat: { status: 'full' } } },
+        },
       },
       tts: {
-        availableVoices: [
-          { voiceURI: 'fr-FR-demo', name: 'Demo FR', lang: 'fr-FR' }
-        ],
-        voice: 'fr-FR-demo'
+        availableVoices: [{ voiceURI: 'fr-FR-demo', name: 'Demo FR', lang: 'fr-FR' }],
+        voice: 'fr-FR-demo',
       },
       audit: {
         lastRun: now,
         summary: {
           headline: 'Audit terminé',
-          totals: { critical: 0, serious: 0 }
-        }
-      }
+          totals: { critical: 0, serious: 0 },
+        },
+      },
     };
     const scenarios = buildGuidedChecklists(snapshot);
     const ttsScenario = scenarios.find((scenario) => scenario.id === 'tts-onboarding');
@@ -95,7 +97,10 @@ describe('fastPassFlows', () => {
 
 describe('toggleManualChecklistStep', () => {
   function createStubState(initial = {}) {
-    const store = structuredClone({ ui: { guides: { completedSteps: {}, selectedScenario: null, cursors: {} } }, ...initial });
+    const store = structuredClone({
+      ui: { guides: { completedSteps: {}, selectedScenario: null, cursors: {} } },
+      ...initial,
+    });
     return {
       get(path) {
         if (!path) return undefined;
@@ -112,7 +117,7 @@ describe('toggleManualChecklistStep', () => {
           target = target[key];
         }
         target[parts[parts.length - 1]] = value;
-      }
+      },
     };
   }
 
@@ -125,7 +130,9 @@ describe('toggleManualChecklistStep', () => {
   });
 
   it('returns false when forcing the same value', () => {
-    const state = createStubState({ ui: { guides: { completedSteps: { 'audit-fastpass:audit-share': true } } } });
+    const state = createStubState({
+      ui: { guides: { completedSteps: { 'audit-fastpass:audit-share': true } } },
+    });
     expect(toggleManualChecklistStep(state, 'audit-fastpass:audit-share', true)).toBe(false);
     expect(state.get('ui.guides.completedSteps')['audit-fastpass:audit-share']).toBe(true);
   });

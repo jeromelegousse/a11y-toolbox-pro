@@ -10,18 +10,20 @@ export const manifest = {
   license: 'MIT',
   authors: [
     { name: 'Équipe Accessibilité', email: 'accessibilite@a11ytoolbox.test' },
-    { name: 'Julien Meyer', email: 'j.meyer@a11ytoolbox.test' }
+    { name: 'Julien Meyer', email: 'j.meyer@a11ytoolbox.test' },
   ],
   guides: [
     {
       id: 'stt-onboarding',
       title: 'Configurer la dictée vocale',
-      description: 'Activez la reconnaissance vocale, vérifiez la compatibilité et réalisez un test de dictée.',
+      description:
+        'Activez la reconnaissance vocale, vérifiez la compatibilité et réalisez un test de dictée.',
       category: 'interaction',
       order: 50,
       prerequisites: [{ type: 'module', id: 'stt' }],
       assistance: {
-        microcopy: 'Informez l’utilisateur de la collecte audio et invitez-le à autoriser le micro avant la première dictée.'
+        microcopy:
+          'Informez l’utilisateur de la collecte audio et invitez-le à autoriser le micro avant la première dictée.',
       },
       steps: [
         {
@@ -31,12 +33,15 @@ export const manifest = {
           detail: ({ moduleName, runtime }) => {
             const name = moduleName || 'Reconnaissance vocale';
             if (!runtime?.enabled) return `${name} est désactivée.`;
-            if (runtime?.state === 'error') return runtime?.error ? `Erreur signalée : ${runtime.error}` : `${name} est en erreur.`;
+            if (runtime?.state === 'error')
+              return runtime?.error
+                ? `Erreur signalée : ${runtime.error}`
+                : `${name} est en erreur.`;
             if (runtime?.state === 'loading') return `${name} se charge…`;
             if (runtime?.state === 'ready') return `${name} est prête.`;
             return `${name} est en attente d’activation.`;
           },
-          check: ({ runtime }) => !!runtime?.enabled && runtime.state === 'ready'
+          check: ({ runtime }) => !!runtime?.enabled && runtime.state === 'ready',
         },
         {
           id: 'stt-compatibility',
@@ -57,7 +62,7 @@ export const manifest = {
             const compat = runtime?.metrics?.compat;
             if (!compat) return false;
             return compat.status === 'full' || compat.status === 'unknown';
-          }
+          },
         },
         {
           id: 'stt-test',
@@ -65,24 +70,25 @@ export const manifest = {
           mode: 'manual',
           detail: ({ snapshot }) => {
             const transcript = snapshot?.stt?.transcript || '';
-            if (!transcript) return 'Aucun texte dicté pour le moment. Lancez une courte phrase test.';
+            if (!transcript)
+              return 'Aucun texte dicté pour le moment. Lancez une courte phrase test.';
             return `Dernière dictée : « ${transcript.slice(0, 60)}${transcript.length > 60 ? '…' : ''} ».`;
           },
           toggleLabels: {
             complete: 'Dictée validée',
-            reset: 'Retester'
-          }
-        }
-      ]
-    }
+            reset: 'Retester',
+          },
+        },
+      ],
+    },
   ],
   runtime: {
-    preload: 'pointer'
+    preload: 'pointer',
   },
   permissions: ['speechRecognition'],
   compat: {
     browsers: ['chrome >= 110', 'edge >= 110'],
-    features: ['SpeechRecognition']
+    features: ['SpeechRecognition'],
   },
   defaults: {
     state: {
@@ -90,9 +96,9 @@ export const manifest = {
         status: 'idle',
         transcript: '',
         language: 'auto',
-        autoPunctuation: true
-      }
-    }
+        autoPunctuation: true,
+      },
+    },
   },
   config: {
     group: 'Reconnaissance vocale',
@@ -107,18 +113,18 @@ export const manifest = {
           { value: 'auto', label: 'Détection automatique' },
           { value: 'fr-FR', label: 'Français (France)' },
           { value: 'fr-CA', label: 'Français (Canada)' },
-          { value: 'en-US', label: 'English (US)' }
+          { value: 'en-US', label: 'English (US)' },
         ],
         onChange: (value) => {
           const labels = {
             auto: 'Détection automatique',
             'fr-FR': 'Français (France)',
             'fr-CA': 'Français (Canada)',
-            'en-US': 'Anglais (États-Unis)'
+            'en-US': 'Anglais (États-Unis)',
           };
           const label = labels[value] || value;
           window.a11ytb?.logActivity?.(`Langue STT sélectionnée : ${label}`);
-        }
+        },
       },
       {
         type: 'toggle',
@@ -126,11 +132,13 @@ export const manifest = {
         label: 'Ponctuation automatique',
         description: 'Ajoute automatiquement des points et des virgules dans les transcriptions.',
         onChange: (value) => {
-          window.a11ytb?.logActivity?.(`Ponctuation automatique ${value ? 'activée' : 'désactivée'}`);
-        }
-      }
-    ]
-  }
+          window.a11ytb?.logActivity?.(
+            `Ponctuation automatique ${value ? 'activée' : 'désactivée'}`
+          );
+        },
+      },
+    ],
+  },
 };
 
 export default manifest;

@@ -47,7 +47,7 @@ export function formatDateRelative(timestamp) {
   return date.toLocaleDateString('fr-FR', {
     year: 'numeric',
     month: 'short',
-    day: 'numeric'
+    day: 'numeric',
   });
 }
 

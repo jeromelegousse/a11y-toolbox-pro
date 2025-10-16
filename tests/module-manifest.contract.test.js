@@ -17,7 +17,7 @@ function ensureTestEnvironment() {
     globalThis.document = {
       documentElement: { lang: 'fr' },
       createElement: () => ({ dataset: {}, style: {}, setAttribute: () => {} }),
-      head: { appendChild: () => {} }
+      head: { appendChild: () => {} },
     };
   } else if (!globalThis.document.documentElement) {
     globalThis.document.documentElement = { lang: 'fr' };
@@ -103,10 +103,7 @@ describe('module manifest contract', () => {
     const manifests = listModuleManifests();
 
     const dependencyGraph = new Map(
-      manifests.map((manifest) => [
-        manifest.id,
-        (manifest.dependencies ?? []).map((dep) => dep.id)
-      ])
+      manifests.map((manifest) => [manifest.id, (manifest.dependencies ?? []).map((dep) => dep.id)])
     );
 
     const missing = [];
@@ -130,11 +127,9 @@ describe('module manifest contract', () => {
   });
 
   it('gère le versionnage des manifestes et historise les changements', async () => {
-    const {
-      registerModuleManifest,
-      getModuleManifest,
-      getModuleManifestHistory
-    } = await import('../src/registry.js');
+    const { registerModuleManifest, getModuleManifest, getModuleManifestHistory } = await import(
+      '../src/registry.js'
+    );
 
     const manifestId = 'test-semver-manifest';
     const baseManifest = {
@@ -147,18 +142,18 @@ describe('module manifest contract', () => {
       permissions: ['speechSynthesis'],
       defaults: {
         state: {
-          [manifestId]: { enabled: true }
-        }
+          [manifestId]: { enabled: true },
+        },
       },
       config: {
         fields: [
           {
             type: 'toggle',
             path: `${manifestId}.enabled`,
-            label: 'Activer le module de test'
-          }
-        ]
-      }
+            label: 'Activer le module de test',
+          },
+        ],
+      },
     };
 
     const initial = registerModuleManifest(baseManifest, manifestId);

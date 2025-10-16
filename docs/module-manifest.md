@@ -9,22 +9,22 @@ objet `manifest` passé à `registerModule`. Les objectifs :
 
 ## Champs supportés
 
-| Champ | Type | Description |
-| --- | --- | --- |
-| `id` | `string` (obligatoire) | Identifiant unique du module. Doit correspondre à `definition.id`. |
-| `name` | `string` | Nom lisible utilisé dans l’interface ou la documentation. |
-| `version` | `string` | Version semver. Si absent, `0.0.0` est utilisée. |
-| `description` | `string` | Résumé court pour la documentation. |
-| `category` | `string` | Regroupement logique (vision, interaction, conversion…). |
-| `keywords` | `string[]` | Mots-clés pour la recherche/filtrage. |
-| `permissions` | `string[]` | Permissions ou APIs requises (`speechSynthesis`, `speechRecognition`, etc.). |
-| `dependencies` | `Array<string | { id, version? }>` | Dépendances vers d’autres modules. |
-| `homepage`, `bugs`, `license` | `string` | Métadonnées standard inspirées des packages npm. |
-| `authors` | `Array<string | { name, email?, url? }>` | Liste des personnes responsables. |
-| `defaults.state` | `object` | Valeurs initiales fusionnées dans le store (non destructives). |
-| `lifecycle` | `object` | Hooks optionnels (`init`, `mount`, `unmount`, `onStateChange`) prêts pour une future exploitation. |
-| `config` | `object` | Schéma libre pour décrire les options exposées au panneau global. |
-| `compat` | `object` | Contrainte de compatibilité (`browsers`, `features`). Les valeurs sont agrégées dans `runtime.modules.<id>.metrics.compat` pour calculer un score global (AA/AAA). |
+| Champ                         | Type                   | Description                                                                                                                                                        |
+| ----------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
+| `id`                          | `string` (obligatoire) | Identifiant unique du module. Doit correspondre à `definition.id`.                                                                                                 |
+| `name`                        | `string`               | Nom lisible utilisé dans l’interface ou la documentation.                                                                                                          |
+| `version`                     | `string`               | Version semver. Si absent, `0.0.0` est utilisée.                                                                                                                   |
+| `description`                 | `string`               | Résumé court pour la documentation.                                                                                                                                |
+| `category`                    | `string`               | Regroupement logique (vision, interaction, conversion…).                                                                                                           |
+| `keywords`                    | `string[]`             | Mots-clés pour la recherche/filtrage.                                                                                                                              |
+| `permissions`                 | `string[]`             | Permissions ou APIs requises (`speechSynthesis`, `speechRecognition`, etc.).                                                                                       |
+| `dependencies`                | `Array<string          | { id, version? }>`                                                                                                                                                 | Dépendances vers d’autres modules. |
+| `homepage`, `bugs`, `license` | `string`               | Métadonnées standard inspirées des packages npm.                                                                                                                   |
+| `authors`                     | `Array<string          | { name, email?, url? }>`                                                                                                                                           | Liste des personnes responsables.  |
+| `defaults.state`              | `object`               | Valeurs initiales fusionnées dans le store (non destructives).                                                                                                     |
+| `lifecycle`                   | `object`               | Hooks optionnels (`init`, `mount`, `unmount`, `onStateChange`) prêts pour une future exploitation.                                                                 |
+| `config`                      | `object`               | Schéma libre pour décrire les options exposées au panneau global.                                                                                                  |
+| `compat`                      | `object`               | Contrainte de compatibilité (`browsers`, `features`). Les valeurs sont agrégées dans `runtime.modules.<id>.metrics.compat` pour calculer un score global (AA/AAA). |
 
 Les champs inconnus sont ignorés avec un avertissement console pour éviter les fautes de frappe.
 
@@ -69,23 +69,25 @@ Les manifestes exposent des parcours FastPass via `manifest.guides`. Chaque entr
 
 ```jsonc
 {
-  "id": "audit-fastpass",                // identifiant unique du parcours
-  "title": "Audit axe-core express",     // titre lisible affiché dans l’UI
+  "id": "audit-fastpass", // identifiant unique du parcours
+  "title": "Audit axe-core express", // titre lisible affiché dans l’UI
   "description": "Préparer et partager un audit.",
-  "category": "diagnostic",              // regroupement logique (vision, audio…)
-  "order": 20,                            // position relative dans la vue Guides
-  "prerequisites": [                      // optionnel : modules ou vérifications nécessaires
+  "category": "diagnostic", // regroupement logique (vision, audio…)
+  "order": 20, // position relative dans la vue Guides
+  "prerequisites": [
+    // optionnel : modules ou vérifications nécessaires
     { "type": "module", "id": "audit" },
-    { "type": "module", "id": "tts", "optional": true }
+    { "type": "module", "id": "tts", "optional": true },
   ],
-  "steps": [                              // séquence ordonnée d’étapes
+  "steps": [
+    // séquence ordonnée d’étapes
     {
       "id": "audit-module-ready",
       "label": "Vérifier la disponibilité du module Audit",
-      "mode": "auto",                    // "auto" = vérification runtime, "manual" = action utilisateur
+      "mode": "auto", // "auto" = vérification runtime, "manual" = action utilisateur
       "detail": "Audit prêt à lancer.",
       "announce": "Module Audit opérationnel.",
-      "check": "({ runtime }) => runtime?.state === 'ready'" // fonction évaluée côté UI
+      "check": "({ runtime }) => runtime?.state === 'ready'", // fonction évaluée côté UI
     },
     {
       "id": "audit-share",
@@ -94,45 +96,49 @@ Les manifestes exposent des parcours FastPass via `manifest.guides`. Chaque entr
       "detail": "Export CSV/JSON et diffusion de la synthèse.",
       "toggleLabels": {
         "complete": "Marquer comme fait",
-        "reset": "Marquer à refaire"
-      }
-    }
+        "reset": "Marquer à refaire",
+      },
+    },
   ],
   "assistance": {
     "microcopy": "Planifiez un audit après chaque livraison majeure.",
     "examples": [
-      { "id": "share-tip", "title": "Astuce", "description": "Diffuser le CSV aux squads produit." }
+      {
+        "id": "share-tip",
+        "title": "Astuce",
+        "description": "Diffuser le CSV aux squads produit.",
+      },
     ],
     "resources": [
       {
         "id": "axe-docs",
         "href": "https://dequeuniversity.com/axe/devtools",
         "label": "Documentation axe DevTools",
-        "external": true
-      }
-    ]
+        "external": true,
+      },
+    ],
   },
-  "tags": ["fastpass", "onboarding"]
+  "tags": ["fastpass", "onboarding"],
 }
 ```
 
 ### Détails des champs
 
-| Champ | Type | Description |
-| --- | --- | --- |
-| `id` | `string` (obligatoire) | Identifiant unique du guide. Sert de clé pour l’état utilisateur. |
-| `title`, `description`, `category`, `order` | `string`, `number` | Métadonnées d’affichage. `order` peut être laissé vide (`100` par défaut). |
-| `prerequisites` | `Array<string \| object>` | Liste des prérequis. Une chaîne est interprétée comme `moduleId`. Un objet accepte `type` (`module`, `feature`, `custom`…), `id`, `optional`, `label`, `detail`, `check`. |
-| `steps` | `object[]` | Étapes ordonnées. Chaque étape doit définir `id`, `label` et `mode`. |
-| `steps[].mode` | `"auto" \| "manual"` | `auto` déclenche `check(context)` pour déterminer l’état ; `manual` utilise l’état stocké (`ui.guides.completedSteps`). |
-| `steps[].check` | `function(context)` | Fonction optionnelle évaluée côté client. Le `context` fournit `snapshot`, `runtime.modules`, `manifest`, `helpers`. |
-| `steps[].detail` / `steps[].announce` | `string \| function(context)` | Texte d’accompagnement. `announce` est diffusé dans une région `aria-live` pour guider l’utilisateur. |
-| `steps[].toggleLabels` | `{ complete, reset }` | Personnalisation des libellés « Marquer comme fait/à refaire » pour les étapes manuelles. |
-| `steps[].hints` | `string[]` | Micro-indications supplémentaires affichées sous l’étape. |
-| `assistance.microcopy` | `string \| function(context)` | Message pédagogique injecté avant la liste d’étapes. |
-| `assistance.examples` | `Array<{ id, title?, description? }>` | Cartes d’exemples ou bonnes pratiques. |
-| `assistance.resources` | `Array<{ id, href, label, external? }>` | Liens utiles (documentation FastPass, guides internes). |
-| `tags` | `string[]` | Facilite le filtrage/score de qualité. |
+| Champ                                       | Type                                    | Description                                                                                                                                                               |
+| ------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                                        | `string` (obligatoire)                  | Identifiant unique du guide. Sert de clé pour l’état utilisateur.                                                                                                         |
+| `title`, `description`, `category`, `order` | `string`, `number`                      | Métadonnées d’affichage. `order` peut être laissé vide (`100` par défaut).                                                                                                |
+| `prerequisites`                             | `Array<string \| object>`               | Liste des prérequis. Une chaîne est interprétée comme `moduleId`. Un objet accepte `type` (`module`, `feature`, `custom`…), `id`, `optional`, `label`, `detail`, `check`. |
+| `steps`                                     | `object[]`                              | Étapes ordonnées. Chaque étape doit définir `id`, `label` et `mode`.                                                                                                      |
+| `steps[].mode`                              | `"auto" \| "manual"`                    | `auto` déclenche `check(context)` pour déterminer l’état ; `manual` utilise l’état stocké (`ui.guides.completedSteps`).                                                   |
+| `steps[].check`                             | `function(context)`                     | Fonction optionnelle évaluée côté client. Le `context` fournit `snapshot`, `runtime.modules`, `manifest`, `helpers`.                                                      |
+| `steps[].detail` / `steps[].announce`       | `string \| function(context)`           | Texte d’accompagnement. `announce` est diffusé dans une région `aria-live` pour guider l’utilisateur.                                                                     |
+| `steps[].toggleLabels`                      | `{ complete, reset }`                   | Personnalisation des libellés « Marquer comme fait/à refaire » pour les étapes manuelles.                                                                                 |
+| `steps[].hints`                             | `string[]`                              | Micro-indications supplémentaires affichées sous l’étape.                                                                                                                 |
+| `assistance.microcopy`                      | `string \| function(context)`           | Message pédagogique injecté avant la liste d’étapes.                                                                                                                      |
+| `assistance.examples`                       | `Array<{ id, title?, description? }>`   | Cartes d’exemples ou bonnes pratiques.                                                                                                                                    |
+| `assistance.resources`                      | `Array<{ id, href, label, external? }>` | Liens utiles (documentation FastPass, guides internes).                                                                                                                   |
+| `tags`                                      | `string[]`                              | Facilite le filtrage/score de qualité.                                                                                                                                    |
 
 > Les guides peuvent être définis directement dans le manifest ou référencer un flux prédéfini (`fastPassFlows`) pour harmoniser les parcours standards (audit, dictée, contraste…).
 
@@ -156,21 +162,21 @@ gouvernance. Chaque critère est pondéré pour refléter les attentes concurren
 
 ```jsonc
 {
-  "level": "AA",           // AAA > AA > A > B > C
-  "levelLabel": "Avancé",  // libellé lisible pour l’interface
-  "coverage": 0.74,         // ratio de critères satisfaits
+  "level": "AA", // AAA > AA > A > B > C
+  "levelLabel": "Avancé", // libellé lisible pour l’interface
+  "coverage": 0.74, // ratio de critères satisfaits
   "coveragePercent": 74,
   "summary": "Couverture métadonnées : 74 % (niveau AA).",
   "detail": "À compléter : Guides FastPass et Licence déclarée.",
   "missing": ["Guides FastPass", "Licence déclarée"],
   "recommendations": [
     "Déclarez des guides pour rivaliser avec les parcours FastPass d’Accessibility Insights.",
-    "Ajoutez la licence du module pour sécuriser la gouvernance."
+    "Ajoutez la licence du module pour sécuriser la gouvernance.",
   ],
   "checks": [
     { "id": "guides", "passed": false, "dimension": "guidage", "weight": 1.5 },
-    { "id": "compat", "passed": true,  "dimension": "fiabilité", "weight": 1.25 }
-  ]
+    { "id": "compat", "passed": true, "dimension": "fiabilité", "weight": 1.25 },
+  ],
 }
 ```
 

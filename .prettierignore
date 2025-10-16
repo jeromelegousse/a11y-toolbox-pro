@@ -4,3 +4,4 @@ tests/visual/report
 build
 dist
 .vscode
+assets/vendor/axe-core/axe.min.js

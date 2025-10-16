@@ -4,14 +4,15 @@ Ce document synthétise des idées pour alléger la charge cognitive de la barre
 
 ## 1. Benchmark UI de références accessibilité
 
-| Produit | Points forts de navigation | Points d'attention |
-| --- | --- | --- |
-| **macOS Réglages d'accessibilité** | Sections groupées par besoin (Vision, Audition, Motricité) avec une double colonne: la première colonne liste les sections, la seconde affiche les réglages du module sélectionné. Utilise des icônes et des libellés courts. | Les listes longues deviennent lourdes sans filtres. |
-| **Microsoft Accessibility Insights** | Panneau latéral à deux niveaux: le premier niveau affiche les modes (Rapide, Automatisé, Explorer), le second affiche des sous-fonctions. Barre de recherche persistante. | Peu de feedback sur l'état des modules lorsque plusieurs sont actifs. |
-| **Stark Suite** | Navigation par onglets latéraux avec sous-catégories repliables. Les modules critiques sont épinglés en tête avec un badge « Recommended ». | Les icônes seules ne suffisent pas: Stark combine systématiquement texte + pictogramme. |
-| **axe DevTools** | Arborescence collapsible avec regroupement par contextes d'audit (Violations, Best Practices). Offre des raccourcis clavier pour chaque section et un résumé compact. | Les intitulés techniques peuvent rebuter sans micro-contenus d'aide. |
+| Produit                              | Points forts de navigation                                                                                                                                                                                                    | Points d'attention                                                                      |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **macOS Réglages d'accessibilité**   | Sections groupées par besoin (Vision, Audition, Motricité) avec une double colonne: la première colonne liste les sections, la seconde affiche les réglages du module sélectionné. Utilise des icônes et des libellés courts. | Les listes longues deviennent lourdes sans filtres.                                     |
+| **Microsoft Accessibility Insights** | Panneau latéral à deux niveaux: le premier niveau affiche les modes (Rapide, Automatisé, Explorer), le second affiche des sous-fonctions. Barre de recherche persistante.                                                     | Peu de feedback sur l'état des modules lorsque plusieurs sont actifs.                   |
+| **Stark Suite**                      | Navigation par onglets latéraux avec sous-catégories repliables. Les modules critiques sont épinglés en tête avec un badge « Recommended ».                                                                                   | Les icônes seules ne suffisent pas: Stark combine systématiquement texte + pictogramme. |
+| **axe DevTools**                     | Arborescence collapsible avec regroupement par contextes d'audit (Violations, Best Practices). Offre des raccourcis clavier pour chaque section et un résumé compact.                                                         | Les intitulés techniques peuvent rebuter sans micro-contenus d'aide.                    |
 
 Points communs observés:
+
 - **Affordances claires** : icônes accompagnées de texte, segmentation visuelle forte, surfaces interactives larges.
 - **Progressive disclosure** : les options avancées restent cachées tant que non requises.
 - **Filtres rapides** : recherche ou puces permettant de filtrer rapidement les modules.

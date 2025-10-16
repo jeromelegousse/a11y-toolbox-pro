@@ -51,9 +51,9 @@
   padding: 16px 0;
 }
 
-.a11ytb-settings-form input[type="text"],
-.a11ytb-settings-form input[type="password"],
-.a11ytb-settings-form input[type="number"],
+.a11ytb-settings-form input[type='text'],
+.a11ytb-settings-form input[type='password'],
+.a11ytb-settings-form input[type='number'],
 .a11ytb-settings-form select {
   max-width: 320px;
 }
@@ -184,16 +184,16 @@
   box-shadow: inset 0 0 0 1px rgb(15 23 42 / 4%);
 }
 
-.a11ytb-status-card[data-tone="active"],
-.a11ytb-status-card[data-tone="confirm"] {
+.a11ytb-status-card[data-tone='active'],
+.a11ytb-status-card[data-tone='confirm'] {
   border-color: color-mix(in srgb, var(--a11ytb-color-accent) 45%, transparent);
 }
 
-.a11ytb-status-card[data-tone="warning"] {
+.a11ytb-status-card[data-tone='warning'] {
   border-color: color-mix(in srgb, var(--a11ytb-color-warning) 45%, transparent);
 }
 
-.a11ytb-status-card[data-tone="alert"] {
+.a11ytb-status-card[data-tone='alert'] {
   border-color: color-mix(in srgb, var(--a11ytb-color-danger) 45%, transparent);
 }
 
@@ -380,22 +380,22 @@
   color: var(--a11ytb-admin-accent);
 }
 
-.a11ytb-admin-badge[data-tone="confirm"] {
+.a11ytb-admin-badge[data-tone='confirm'] {
   background: color-mix(in srgb, var(--a11ytb-color-success) 18%, transparent);
   color: var(--a11ytb-color-success-strong, #0f766e);
 }
 
-.a11ytb-admin-badge[data-tone="alert"] {
+.a11ytb-admin-badge[data-tone='alert'] {
   background: color-mix(in srgb, var(--a11ytb-color-danger) 18%, transparent);
   color: var(--a11ytb-color-danger-strong, #b91c1c);
 }
 
-.a11ytb-admin-badge[data-tone="warning"] {
+.a11ytb-admin-badge[data-tone='warning'] {
   background: color-mix(in srgb, var(--a11ytb-color-warning) 18%, transparent);
   color: var(--a11ytb-color-warning-strong, #b45309);
 }
 
-.a11ytb-admin-badge[data-tone="muted"] {
+.a11ytb-admin-badge[data-tone='muted'] {
   background: color-mix(in srgb, var(--a11ytb-admin-muted) 12%, transparent);
   color: var(--a11ytb-admin-muted);
 }
@@ -541,7 +541,9 @@
   color: var(--a11ytb-admin-accent);
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
 }
 
 .a11ytb-admin-action:hover:not(:disabled) {

@@ -26,10 +26,7 @@ test.describe('Activité — connecteurs et synchronisations', () => {
 
     const sendButton = page.locator('[data-action="activity-send-sync"]');
     await expect(sendButton).toBeDisabled();
-    await expect(sendButton).toHaveAttribute(
-      'title',
-      /Ajoutez un connecteur dans l’admin/
-    );
+    await expect(sendButton).toHaveAttribute('title', /Ajoutez un connecteur dans l’admin/);
 
     const connectorsList = page.locator('[data-ref="activity-connectors"]');
     await expect(connectorsList).toHaveAttribute('role', 'list');

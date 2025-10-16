@@ -13,7 +13,7 @@ function ensureTestEnvironment() {
     globalThis.document = {
       documentElement: { lang: 'fr' },
       createElement: () => ({ dataset: {}, style: {}, setAttribute: () => {} }),
-      head: { appendChild: () => {} }
+      head: { appendChild: () => {} },
     };
   } else {
     if (!globalThis.document.documentElement) {
@@ -32,7 +32,7 @@ const LEVEL_PRIORITY = new Map([
   ['B', 1],
   ['C', 0],
   ['D', -1],
-  ['E', -2]
+  ['E', -2],
 ]);
 
 const MINIMUM_LEVEL = 'AA';
@@ -47,7 +47,9 @@ const seenIds = new Map();
 
 moduleCatalog.forEach(({ id, manifest }) => {
   if (seenIds.has(id)) {
-    issues.push(`Identifiant dupliqué « ${id} » détecté dans le catalogue (déjà utilisé par ${seenIds.get(id)}).`);
+    issues.push(
+      `Identifiant dupliqué « ${id} » détecté dans le catalogue (déjà utilisé par ${seenIds.get(id)}).`
+    );
     return;
   }
   seenIds.set(id, manifest?.name || id);
@@ -65,7 +67,7 @@ moduleCatalog.forEach(({ id, manifest }) => {
     name: normalized.name || normalized.id,
     level,
     coveragePercent: quality.coveragePercent ?? Math.round(coverage * 100),
-    missing
+    missing,
   });
 
   if (levelScore < (LEVEL_PRIORITY.get(MINIMUM_LEVEL) ?? 3)) {
@@ -76,7 +78,9 @@ moduleCatalog.forEach(({ id, manifest }) => {
   } else if (coverage < MINIMUM_COVERAGE) {
     warnings.push(
       `Le module « ${normalized.name || normalized.id} » atteint ${Math.round(coverage * 100)} % de couverture. ` +
-        'Stark recommande une documentation plus exhaustive (complétez : ' + missing.join(', ') + ').'
+        'Stark recommande une documentation plus exhaustive (complétez : ' +
+        missing.join(', ') +
+        ').'
     );
   }
 
@@ -99,7 +103,8 @@ moduleCatalog.forEach(({ id, manifest }) => {
   }
 });
 
-const header = '\nA11y Toolbox Pro – audit des manifestes (benchmarks Deque axe DevTools, Accessibility Insights, Stark)\n';
+const header =
+  '\nA11y Toolbox Pro – audit des manifestes (benchmarks Deque axe DevTools, Accessibility Insights, Stark)\n';
 console.log(header);
 
 if (report.length) {
@@ -107,7 +112,7 @@ if (report.length) {
     Module: entry.name,
     Niveau: entry.level,
     Couverture: `${entry.coveragePercent}%`,
-    Manques: entry.missing.join(', ') || '—'
+    Manques: entry.missing.join(', ') || '—',
   }));
   console.table(table);
 }
@@ -124,7 +129,9 @@ if (issues.length) {
   issues.forEach((issue) => {
     console.error(` - ${issue}`);
   });
-  console.error('\nMettez à jour les manifestes pour atteindre au minimum le niveau AA, à l’image des suites professionnelles.');
+  console.error(
+    '\nMettez à jour les manifestes pour atteindre au minimum le niveau AA, à l’image des suites professionnelles.'
+  );
   process.exitCode = 1;
 } else {
   console.log('\n✅  Tous les manifestes atteignent le socle AA exigé par les outils enterprise.');

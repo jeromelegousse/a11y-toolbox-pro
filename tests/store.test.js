@@ -87,7 +87,7 @@ describe('createStore', () => {
     expect(store.get('nested.value')).toBe(42);
     expect(JSON.parse(localStorage.getItem(KEY))).toEqual({
       foo: 'bar',
-      nested: { value: 42 }
+      nested: { value: 42 },
     });
   });
 
@@ -99,7 +99,7 @@ describe('createStore', () => {
     expect(store.get()).toEqual({
       foo: 'baz',
       extra: true,
-      nested: { value: 1 }
+      nested: { value: 1 },
     });
   });
 
@@ -114,7 +114,7 @@ describe('createStore', () => {
     expect(listener).toHaveBeenCalledTimes(1);
     expect(listener).toHaveBeenCalledWith({
       foo: 'updated',
-      nested: { value: 1 }
+      nested: { value: 1 },
     });
 
     unsubscribe();
@@ -139,10 +139,16 @@ describe('createStore', () => {
 
     store.tx({ foo: 'serialized' });
 
-    expect(store.serialize()).toBe(JSON.stringify({
-      foo: 'serialized',
-      nested: { value: 1 }
-    }, null, 2));
+    expect(store.serialize()).toBe(
+      JSON.stringify(
+        {
+          foo: 'serialized',
+          nested: { value: 1 },
+        },
+        null,
+        2
+      )
+    );
   });
 
   it('continue de fonctionner quand window et localStorage sont absents', () => {
@@ -182,7 +188,7 @@ describe('createStore', () => {
 
     expect(JSON.parse(adapter.getItem(KEY))).toEqual({
       foo: 'bar',
-      nested: { value: 7 }
+      nested: { value: 7 },
     });
 
     if (previousStorage === undefined) {
@@ -203,10 +209,8 @@ describe('createStore', () => {
       createdAt: new Date('2024-01-01T00:00:00.000Z'),
       pattern: /test/gi,
       tags: new Set(['a', { deep: true }]),
-      entries: new Map([
-        ['first', { ready: true }]
-      ]),
-      bytes: new Uint8Array([1, 2, 3])
+      entries: new Map([['first', { ready: true }]]),
+      bytes: new Uint8Array([1, 2, 3]),
     };
 
     const store = createStore(KEY, initial);

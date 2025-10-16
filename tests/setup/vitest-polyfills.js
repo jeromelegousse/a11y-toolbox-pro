@@ -5,7 +5,7 @@ if (typeof ArrayBuffer !== 'undefined') {
       configurable: true,
       get() {
         return false;
-      }
+      },
     });
   }
 }
@@ -16,7 +16,7 @@ if (typeof SharedArrayBuffer === 'undefined') {
     configurable: true,
     get() {
       return false;
-    }
+    },
   });
   globalThis.SharedArrayBuffer = SharedArrayBufferMock;
 } else {
@@ -26,7 +26,7 @@ if (typeof SharedArrayBuffer === 'undefined') {
       configurable: true,
       get() {
         return false;
-      }
+      },
     });
   }
 }

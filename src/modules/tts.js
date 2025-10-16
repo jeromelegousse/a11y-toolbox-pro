@@ -12,7 +12,11 @@ let preferredLangUnsubscribe = null;
 let lastPreferredLang = '';
 
 function clearVoicesWatchers() {
-  if (voicesListener && 'speechSynthesis' in window && typeof window.speechSynthesis.removeEventListener === 'function') {
+  if (
+    voicesListener &&
+    'speechSynthesis' in window &&
+    typeof window.speechSynthesis.removeEventListener === 'function'
+  ) {
     window.speechSynthesis.removeEventListener('voiceschanged', voicesListener);
   }
   voicesListener = null;
@@ -53,9 +57,7 @@ function getSelectionText() {
 
 function resolveVoice(state) {
   if (!state) return null;
-  const voiceId = typeof state.get === 'function'
-    ? state.get('tts.voice')
-    : state.tts?.voice;
+  const voiceId = typeof state.get === 'function' ? state.get('tts.voice') : state.tts?.voice;
   if (!voiceId || !('speechSynthesis' in window)) return null;
   const voices = window.speechSynthesis?.getVoices?.() ?? [];
   return voices.find((voice) => voice.voiceURI === voiceId) || null;
@@ -73,7 +75,9 @@ function speak(text, { rate = 1, pitch = 1, volume = 1 } = {}, state) {
   }
   window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
-  utter.rate = rate; utter.pitch = pitch; utter.volume = volume;
+  utter.rate = rate;
+  utter.pitch = pitch;
+  utter.volume = volume;
   const voice = resolveVoice(state);
   if (voice) utter.voice = voice;
   abortedByStop = false;
@@ -114,10 +118,12 @@ function voicesEqual(a = [], b = []) {
   if (a.length !== b.length) return false;
   return a.every((entry, index) => {
     const other = b[index];
-    return entry?.voiceURI === other?.voiceURI
-      && entry?.lang === other?.lang
-      && entry?.name === other?.name
-      && !!entry?.default === !!other?.default;
+    return (
+      entry?.voiceURI === other?.voiceURI &&
+      entry?.lang === other?.lang &&
+      entry?.name === other?.name &&
+      !!entry?.default === !!other?.default
+    );
   });
 }
 
@@ -128,7 +134,7 @@ function updateVoices() {
     name: voice.name,
     lang: voice.lang,
     voiceURI: voice.voiceURI,
-    default: voice.default
+    default: voice.default,
   }));
   const current = store.get('tts.availableVoices') || [];
   if (!voicesEqual(current, mapped)) {
@@ -224,7 +230,7 @@ const tts = {
         store?.set('tts.progress', 0);
         window.a11ytb?.feedback?.play('toggle');
         window.a11ytb?.logActivity?.('Lecture interrompue');
-      }
+      },
     };
     if (!window.a11ytb) window.a11ytb = {};
     window.a11ytb.tts = api;
@@ -242,7 +248,7 @@ const tts = {
     store?.set('tts.speaking', false);
     store?.set('tts.status', 'idle');
     store?.set('tts.progress', 0);
-  }
+  },
 };
 
 registerModule(tts);

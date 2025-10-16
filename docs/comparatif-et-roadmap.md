@@ -4,21 +4,21 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 
 ## Solutions observées
 
-| Solution | Fonctionnalités marquantes | Positionnement |
-| --- | --- | --- |
-| **Deque axe DevTools** | Audit WCAG automatisé (DOM + contrastes), génération de rapports partageables, intégration CI/CD, tri par gravité | Outil expert pour développeurs et QA |
-| **Microsoft Accessibility Insights** | Parcours guidés (FastPass), capture de scénarios, intégration GitHub/Azure Boards, suggestions de correctifs | Audit guidé multi-profils (dev, test, design) |
-| **Stark** | Vérifications contraste/couleurs, simulation Daltonisme, export Figma/Sketch, collaboration équipe | Outil design + produit |
-| **EqualWeb / accessiBe toolbars** | Barre flottante grand public, personnalisation UI (taille texte, espacement, curseurs, TTS), profils pré-configurés | Ciblent l'utilisateur final |
+| Solution                             | Fonctionnalités marquantes                                                                                          | Positionnement                                |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| **Deque axe DevTools**               | Audit WCAG automatisé (DOM + contrastes), génération de rapports partageables, intégration CI/CD, tri par gravité   | Outil expert pour développeurs et QA          |
+| **Microsoft Accessibility Insights** | Parcours guidés (FastPass), capture de scénarios, intégration GitHub/Azure Boards, suggestions de correctifs        | Audit guidé multi-profils (dev, test, design) |
+| **Stark**                            | Vérifications contraste/couleurs, simulation Daltonisme, export Figma/Sketch, collaboration équipe                  | Outil design + produit                        |
+| **EqualWeb / accessiBe toolbars**    | Barre flottante grand public, personnalisation UI (taille texte, espacement, curseurs, TTS), profils pré-configurés | Ciblent l'utilisateur final                   |
 
 ### Analyse détaillée par axe
 
-| Axe | Forces des solutions pro | État actuel A11y Toolbox Pro | Pistes rapides |
-| --- | --- | --- | --- |
-| **UX / UI** | Parcours guidés, microcopie pédagogique, hiérarchie d'information claire (axe Insights, Stark) | Panneau unique avec options listées et vue Guides (checklists onboarding) mais peu de scénarios contextualisés | Prioriser les actions critiques, étendre l'onboarding contextuel et proposer des exemples d'usage |
-| **Ergonomie** | Navigation clavier fluide, focus trap dans les dialogues, raccourcis cohérents, feedback état chargement | Focus trap complet, vue « Raccourcis » et centre d’état temps réel (TTS/STT/Braille) mais peu d’indicateurs pour les autres modules | Harmoniser les patterns clavier, ajouter indicateurs de statut (chargement/sauvegarde), préparer la personnalisation des raccourcis |
-| **Fiabilité** | Tests automatisés (axe core), reporting d'erreurs, synchronisation cloud, compatibilité multi-navigateurs | Suite de tests (lint, unitaires Vitest, visuels Playwright) et journal exportable mais pas encore de CI distante ni de monitoring cloud | Connecter la CI, ajouter des tests offline/résilience et prévoir un reporting partagé |
-| **Design** | Design systems documentés, tokens (couleurs, espace), mode sombre cohérent | Styles ad hoc par module, contraste variable, icônes hétérogènes | Définir tokens de base, bibliothèque d'icônes accessible, mode sombre clair | 
+| Axe           | Forces des solutions pro                                                                                  | État actuel A11y Toolbox Pro                                                                                                            | Pistes rapides                                                                                                                      |
+| ------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **UX / UI**   | Parcours guidés, microcopie pédagogique, hiérarchie d'information claire (axe Insights, Stark)            | Panneau unique avec options listées et vue Guides (checklists onboarding) mais peu de scénarios contextualisés                          | Prioriser les actions critiques, étendre l'onboarding contextuel et proposer des exemples d'usage                                   |
+| **Ergonomie** | Navigation clavier fluide, focus trap dans les dialogues, raccourcis cohérents, feedback état chargement  | Focus trap complet, vue « Raccourcis » et centre d’état temps réel (TTS/STT/Braille) mais peu d’indicateurs pour les autres modules     | Harmoniser les patterns clavier, ajouter indicateurs de statut (chargement/sauvegarde), préparer la personnalisation des raccourcis |
+| **Fiabilité** | Tests automatisés (axe core), reporting d'erreurs, synchronisation cloud, compatibilité multi-navigateurs | Suite de tests (lint, unitaires Vitest, visuels Playwright) et journal exportable mais pas encore de CI distante ni de monitoring cloud | Connecter la CI, ajouter des tests offline/résilience et prévoir un reporting partagé                                               |
+| **Design**    | Design systems documentés, tokens (couleurs, espace), mode sombre cohérent                                | Styles ad hoc par module, contraste variable, icônes hétérogènes                                                                        | Définir tokens de base, bibliothèque d'icônes accessible, mode sombre clair                                                         |
 
 ## Écarts actuels
 
@@ -62,7 +62,7 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 - **Collaboration** : toujours aucune intégration Jira/Linear/Slack ni gestion multi-utilisateurs.
 - **Observabilité** : les métriques runtime sont locales, désormais agrégées dans un indice de conformité AA/AAA consolidé **et dans un suivi d’historique manifestes**. Il manque encore l’agrégation historique multi-instance et des tableaux de bord partageables comme sur les plateformes enterprise.
 
-> *Exemple* : le guide « Formulaire accessible » enchaîne désormais un précheck des prérequis (structure de formulaire, attributs ARIA requis), déclenche les tests automatiques (axe-core ciblé) puis propose des validations manuelles assistées (annonces clavier, revues visuelles). Cela le rapproche des FastPass, mais il manque encore la capture d'un scénario multi-pages et le co-tri des résultats avec un collègue dans l'interface.
+> _Exemple_ : le guide « Formulaire accessible » enchaîne désormais un précheck des prérequis (structure de formulaire, attributs ARIA requis), déclenche les tests automatiques (axe-core ciblé) puis propose des validations manuelles assistées (annonces clavier, revues visuelles). Cela le rapproche des FastPass, mais il manque encore la capture d'un scénario multi-pages et le co-tri des résultats avec un collègue dans l'interface.
 
 ## Webhooks d’activité & implications de sécurité
 
@@ -80,8 +80,8 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
 
 1. **Clarifier les cas d'usage**
    - Deux axes distincts :
-     - *Assistant utilisateur final* (rapide, centré sur profils, sans audit).
-     - *Outil développeur/QA* (audit, export, intégrations).
+     - _Assistant utilisateur final_ (rapide, centré sur profils, sans audit).
+     - _Outil développeur/QA_ (audit, export, intégrations).
    - Décider si l'extension doit couvrir les deux via des « modes » ou se spécialiser.
 
 2. **Renforcer la modularité**
@@ -95,10 +95,11 @@ Cette note sert de base pour situer A11y Toolbox Pro par rapport aux extensions 
    - Paramétrage contextuel : permettre aux modules de déclarer leurs paramètres et d'afficher un panneau commun (comparable à Stark qui centralise la configuration contraste/vision).
 
 4. **Améliorer l'expérience utilisateur et la cohérence visuelle**
-  - Étendre les **parcours guidés** (vue Guides actuelle) vers des checklists contextuelles inspirées des FastPass d'Accessibility Insights pour accompagner la configuration avancée.
-   - Ajouter une **microcopie d'aide** (tooltips, exemples) pour chaque option critique afin de réduire la charge cognitive.
-   - Construire un **design system minimal** : palette accessible, échelles de spacing/typo, composants (boutons, input, toggles) mutualisés.
-   - Définir un **mode sombre** et garantir une cohérence icône/illustration (SVG optimisés, lignes de 1.5px, labels visibles).
+
+- Étendre les **parcours guidés** (vue Guides actuelle) vers des checklists contextuelles inspirées des FastPass d'Accessibility Insights pour accompagner la configuration avancée.
+- Ajouter une **microcopie d'aide** (tooltips, exemples) pour chaque option critique afin de réduire la charge cognitive.
+- Construire un **design system minimal** : palette accessible, échelles de spacing/typo, composants (boutons, input, toggles) mutualisés.
+- Définir un **mode sombre** et garantir une cohérence icône/illustration (SVG optimisés, lignes de 1.5px, labels visibles).
 
 5. **Collaboration et observabilité**
    - Consolider `window.a11ytb.logActivity` avec historique filtrable, notifications FastPass et connecteurs d’export (copie presse-papiers, webhook, Jira/Linear).

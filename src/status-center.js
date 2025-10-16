@@ -13,7 +13,7 @@ const SCORE_PRIORITY = new Map([
   ['AA', 1],
   ['A', 2],
   ['B', 3],
-  ['C', 4]
+  ['C', 4],
 ]);
 
 function normalizeScore(value) {
@@ -45,32 +45,35 @@ function isNavigatorOnline() {
 }
 
 function computeBucketLatency(bucket) {
-  const loadAverage = bucket.latency.load.samples > 0
-    ? bucket.latency.load.total / bucket.latency.load.samples
-    : null;
-  const initAverage = bucket.latency.init.samples > 0
-    ? bucket.latency.init.total / bucket.latency.init.samples
-    : null;
-  const combinedAverage = (Number.isFinite(loadAverage) ? loadAverage : 0)
-    + (Number.isFinite(initAverage) ? initAverage : 0);
+  const loadAverage =
+    bucket.latency.load.samples > 0
+      ? bucket.latency.load.total / bucket.latency.load.samples
+      : null;
+  const initAverage =
+    bucket.latency.init.samples > 0
+      ? bucket.latency.init.total / bucket.latency.init.samples
+      : null;
+  const combinedAverage =
+    (Number.isFinite(loadAverage) ? loadAverage : 0) +
+    (Number.isFinite(initAverage) ? initAverage : 0);
   return {
     load: {
       average: Number.isFinite(loadAverage) ? loadAverage : null,
-      samples: bucket.latency.load.samples
+      samples: bucket.latency.load.samples,
     },
     init: {
       average: Number.isFinite(initAverage) ? initAverage : null,
-      samples: bucket.latency.init.samples
+      samples: bucket.latency.init.samples,
     },
-    combinedAverage: Number.isFinite(combinedAverage) && combinedAverage > 0 ? combinedAverage : null
+    combinedAverage:
+      Number.isFinite(combinedAverage) && combinedAverage > 0 ? combinedAverage : null,
   };
 }
 
 function bucketToSnapshot(bucket, state, nowFn) {
   const latency = computeBucketLatency(bucket);
-  const runtimeEntry = typeof state?.get === 'function'
-    ? state.get(`runtime.modules.${bucket.moduleId}`)
-    : null;
+  const runtimeEntry =
+    typeof state?.get === 'function' ? state.get(`runtime.modules.${bucket.moduleId}`) : null;
   const moduleLabel = runtimeEntry?.manifestName || bucket.moduleId;
   const collections = Array.isArray(runtimeEntry?.collections)
     ? runtimeEntry.collections.slice()
@@ -79,7 +82,7 @@ function bucketToSnapshot(bucket, state, nowFn) {
     type: incident.type || 'incident',
     severity: incident.severity || (incident.type === 'warning' ? 'warning' : 'error'),
     message: incident.message || '',
-    at: incident.at
+    at: incident.at,
   }));
   return {
     moduleId: bucket.moduleId,
@@ -97,7 +100,7 @@ function bucketToSnapshot(bucket, state, nowFn) {
     collections,
     lastTimestamp: bucket.lastTimestamp,
     lastIncidentAt: bucket.lastIncidentAt,
-    generatedAt: nowFn()
+    generatedAt: nowFn(),
   };
 }
 
@@ -109,7 +112,7 @@ export function createMetricsSyncService({
   flushInterval = DEFAULT_FLUSH_INTERVAL,
   maxWindowAge = DEFAULT_MAX_WINDOW_AGE,
   timeoutMs = DEFAULT_TIMEOUT_MS,
-  now: nowFn = () => Date.now()
+  now: nowFn = () => Date.now(),
 } = {}) {
   const effectiveWindow = Math.max(10, Number(windowDuration) || DEFAULT_WINDOW_DURATION);
   const windows = new Map();
@@ -120,25 +123,30 @@ export function createMetricsSyncService({
 
   const ready = storage?.load
     ? Promise.resolve()
-      .then(() => storage.load())
-      .then((stored) => {
-        if (Array.isArray(stored)) {
-          queue = stored.slice(0, MAX_SYNC_QUEUE_SIZE);
-        }
-      })
-      .catch((error) => {
-        console.warn('a11ytb: impossible de charger la file de synchronisation métriques.', error);
-      })
+        .then(() => storage.load())
+        .then((stored) => {
+          if (Array.isArray(stored)) {
+            queue = stored.slice(0, MAX_SYNC_QUEUE_SIZE);
+          }
+        })
+        .catch((error) => {
+          console.warn(
+            'a11ytb: impossible de charger la file de synchronisation métriques.',
+            error
+          );
+        })
     : Promise.resolve();
 
   function emitUpdate() {
     const snapshot = {
-      activeWindows: Array.from(windows.values()).map((bucket) => bucketToSnapshot(bucket, state, nowFn)),
+      activeWindows: Array.from(windows.values()).map((bucket) =>
+        bucketToSnapshot(bucket, state, nowFn)
+      ),
       pendingQueue: queue.map((payload) => ({
         generatedAt: payload.generatedAt,
-        windows: payload.windows.length
+        windows: payload.windows.length,
       })),
-      lastUpdatedAt: nowFn()
+      lastUpdatedAt: nowFn(),
     };
     if (state?.set) {
       state.set('runtime.metricsSync', snapshot);
@@ -171,12 +179,12 @@ export function createMetricsSyncService({
         retryCount: 0,
         latency: {
           load: { total: 0, samples: 0 },
-          init: { total: 0, samples: 0 }
+          init: { total: 0, samples: 0 },
         },
         incidents: [],
         score: 'AAA',
         lastTimestamp: windowStart,
-        lastIncidentAt: 0
+        lastIncidentAt: 0,
       });
     }
     return windows.get(key);
@@ -185,7 +193,7 @@ export function createMetricsSyncService({
   function cleanupBuckets(reference = nowFn()) {
     const threshold = Math.max(effectiveWindow, Number(maxWindowAge) || DEFAULT_MAX_WINDOW_AGE);
     windows.forEach((bucket, key) => {
-      if ((reference - bucket.windowStart) > threshold && bucket.samples === 0) {
+      if (reference - bucket.windowStart > threshold && bucket.samples === 0) {
         windows.delete(key);
       }
     });
@@ -225,15 +233,13 @@ export function createMetricsSyncService({
 
   function recordIncidents(bucket, previous, incidents = [], collectedAt) {
     incidents.forEach((incident) => {
-      const at = Number.isFinite(incident?.at)
-        ? incident.at
-        : collectedAt;
+      const at = Number.isFinite(incident?.at) ? incident.at : collectedAt;
       if (at > (previous.lastIncidentAt ?? 0)) {
         bucket.incidents.push({
           type: incident?.type || 'incident',
           severity: incident?.severity || (incident?.type === 'warning' ? 'warning' : 'error'),
           message: incident?.message || '',
-          at
+          at,
         });
         bucket.lastIncidentAt = Math.max(bucket.lastIncidentAt, at);
         previous.lastIncidentAt = at;
@@ -263,7 +269,7 @@ export function createMetricsSyncService({
       loadSamples: 0,
       initTotal: 0,
       initSamples: 0,
-      lastIncidentAt: 0
+      lastIncidentAt: 0,
     };
 
     const deltaAttempts = Math.max(0, attempts - (previous.attempts ?? 0));
@@ -296,7 +302,7 @@ export function createMetricsSyncService({
       loadSamples: previous.loadSamples,
       initTotal: previous.initTotal,
       initSamples: previous.initSamples,
-      lastIncidentAt: previous.lastIncidentAt
+      lastIncidentAt: previous.lastIncidentAt,
     });
 
     emitUpdate();
@@ -316,7 +322,7 @@ export function createMetricsSyncService({
           sendPromise,
           new Promise((_, reject) => {
             setTimeout(() => reject(new Error('timeout')), timeoutMs);
-          })
+          }),
         ]);
       } else {
         await sendPromise;
@@ -360,9 +366,8 @@ export function createMetricsSyncService({
         windows.delete(key);
         return;
       }
-      const expired = force
-        || nowTs >= bucket.windowEnd
-        || (nowTs - bucket.lastTimestamp) >= effectiveWindow;
+      const expired =
+        force || nowTs >= bucket.windowEnd || nowTs - bucket.lastTimestamp >= effectiveWindow;
       if (expired) {
         matured.push(bucketToSnapshot(bucket, state, nowFn));
         windows.delete(key);
@@ -384,11 +389,14 @@ export function createMetricsSyncService({
 
   function start() {
     if (timer) return;
-    timer = setInterval(() => {
-      flush().catch((error) => {
-        console.warn('a11ytb: flush métriques en arrière-plan impossible.', error);
-      });
-    }, Math.max(1000, Number(flushInterval) || DEFAULT_FLUSH_INTERVAL));
+    timer = setInterval(
+      () => {
+        flush().catch((error) => {
+          console.warn('a11ytb: flush métriques en arrière-plan impossible.', error);
+        });
+      },
+      Math.max(1000, Number(flushInterval) || DEFAULT_FLUSH_INTERVAL)
+    );
   }
 
   function stop() {
@@ -419,7 +427,7 @@ export function createMetricsSyncService({
     getActiveWindows,
     getQueue: getQueueSnapshot,
     setOnUpdate,
-    isRunning: () => Boolean(timer)
+    isRunning: () => Boolean(timer),
   };
 }
 
@@ -476,7 +484,9 @@ function buildGlobalScoreSummary(snapshot = {}) {
     }
     const metrics = computeModuleMetrics(runtime, { label: runtime.manifestName || moduleId });
     worstScore = pickWorstScore(worstScore, metrics.riskLevel);
-    const failureCount = Number.isFinite(metrics.failures) ? metrics.failures : Number(runtime.metrics?.failures) || 0;
+    const failureCount = Number.isFinite(metrics.failures)
+      ? metrics.failures
+      : Number(runtime.metrics?.failures) || 0;
     if (failureCount > 0 && runtime.state !== 'error') {
       warnings += 1;
     }
@@ -510,15 +520,18 @@ function buildGlobalScoreSummary(snapshot = {}) {
     live: 'polite',
     metaLabels: {
       latency: 'Modules prêts',
-      compat: 'Incidents actifs'
+      compat: 'Incidents actifs',
     },
     insights: {
       riskLevel: worstScore,
       riskDescription: `Indice global ${worstScore}.`,
       announcement: `Indice global ${worstScore}`,
       latencyLabel: tracked > 0 ? `${ready}/${tracked}` : '0/0',
-      compatLabel: totalIncidents > 0 ? `${totalIncidents} incident${totalIncidents > 1 ? 's' : ''}` : 'Aucun incident'
-    }
+      compatLabel:
+        totalIncidents > 0
+          ? `${totalIncidents} incident${totalIncidents > 1 ? 's' : ''}`
+          : 'Aucun incident',
+    },
   };
 }
 
@@ -555,9 +568,10 @@ function buildMetadataSummary(snapshot = {}) {
   });
 
   if (tracked === 0) {
-    const baseline = totalModules > 0
-      ? `Ajoutez des manifestes complets pour ${totalModules} module${totalModules > 1 ? 's' : ''} afin de rivaliser avec Accessibility Insights.`
-      : 'Ajoutez des manifestes complets pour suivre la qualité face aux outils professionnels.';
+    const baseline =
+      totalModules > 0
+        ? `Ajoutez des manifestes complets pour ${totalModules} module${totalModules > 1 ? 's' : ''} afin de rivaliser avec Accessibility Insights.`
+        : 'Ajoutez des manifestes complets pour suivre la qualité face aux outils professionnels.';
     return {
       id: 'metadata-score',
       label: 'Maturité manifestes',
@@ -568,7 +582,7 @@ function buildMetadataSummary(snapshot = {}) {
       live: 'polite',
       metaLabels: {
         latency: 'Manifestes évalués',
-        compat: 'Priorités'
+        compat: 'Priorités',
       },
       insights: {
         riskLevel: 'B',
@@ -577,19 +591,17 @@ function buildMetadataSummary(snapshot = {}) {
         totalModules,
         latencyLabel: `0/${totalModules}`,
         compatLabel: 'Complétez les manifestes pour atteindre la parité Stark',
-        missingHighlights: []
-      }
+        missingHighlights: [],
+      },
     };
   }
 
   const averageCoverage = Math.round((coverageSum / Math.max(tracked, 1)) * 100);
   const LEVEL_ORDER = ['AAA', 'AA', 'A', 'B', 'C'];
-  const distributionParts = LEVEL_ORDER
-    .map((level) => {
-      const count = distribution.get(level) ?? 0;
-      return count > 0 ? `${count} ${level}` : null;
-    })
-    .filter(Boolean);
+  const distributionParts = LEVEL_ORDER.map((level) => {
+    const count = distribution.get(level) ?? 0;
+    return count > 0 ? `${count} ${level}` : null;
+  }).filter(Boolean);
   const distributionLabel = distributionParts.length
     ? `Répartition : ${distributionParts.join(' · ')}`
     : 'Répartition : données partielles';
@@ -603,9 +615,7 @@ function buildMetadataSummary(snapshot = {}) {
     ? `Manques clés : ${missingHighlights.join(' ; ')}.`
     : 'Parité atteinte avec les grilles Stark.';
 
-  const compatLabel = missingHighlights.length
-    ? missingHighlights.join(' · ')
-    : 'Aligné sur Stark';
+  const compatLabel = missingHighlights.length ? missingHighlights.join(' · ') : 'Aligné sur Stark';
 
   return {
     id: 'metadata-score',
@@ -617,7 +627,7 @@ function buildMetadataSummary(snapshot = {}) {
     live: 'polite',
     metaLabels: {
       latency: 'Manifestes évalués',
-      compat: 'Écart vs FastPass/Stark'
+      compat: 'Écart vs FastPass/Stark',
     },
     insights: {
       riskLevel: worstLevel,
@@ -626,8 +636,8 @@ function buildMetadataSummary(snapshot = {}) {
       totalModules,
       latencyLabel: `${tracked}/${totalModules}`,
       compatLabel,
-      missingHighlights
-    }
+      missingHighlights,
+    },
   };
 }
 
@@ -667,7 +677,7 @@ function analyzeManifestHistory(historyBuckets = [], { now = Date.now() } = {}) 
     rejections: 0,
     downgradeBlocks: 0,
     recentlyUpdated: 0,
-    staleModules: 0
+    staleModules: 0,
   };
 
   historyBuckets.forEach((bucket) => {
@@ -719,11 +729,12 @@ function analyzeManifestHistory(historyBuckets = [], { now = Date.now() } = {}) 
     }
   });
 
-  metrics.coverageRate = metrics.totalModules > 0
-    ? Math.round((metrics.trackedModules / metrics.totalModules) * 100)
-    : metrics.trackedModules > 0
-      ? 100
-      : 0;
+  metrics.coverageRate =
+    metrics.totalModules > 0
+      ? Math.round((metrics.trackedModules / metrics.totalModules) * 100)
+      : metrics.trackedModules > 0
+        ? 100
+        : 0;
 
   return metrics;
 }
@@ -732,14 +743,18 @@ function buildManifestHistorySummary(snapshot = {}) {
   const historyBuckets = getManifestHistoryBuckets(snapshot);
   const now = Number.isFinite(snapshot?.now) ? Number(snapshot.now) : Date.now();
   const metrics = analyzeManifestHistory(historyBuckets, { now });
-  const declaredTotal = getDeclaredManifestTotal(snapshot, Math.max(metrics.totalModules, metrics.trackedModules));
+  const declaredTotal = getDeclaredManifestTotal(
+    snapshot,
+    Math.max(metrics.totalModules, metrics.trackedModules)
+  );
   const totalFallback = declaredTotal ?? metrics.totalModules ?? metrics.trackedModules;
 
   if (metrics.trackedModules === 0) {
     const targetTotal = declaredTotal ?? metrics.totalModules ?? metrics.trackedModules;
-    const moduleCountLabel = targetTotal && targetTotal > 0
-      ? `${targetTotal} manifeste${targetTotal > 1 ? 's' : ''}`
-      : 'vos manifestes';
+    const moduleCountLabel =
+      targetTotal && targetTotal > 0
+        ? `${targetTotal} manifeste${targetTotal > 1 ? 's' : ''}`
+        : 'vos manifestes';
     return {
       id: 'manifest-history',
       label: 'Historique manifestes',
@@ -750,7 +765,7 @@ function buildManifestHistorySummary(snapshot = {}) {
       live: 'polite',
       metaLabels: {
         latency: 'Mises à jour < 30 j',
-        compat: 'Downgrades bloqués'
+        compat: 'Downgrades bloqués',
       },
       insights: {
         riskLevel: 'AA',
@@ -766,8 +781,8 @@ function buildManifestHistorySummary(snapshot = {}) {
         totalEntries: 0,
         latencyLabel: '0/0',
         compatLabel: 'Aucun blocage',
-        coverageRate: 0
-      }
+        coverageRate: 0,
+      },
     };
   }
 
@@ -776,13 +791,17 @@ function buildManifestHistorySummary(snapshot = {}) {
     detailParts.push(`${metrics.recentlyUpdated} mis à jour < 30 j`);
   }
   if (metrics.downgradeBlocks > 0) {
-    detailParts.push(`${metrics.downgradeBlocks} rétrogradation${metrics.downgradeBlocks > 1 ? 's' : ''} bloquée${metrics.downgradeBlocks > 1 ? 's' : ''}`);
+    detailParts.push(
+      `${metrics.downgradeBlocks} rétrogradation${metrics.downgradeBlocks > 1 ? 's' : ''} bloquée${metrics.downgradeBlocks > 1 ? 's' : ''}`
+    );
   }
   if (metrics.refreshes > 0) {
     detailParts.push(`${metrics.refreshes} synchronisation${metrics.refreshes > 1 ? 's' : ''}`);
   }
   if (metrics.pendingModules > 0) {
-    detailParts.push(`${metrics.pendingModules} manifeste${metrics.pendingModules > 1 ? 's' : ''} à historiser`);
+    detailParts.push(
+      `${metrics.pendingModules} manifeste${metrics.pendingModules > 1 ? 's' : ''} à historiser`
+    );
   }
   if (!detailParts.length) {
     detailParts.push('Suivi aligné sur Accessibility Insights.');
@@ -805,7 +824,7 @@ function buildManifestHistorySummary(snapshot = {}) {
     live: 'polite',
     metaLabels: {
       latency: 'Mises à jour < 30 j',
-      compat: 'Downgrades bloqués'
+      compat: 'Downgrades bloqués',
     },
     insights: {
       riskLevel: tone === STATUS_TONE_WARNING ? 'AA' : 'AAA',
@@ -820,11 +839,12 @@ function buildManifestHistorySummary(snapshot = {}) {
       refreshes: metrics.refreshes,
       totalEntries: metrics.totalEntries,
       latencyLabel: `${metrics.recentlyUpdated}/${metrics.trackedModules}`,
-      compatLabel: metrics.downgradeBlocks > 0
-        ? `${metrics.downgradeBlocks} blocage${metrics.downgradeBlocks > 1 ? 's' : ''}`
-        : 'Aucun blocage',
-      coverageRate: metrics.coverageRate
-    }
+      compatLabel:
+        metrics.downgradeBlocks > 0
+          ? `${metrics.downgradeBlocks} blocage${metrics.downgradeBlocks > 1 ? 's' : ''}`
+          : 'Aucun blocage',
+      coverageRate: metrics.coverageRate,
+    },
   };
 }
 
@@ -857,12 +877,15 @@ export function computeModuleMetrics(runtimeEntry = {}, { label } = {}) {
   const attempts = Number.isFinite(metrics.attempts) ? metrics.attempts : 0;
   const successes = Number.isFinite(metrics.successes) ? metrics.successes : 0;
   const failures = Number.isFinite(metrics.failures) ? metrics.failures : 0;
-  const retryCount = Number.isFinite(metrics.retryCount) ? metrics.retryCount : Math.max(0, attempts - successes);
+  const retryCount = Number.isFinite(metrics.retryCount)
+    ? metrics.retryCount
+    : Math.max(0, attempts - successes);
   const timings = metrics.timings || {};
   const combinedAverage = Number.isFinite(timings.combinedAverage) ? timings.combinedAverage : null;
-  const latencyLabel = Number.isFinite(combinedAverage) && combinedAverage > 0
-    ? `${Math.round(combinedAverage)} ms`
-    : 'Non mesuré';
+  const latencyLabel =
+    Number.isFinite(combinedAverage) && combinedAverage > 0
+      ? `${Math.round(combinedAverage)} ms`
+      : 'Non mesuré';
 
   const compat = metrics.compat && typeof metrics.compat === 'object' ? metrics.compat : {};
   const required = normalizeCompatSection(compat.required);
@@ -914,7 +937,7 @@ export function computeModuleMetrics(runtimeEntry = {}, { label } = {}) {
     riskLevel,
     riskDescription,
     announcement,
-    compat: { required, missing, unknown }
+    compat: { required, missing, unknown },
   };
 }
 
@@ -949,7 +972,7 @@ function buildAuditSummary(snapshot = {}) {
     value: '',
     detail: '',
     tone: STATUS_TONE_DEFAULT,
-    live: 'polite'
+    live: 'polite',
   };
 
   if (!enabled) {
@@ -1001,9 +1024,8 @@ function buildAuditSummary(snapshot = {}) {
     return summary;
   }
 
-  const reportSummary = audit.summary && audit.summary.totals
-    ? audit.summary
-    : summarizeReport(audit.lastReport);
+  const reportSummary =
+    audit.summary && audit.summary.totals ? audit.summary : summarizeReport(audit.lastReport);
   const timestamp = formatTimestamp(audit.lastRun);
   summary.badge = 'Dernier audit';
   summary.value = reportSummary.headline || 'Audit réalisé';
@@ -1029,7 +1051,7 @@ function buildTtsSummary(snapshot = {}) {
     value: '',
     detail: '',
     tone: STATUS_TONE_DEFAULT,
-    live: 'polite'
+    live: 'polite',
   };
 
   if (!enabled) {
@@ -1082,7 +1104,9 @@ function buildTtsSummary(snapshot = {}) {
     default: {
       const voices = Array.isArray(tts.availableVoices) ? tts.availableVoices : [];
       const selectedVoice = voices.find((voice) => voice.voiceURI === tts.voice);
-      const voiceLabel = selectedVoice ? `${selectedVoice.name} (${selectedVoice.lang})` : 'Voix du navigateur';
+      const voiceLabel = selectedVoice
+        ? `${selectedVoice.name} (${selectedVoice.lang})`
+        : 'Voix du navigateur';
       summary.value = 'En veille';
       summary.detail = `Voix active\u00A0: ${voiceLabel}`;
       break;
@@ -1104,7 +1128,7 @@ function buildSttSummary(snapshot = {}) {
     value: '',
     detail: '',
     tone: STATUS_TONE_DEFAULT,
-    live: 'polite'
+    live: 'polite',
   };
 
   if (!enabled) {
@@ -1171,7 +1195,7 @@ function buildBrailleSummary(snapshot = {}) {
     value: '',
     detail: '',
     tone: STATUS_TONE_DEFAULT,
-    live: 'polite'
+    live: 'polite',
   };
 
   if (!enabled) {
@@ -1224,7 +1248,7 @@ function buildContrastSummary(snapshot = {}) {
     value: '',
     detail: '',
     tone: STATUS_TONE_DEFAULT,
-    live: 'polite'
+    live: 'polite',
   };
 
   if (!enabled) {
@@ -1276,7 +1300,7 @@ function buildSpacingSummary(snapshot = {}) {
     value: '',
     detail: '',
     tone: STATUS_TONE_DEFAULT,
-    live: 'polite'
+    live: 'polite',
   };
 
   if (!enabled) {
@@ -1305,7 +1329,8 @@ function buildSpacingSummary(snapshot = {}) {
   const lineHeight = Number(spacing.lineHeight ?? 1.5);
   const letterSpacing = Number(spacing.letterSpacing ?? 0);
   const hasCustomLineHeight = Number.isFinite(lineHeight) && Math.abs(lineHeight - 1.5) > 0.05;
-  const hasCustomLetterSpacing = Number.isFinite(letterSpacing) && Math.abs(letterSpacing - 0) > 0.01;
+  const hasCustomLetterSpacing =
+    Number.isFinite(letterSpacing) && Math.abs(letterSpacing - 0) > 0.01;
   const hasCustomSettings = hasCustomLineHeight || hasCustomLetterSpacing;
 
   if (hasCustomSettings) {
@@ -1336,7 +1361,7 @@ export function summarizeStatuses(snapshot = {}) {
     buildSttSummary(snapshot),
     buildBrailleSummary(snapshot),
     buildContrastSummary(snapshot),
-    buildSpacingSummary(snapshot)
+    buildSpacingSummary(snapshot),
   ];
 }
 
@@ -1345,5 +1370,5 @@ export const STATUS_TONES = {
   ACTIVE: STATUS_TONE_ACTIVE,
   ALERT: STATUS_TONE_ALERT,
   WARNING: STATUS_TONE_WARNING,
-  MUTED: STATUS_TONE_MUTED
+  MUTED: STATUS_TONE_MUTED,
 };

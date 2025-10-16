@@ -34,7 +34,7 @@ function createTestState(initial) {
     on(fn) {
       listeners.add(fn);
       return () => listeners.delete(fn);
-    }
+    },
   };
 }
 
@@ -55,7 +55,7 @@ describe('module collections integration', () => {
       registerModule({
         id: moduleId,
         init: initSpy,
-        manifest: { id: moduleId, name: 'Test module' }
+        manifest: { id: moduleId, name: 'Test module' },
       });
     });
     registerBlock({
@@ -63,15 +63,15 @@ describe('module collections integration', () => {
       moduleId,
       title: 'Test module',
       category: 'vision',
-      render: () => '<div>Test block</div>'
+      render: () => '<div>Test block</div>',
     });
 
     const state = createTestState({
       ui: {
         disabled: [],
-        collections: { disabled: [collectionId] }
+        collections: { disabled: [collectionId] },
       },
-      runtime: { modules: {} }
+      runtime: { modules: {} },
     });
 
     setupModuleRuntime({
@@ -79,16 +79,16 @@ describe('module collections integration', () => {
       catalog: [
         {
           id: moduleId,
-          loader
-        }
+          loader,
+        },
       ],
       collections: [
         {
           id: collectionId,
           label: 'Test collection',
-          modules: [moduleId]
-        }
-      ]
+          modules: [moduleId],
+        },
+      ],
     });
 
     expect(state.get(`runtime.modules.${moduleId}.enabled`)).toBe(false);
@@ -112,7 +112,7 @@ describe('module collections integration', () => {
       moduleId: 'contrast',
       title: 'Contraste test',
       category: 'vision',
-      render: () => '<div>Contraste</div>'
+      render: () => '<div>Contraste</div>',
     });
 
     const state = createTestState({
@@ -130,19 +130,21 @@ describe('module collections integration', () => {
         lastProfile: null,
         priorities: {},
         guides: { completedSteps: {} },
-        collections: { disabled: [] }
+        collections: { disabled: [] },
       },
       profiles: {},
       runtime: { modules: {} },
       audio: {},
-      tts: { status: 'idle', progress: 0 }
+      tts: { status: 'idle', progress: 0 },
     });
 
     const root = document.createElement('div');
     document.body.appendChild(root);
     mountUI({ root, state });
 
-    const button = root.querySelector(`button.a11ytb-collection-toggle[data-collection-id="${collectionId}"]`);
+    const button = root.querySelector(
+      `button.a11ytb-collection-toggle[data-collection-id="${collectionId}"]`
+    );
     expect(button).toBeTruthy();
 
     button.click();
@@ -152,7 +154,9 @@ describe('module collections integration', () => {
     });
     expect(state.get('ui.disabled')).toEqual([]);
 
-    const adminCheckbox = root.querySelector(`.a11ytb-admin-item[data-block-id="${blockId}"] input[type="checkbox"]`);
+    const adminCheckbox = root.querySelector(
+      `.a11ytb-admin-item[data-block-id="${blockId}"] input[type="checkbox"]`
+    );
     expect(adminCheckbox).toBeTruthy();
     expect(adminCheckbox.disabled).toBe(true);
 

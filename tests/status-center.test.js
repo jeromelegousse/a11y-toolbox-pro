@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeStatuses, computeModuleMetrics, getModuleCompatibilityScore } from '../src/status-center.js';
+import {
+  summarizeStatuses,
+  computeModuleMetrics,
+  getModuleCompatibilityScore,
+} from '../src/status-center.js';
 
 const DEFAULT_SUMMARY = 'Couverture métadonnées simulée.';
 const BASE_NOW = 1700000000000;
@@ -10,7 +14,7 @@ function createHistoryEntry({
   reason = 'upgrade',
   version = '1.1.0',
   versionInfo,
-  metadataQuality
+  metadataQuality,
 } = {}) {
   return {
     status,
@@ -18,7 +22,7 @@ function createHistoryEntry({
     timestamp,
     version,
     versionInfo,
-    metadataQuality
+    metadataQuality,
   };
 }
 
@@ -32,7 +36,7 @@ function createQuality({
   coveragePercent = Math.round(coverage * 100),
   detail = '',
   missing = [],
-  summary = DEFAULT_SUMMARY
+  summary = DEFAULT_SUMMARY,
 } = {}) {
   return {
     level,
@@ -43,7 +47,7 @@ function createQuality({
     detail,
     missing: Array.from(missing),
     recommendations: [],
-    checks: []
+    checks: [],
   };
 }
 
@@ -58,13 +62,13 @@ describe('summarizeStatuses', () => {
           headline: 'Audit en attente',
           detail: '',
           tone: 'info',
-          totals: { critical: 0, serious: 0, moderate: 0, minor: 0, unknown: 0, total: 0 }
-        }
+          totals: { critical: 0, serious: 0, moderate: 0, minor: 0, unknown: 0, total: 0 },
+        },
       },
       tts: {
         status: 'idle',
         voice: 'fr-default',
-        availableVoices: [{ voiceURI: 'fr-default', name: 'Louise', lang: 'fr-FR' }]
+        availableVoices: [{ voiceURI: 'fr-default', name: 'Louise', lang: 'fr-FR' }],
       },
       stt: { status: 'idle' },
       braille: { output: '' },
@@ -72,42 +76,128 @@ describe('summarizeStatuses', () => {
       spacing: { lineHeight: 1.5, letterSpacing: 0 },
       runtime: {
         modules: {
-          audit: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AAA', coverage: 0.95, missing: [] }) },
-          tts: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AA', coverage: 0.82, missing: ['Guides FastPass'] }) },
-          stt: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'A', coverage: 0.6, missing: ['Guides FastPass', 'Licence déclarée'] }) },
-          braille: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AA', coverage: 0.76, missing: [] }) },
-          contrast: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AAA', coverage: 0.9, missing: [] }) },
-          spacing: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AA', coverage: 0.7, missing: ['Licence déclarée'] }) }
-        }
-      }
+          audit: {
+            enabled: true,
+            state: 'ready',
+            metadataQuality: createQuality({ level: 'AAA', coverage: 0.95, missing: [] }),
+          },
+          tts: {
+            enabled: true,
+            state: 'ready',
+            metadataQuality: createQuality({
+              level: 'AA',
+              coverage: 0.82,
+              missing: ['Guides FastPass'],
+            }),
+          },
+          stt: {
+            enabled: true,
+            state: 'ready',
+            metadataQuality: createQuality({
+              level: 'A',
+              coverage: 0.6,
+              missing: ['Guides FastPass', 'Licence déclarée'],
+            }),
+          },
+          braille: {
+            enabled: true,
+            state: 'ready',
+            metadataQuality: createQuality({ level: 'AA', coverage: 0.76, missing: [] }),
+          },
+          contrast: {
+            enabled: true,
+            state: 'ready',
+            metadataQuality: createQuality({ level: 'AAA', coverage: 0.9, missing: [] }),
+          },
+          spacing: {
+            enabled: true,
+            state: 'ready',
+            metadataQuality: createQuality({
+              level: 'AA',
+              coverage: 0.7,
+              missing: ['Licence déclarée'],
+            }),
+          },
+        },
+      },
     };
 
     snapshot.manifests = {
       total: 6,
       history: [
         createHistoryBucket('audit', [
-          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 40 * 24 * 60 * 60 * 1000 }),
-          createHistoryEntry({ status: 'accepted', reason: 'upgrade', version: '1.1.0', timestamp: BASE_NOW - 5 * 24 * 60 * 60 * 1000 })
+          createHistoryEntry({
+            status: 'accepted',
+            reason: 'initial',
+            version: '1.0.0',
+            timestamp: BASE_NOW - 40 * 24 * 60 * 60 * 1000,
+          }),
+          createHistoryEntry({
+            status: 'accepted',
+            reason: 'upgrade',
+            version: '1.1.0',
+            timestamp: BASE_NOW - 5 * 24 * 60 * 60 * 1000,
+          }),
         ]),
         createHistoryBucket('tts', [
-          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 20 * 24 * 60 * 60 * 1000 }),
-          createHistoryEntry({ status: 'rejected', reason: 'downgrade', version: '0.9.0', timestamp: BASE_NOW - 18 * 24 * 60 * 60 * 1000 }),
-          createHistoryEntry({ status: 'accepted', reason: 'upgrade', version: '1.2.0', timestamp: BASE_NOW - 9 * 24 * 60 * 60 * 1000 })
+          createHistoryEntry({
+            status: 'accepted',
+            reason: 'initial',
+            version: '1.0.0',
+            timestamp: BASE_NOW - 20 * 24 * 60 * 60 * 1000,
+          }),
+          createHistoryEntry({
+            status: 'rejected',
+            reason: 'downgrade',
+            version: '0.9.0',
+            timestamp: BASE_NOW - 18 * 24 * 60 * 60 * 1000,
+          }),
+          createHistoryEntry({
+            status: 'accepted',
+            reason: 'upgrade',
+            version: '1.2.0',
+            timestamp: BASE_NOW - 9 * 24 * 60 * 60 * 1000,
+          }),
         ]),
         createHistoryBucket('stt', [
-          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 50 * 24 * 60 * 60 * 1000 }),
-          createHistoryEntry({ status: 'accepted', reason: 'refresh', version: '1.0.0', timestamp: BASE_NOW - 40 * 24 * 60 * 60 * 1000 })
+          createHistoryEntry({
+            status: 'accepted',
+            reason: 'initial',
+            version: '1.0.0',
+            timestamp: BASE_NOW - 50 * 24 * 60 * 60 * 1000,
+          }),
+          createHistoryEntry({
+            status: 'accepted',
+            reason: 'refresh',
+            version: '1.0.0',
+            timestamp: BASE_NOW - 40 * 24 * 60 * 60 * 1000,
+          }),
         ]),
         createHistoryBucket('braille', [
-          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 33 * 24 * 60 * 60 * 1000 })
+          createHistoryEntry({
+            status: 'accepted',
+            reason: 'initial',
+            version: '1.0.0',
+            timestamp: BASE_NOW - 33 * 24 * 60 * 60 * 1000,
+          }),
         ]),
         createHistoryBucket('contrast', [
-          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 4 * 24 * 60 * 60 * 1000 })
+          createHistoryEntry({
+            status: 'accepted',
+            reason: 'initial',
+            version: '1.0.0',
+            timestamp: BASE_NOW - 4 * 24 * 60 * 60 * 1000,
+          }),
         ]),
         createHistoryBucket('spacing', [
-          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 2 * 24 * 60 * 60 * 1000 })
-        ])
-      ]
+          createHistoryEntry({
+            status: 'accepted',
+            reason: 'initial',
+            version: '1.0.0',
+            timestamp: BASE_NOW - 2 * 24 * 60 * 60 * 1000,
+          }),
+        ]),
+      ],
     };
 
     const statuses = summarizeStatuses(snapshot);
@@ -178,8 +268,8 @@ describe('summarizeStatuses', () => {
           headline: 'Audit en attente',
           detail: '',
           tone: 'info',
-          totals: { critical: 0, serious: 0, moderate: 0, minor: 0, unknown: 0, total: 0 }
-        }
+          totals: { critical: 0, serious: 0, moderate: 0, minor: 0, unknown: 0, total: 0 },
+        },
       },
       tts: { status: 'error' },
       stt: { status: 'idle' },
@@ -188,30 +278,75 @@ describe('summarizeStatuses', () => {
       spacing: { lineHeight: 1.5, letterSpacing: 0 },
       runtime: {
         modules: {
-          audit: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AA', coverage: 0.72, missing: ['Guides FastPass'] }) },
-          tts: { enabled: true, state: 'error', error: 'Échec de chargement', metadataQuality: createQuality({ level: 'B', coverage: 0.4, missing: ['Guides FastPass', 'Licence déclarée'] }) },
+          audit: {
+            enabled: true,
+            state: 'ready',
+            metadataQuality: createQuality({
+              level: 'AA',
+              coverage: 0.72,
+              missing: ['Guides FastPass'],
+            }),
+          },
+          tts: {
+            enabled: true,
+            state: 'error',
+            error: 'Échec de chargement',
+            metadataQuality: createQuality({
+              level: 'B',
+              coverage: 0.4,
+              missing: ['Guides FastPass', 'Licence déclarée'],
+            }),
+          },
           stt: { enabled: false, state: 'idle' },
-          braille: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AA', coverage: 0.8, missing: [] }) },
+          braille: {
+            enabled: true,
+            state: 'ready',
+            metadataQuality: createQuality({ level: 'AA', coverage: 0.8, missing: [] }),
+          },
           contrast: { enabled: false, state: 'idle' },
-          spacing: { enabled: true, state: 'error', error: 'Espacement indisponible', metadataQuality: createQuality({ level: 'A', coverage: 0.62, missing: ['Licence déclarée'] }) }
-        }
-      }
+          spacing: {
+            enabled: true,
+            state: 'error',
+            error: 'Espacement indisponible',
+            metadataQuality: createQuality({
+              level: 'A',
+              coverage: 0.62,
+              missing: ['Licence déclarée'],
+            }),
+          },
+        },
+      },
     };
 
     snapshot.manifests = {
       total: 5,
       history: [
         createHistoryBucket('audit', [
-          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 120 * 24 * 60 * 60 * 1000 })
+          createHistoryEntry({
+            status: 'accepted',
+            reason: 'initial',
+            version: '1.0.0',
+            timestamp: BASE_NOW - 120 * 24 * 60 * 60 * 1000,
+          }),
         ]),
         createHistoryBucket('tts', [
-          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 80 * 24 * 60 * 60 * 1000 }),
-          createHistoryEntry({ status: 'rejected', reason: 'downgrade', version: '0.9.0', timestamp: BASE_NOW - 70 * 24 * 60 * 60 * 1000 })
+          createHistoryEntry({
+            status: 'accepted',
+            reason: 'initial',
+            version: '1.0.0',
+            timestamp: BASE_NOW - 80 * 24 * 60 * 60 * 1000,
+          }),
+          createHistoryEntry({
+            status: 'rejected',
+            reason: 'downgrade',
+            version: '0.9.0',
+            timestamp: BASE_NOW - 70 * 24 * 60 * 60 * 1000,
+          }),
         ]),
         createHistoryBucket('stt', []),
         createHistoryBucket('contrast', []),
-        createHistoryBucket('spacing', [])
-      ]
+        createHistoryBucket('spacing', []),
+      ],
     };
 
     const statuses = summarizeStatuses(snapshot);
@@ -276,9 +411,9 @@ describe('summarizeStatuses', () => {
               description: 'Contraste insuffisant',
               help: 'Augmentez le contraste',
               helpUrl: 'https://example.test',
-              nodes: [{ target: ['.btn'], failureSummary: 'ratio insuffisant' }]
-            }
-          ]
+              nodes: [{ target: ['.btn'], failureSummary: 'ratio insuffisant' }],
+            },
+          ],
         },
         summary: {
           outcome: 'critical',
@@ -286,8 +421,8 @@ describe('summarizeStatuses', () => {
           detail: '1 critique',
           tone: 'alert',
           totals: { critical: 1, serious: 0, moderate: 0, minor: 0, unknown: 0, total: 1 },
-          totalNodes: 1
-        }
+          totalNodes: 1,
+        },
       },
       tts: { status: 'speaking', progress: 0.42 },
       stt: { status: 'listening' },
@@ -296,30 +431,69 @@ describe('summarizeStatuses', () => {
       spacing: { lineHeight: 1.9, letterSpacing: 0.1 },
       runtime: {
         modules: {
-          audit: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }) },
-          tts: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }) },
-          stt: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }) },
-          braille: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }) },
-          contrast: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }) },
-          spacing: { enabled: true, state: 'ready', metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }) }
-        }
-      }
+          audit: {
+            enabled: true,
+            state: 'ready',
+            metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }),
+          },
+          tts: {
+            enabled: true,
+            state: 'ready',
+            metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }),
+          },
+          stt: {
+            enabled: true,
+            state: 'ready',
+            metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }),
+          },
+          braille: {
+            enabled: true,
+            state: 'ready',
+            metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }),
+          },
+          contrast: {
+            enabled: true,
+            state: 'ready',
+            metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }),
+          },
+          spacing: {
+            enabled: true,
+            state: 'ready',
+            metadataQuality: createQuality({ level: 'AAA', coverage: 0.92, missing: [] }),
+          },
+        },
+      },
     };
 
     snapshot.manifests = {
       total: 4,
       history: [
         createHistoryBucket('audit', [
-          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 5 * 24 * 60 * 60 * 1000 })
+          createHistoryEntry({
+            status: 'accepted',
+            reason: 'initial',
+            version: '1.0.0',
+            timestamp: BASE_NOW - 5 * 24 * 60 * 60 * 1000,
+          }),
         ]),
         createHistoryBucket('tts', [
-          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 3 * 24 * 60 * 60 * 1000 })
+          createHistoryEntry({
+            status: 'accepted',
+            reason: 'initial',
+            version: '1.0.0',
+            timestamp: BASE_NOW - 3 * 24 * 60 * 60 * 1000,
+          }),
         ]),
         createHistoryBucket('stt', [
-          createHistoryEntry({ status: 'accepted', reason: 'initial', version: '1.0.0', timestamp: BASE_NOW - 40 * 24 * 60 * 60 * 1000 })
+          createHistoryEntry({
+            status: 'accepted',
+            reason: 'initial',
+            version: '1.0.0',
+            timestamp: BASE_NOW - 40 * 24 * 60 * 60 * 1000,
+          }),
         ]),
-        createHistoryBucket('braille', [])
-      ]
+        createHistoryBucket('braille', []),
+      ],
     };
 
     const statuses = summarizeStatuses(snapshot);
@@ -377,10 +551,14 @@ describe('summarizeStatuses', () => {
       tts: { status: 'error' },
       runtime: {
         modules: {
-          tts: { enabled: true, state: 'ready', metrics: { compat: { browsers: ['chrome >= 100'] } } }
-        }
+          tts: {
+            enabled: true,
+            state: 'ready',
+            metrics: { compat: { browsers: ['chrome >= 100'] } },
+          },
+        },
       },
-      manifests: { total: 0, history: [] }
+      manifests: { total: 0, history: [] },
     };
 
     const statuses = summarizeStatuses(snapshot);
@@ -401,16 +579,16 @@ describe('summarizeStatuses', () => {
         timings: {
           load: { last: 150, average: 120, samples: 1 },
           init: { last: null, average: null, samples: 0 },
-          combinedAverage: 120
+          combinedAverage: 120,
         },
         compat: {
           required: { features: ['SpeechRecognition'], browsers: [] },
           missing: { features: ['SpeechRecognition'], browsers: [] },
           unknown: { features: [], browsers: [] },
           status: 'partial',
-          score: 'AA'
-        }
-      }
+          score: 'AA',
+        },
+      },
     };
 
     const metrics = computeModuleMetrics(runtimeEntry, { label: 'Reconnaissance vocale' });

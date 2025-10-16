@@ -1,5 +1,10 @@
 import { registerModule } from '../registry.js';
-import { AUDIO_SEVERITIES, DEFAULT_AUDIO_VOLUME, createDefaultAudioState, normalizeAudioEvents } from '../audio-config.js';
+import {
+  AUDIO_SEVERITIES,
+  DEFAULT_AUDIO_VOLUME,
+  createDefaultAudioState,
+  normalizeAudioEvents,
+} from '../audio-config.js';
 import { manifest } from './audio.manifest.js';
 
 export { manifest };
@@ -20,7 +25,7 @@ function clampVolume(value, fallback = DEFAULT_AUDIO_VOLUME) {
 const DEFAULT_AUDIO_SOURCE = manifest.defaults?.state?.audio ?? createDefaultAudioState();
 const DEFAULT_AUDIO = {
   volume: clampVolume(DEFAULT_AUDIO_SOURCE.volume, DEFAULT_AUDIO_VOLUME),
-  events: normalizeAudioEvents(DEFAULT_AUDIO_SOURCE.events)
+  events: normalizeAudioEvents(DEFAULT_AUDIO_SOURCE.events),
 };
 
 function sanitizeEventEntry(entry) {
@@ -45,7 +50,10 @@ function migrateEvents(rawEvents) {
         sanitized[severity] = entry;
       }
     });
-    if (sanitized.success === undefined && Object.prototype.hasOwnProperty.call(rawEvents, 'confirm')) {
+    if (
+      sanitized.success === undefined &&
+      Object.prototype.hasOwnProperty.call(rawEvents, 'confirm')
+    ) {
       const legacyConfirm = sanitizeEventEntry(rawEvents.confirm);
       if (legacyConfirm) {
         sanitized.success = legacyConfirm;
@@ -113,14 +121,14 @@ const audioFeedback = {
       const config = normalizeConfig(snapshot);
       const payload = {
         volume: config.volume,
-        events: {}
+        events: {},
       };
       AUDIO_SEVERITIES.forEach((severity) => {
         const entry = config.events?.[severity];
         if (!entry) return;
         payload.events[severity] = {
           enabled: entry.enabled !== false,
-          sound: entry.sound
+          sound: entry.sound,
         };
       });
       const signature = JSON.stringify(payload);
@@ -146,7 +154,7 @@ const audioFeedback = {
       const fallback = normalizeConfig(buildSilentSnapshot());
       feedbackInstance.configure(fallback);
     }
-  }
+  },
 };
 
 registerModule(audioFeedback);

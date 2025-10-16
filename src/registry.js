@@ -33,7 +33,7 @@ function createHistoryEntry(manifest, { status, reason }) {
     metadataQuality: manifest.metadataQuality,
     status,
     reason,
-    timestamp: Date.now()
+    timestamp: Date.now(),
   };
   if (manifest.name) {
     entry.name = manifest.name;
@@ -45,9 +45,12 @@ function createHistoryEntry(manifest, { status, reason }) {
 }
 
 function notifyManifestGovernanceUpdate() {
-  const scope = typeof globalThis !== 'undefined'
-    ? globalThis
-    : (typeof window !== 'undefined' ? window : undefined);
+  const scope =
+    typeof globalThis !== 'undefined'
+      ? globalThis
+      : typeof window !== 'undefined'
+        ? window
+        : undefined;
   const refresh = scope?.a11ytb?.runtime?.refreshManifestGovernance;
   if (typeof refresh === 'function') {
     try {
@@ -101,7 +104,8 @@ export function registerModuleManifest(manifest, moduleId) {
   notifyManifestGovernanceUpdate();
   return normalized;
 }
-const PLACEHOLDER_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 3a2 2 0 11-2 2 2 2 0 012-2zm0 4a1 1 0 011 1v8a1 1 0 01-2 0V10a1 1 0 011-1z"/></svg>';
+const PLACEHOLDER_ICON =
+  '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 3a2 2 0 11-2 2 2 2 0 012-2zm0 4a1 1 0 011 1v8a1 1 0 01-2 0V10a1 1 0 011-1z"/></svg>';
 export const DEFAULT_BLOCK_ICON = PLACEHOLDER_ICON;
 
 export function registerModule(definition) {
@@ -121,7 +125,7 @@ export function registerModule(definition) {
   const normalized = {
     ...definition,
     id,
-    manifest
+    manifest,
   };
   Object.freeze(normalized);
   _modules.set(id, normalized);
@@ -152,7 +156,7 @@ export function getModuleManifestHistory(id) {
 export function listModuleManifestHistory() {
   return Array.from(_moduleManifestHistory.entries()).map(([id, entries]) => ({
     id,
-    history: entries.slice()
+    history: entries.slice(),
   }));
 }
 
@@ -161,8 +165,12 @@ export function registerBlock(block) {
   if (!block || !block.id) throw new Error('Block requires an id');
   _blocks.set(block.id, block);
 }
-export function listBlocks() { return Array.from(_blocks.values()); }
-export function getBlock(id) { return _blocks.get(id); }
+export function listBlocks() {
+  return Array.from(_blocks.values());
+}
+export function getBlock(id) {
+  return _blocks.get(id);
+}
 
 export function renderBlock(block, state, root) {
   const el = document.createElement('article');
@@ -170,10 +178,7 @@ export function renderBlock(block, state, root) {
   el.dataset.blockId = block.id;
   if (block.category) el.dataset.category = block.category;
   if (block.title) el.dataset.title = block.title;
-  const keywords = [block.title, ...(block.keywords || [])]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
+  const keywords = [block.title, ...(block.keywords || [])].filter(Boolean).join(' ').toLowerCase();
   if (keywords) el.dataset.keywords = keywords;
 
   const header = document.createElement('header');
@@ -221,7 +226,10 @@ export function renderBlock(block, state, root) {
     try {
       window.a11ytb.runtime.registerBlockElement(block.id, el);
     } catch (error) {
-      console.error(`a11ytb: impossible d’enregistrer le bloc ${block.id} auprès du runtime.`, error);
+      console.error(
+        `a11ytb: impossible d’enregistrer le bloc ${block.id} auprès du runtime.`,
+        error
+      );
     }
   }
   return el;
@@ -238,6 +246,6 @@ if (!window.a11ytb.registry) {
     getModuleManifest,
     registerModuleManifest,
     getModuleManifestHistory,
-    listModuleManifestHistory
+    listModuleManifestHistory,
   };
 }

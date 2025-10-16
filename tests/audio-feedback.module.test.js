@@ -6,7 +6,7 @@ vi.mock('../src/registry.js', () => ({
   registerModule: (definition) => {
     registeredModules.push(definition);
     return definition;
-  }
+  },
 }));
 
 function createMockState(initial = {}) {
@@ -15,7 +15,9 @@ function createMockState(initial = {}) {
   return {
     get(path) {
       if (!path) return structuredClone(data);
-      return path.split('.').reduce((acc, key) => (acc && typeof acc === 'object' ? acc[key] : undefined), data);
+      return path
+        .split('.')
+        .reduce((acc, key) => (acc && typeof acc === 'object' ? acc[key] : undefined), data);
     },
     set(path, value) {
       if (!path) return;
@@ -35,7 +37,7 @@ function createMockState(initial = {}) {
     on(fn) {
       listeners.add(fn);
       return () => listeners.delete(fn);
-    }
+    },
   };
 }
 

@@ -1,6 +1,7 @@
 # Plan de refonte ergonomique
 
 ## Objectifs
+
 - **Réduire l'encombrement visuel** pour laisser la priorité au site audité.
 - **Garantir la navigation clavier / ARIA** en reprenant des patrons éprouvés (menu `menubutton`, overlays modaux, navigation par `listbox`).
 - **Uniformiser l'accès** aux fonctions avancées (audit, profils, options) via des panneaux plein écran inspirés de Stark, Axe DevTools et Linear.
@@ -9,6 +10,7 @@
 ## 1. Sidebar dockable simplifiée
 
 ### 1.1 Structure générale
+
 - Barre latérale resserrée (64 px) avec uniquement des icônes sur fond semi-transparent.
 - Bouton principal en tête (logo module) conservé en sticky.
 - Empilement d'icônes (avec tooltips et labels affichés au focus) pour les entrées suivantes :
@@ -20,6 +22,7 @@
   6. **Plein écran** (icône arrows-expand)
 
 ### 1.2 Gestion du docking
+
 - Remplacer les boutons texte « dock gauche/droite/bas » par un **menubutton** :
   - Bouton iconique (`aria-haspopup="menu"`, `aria-expanded`).
   - Menu déroulant (`role="menu"`) listant les positions disponibles + option « détaché ».
@@ -28,6 +31,7 @@
 - Inspiré de la gestion de panneaux de **Figma** ou **Arc Browser** qui condensent plusieurs options sous un menu iconique.
 
 ### 1.3 Bouton plein écran
+
 - Icône dédiée (double flèche) qui déclenche :
   - Passage en mode **overlay plein écran** pour l'outil (hors barre sticky).
   - Ajout d'une classe `is-fullscreen` au `<body>` pour gérer la mise en page.
@@ -35,6 +39,7 @@
 - Raccourci clavier `Ctrl + Shift + F` avec annonce dans l'infobulle.
 
 ### 1.4 Accessibilité & feedback
+
 - Chaque icône conserve un **libellé visible au focus** (`.sr-only` remplacé par badge latéral).
 - Focus trap appliqué quand un overlay est ouvert.
 - Ajout d'un **compteur** discret sur l'icône Modules indiquant le nombre de filtres actifs.
@@ -42,11 +47,13 @@
 ## 2. Overlays plein écran à effet glassmorphism
 
 ### 2.1 Principes généraux
+
 - Panneaux flottants en surimpression (`position: fixed`), centrés, occupant 80-90% de la viewport avec bords arrondis et arrière-plan glassmorphism (`backdrop-filter: blur(18px)`, `rgba(18,18,28,0.75)`).
 - Animation d'apparition `scale + fade` inspirée de **Linear** et **Raycast**.
 - Fermeture via `Esc`, bouton X en haut à droite, et clic sur fond.
 
 ### 2.2 Overlay Audit Temps Réel
+
 - Accès via l'icône « temps réel ».
 - Présentation pleine largeur avec **grille responsive** (12 colonnes) :
   - Ligne 1 : Résumé (score, nombre d'erreurs critiques, CTA « Lancer audit complet »).
@@ -57,6 +64,7 @@
 - `role="dialog"` avec `aria-labelledby` et `aria-describedby`.
 
 ### 2.3 Overlay Profils & Configuration
+
 - Accès via l'icône roue crantée.
 - Onglets horizontaux ou navigation par `tablist` pour :
   1. Profils & Modèles (grille de cartes activables).
@@ -67,6 +75,7 @@
 - Inspirations : **Notion settings** (layout split), **Stark** (cartes modulaires).
 
 ### 2.4 Overlay Aides & Guides
+
 - Mise en avant de micro-guides, FAQ, raccourcis clavier.
 - Mode onboarding avec étapes (progress bar) et `aria-current="step"`.
 

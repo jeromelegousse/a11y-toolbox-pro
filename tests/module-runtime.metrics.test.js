@@ -12,7 +12,9 @@ function createStubState(initial = {}) {
   const listeners = new Set();
   function getPath(path) {
     if (!path) return structuredClone(data);
-    return path.split('.').reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), data);
+    return path
+      .split('.')
+      .reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), data);
   }
   function setPath(path, value) {
     if (!path) return;
@@ -34,7 +36,7 @@ function createStubState(initial = {}) {
     on(fn) {
       listeners.add(fn);
       return () => listeners.delete(fn);
-    }
+    },
   };
 }
 
@@ -50,7 +52,7 @@ describe('setupModuleRuntime metrics', () => {
 
     const state = createStubState({
       ui: { disabled: [] },
-      runtime: { modules: {} }
+      runtime: { modules: {} },
     });
 
     const catalog = [
@@ -59,8 +61,8 @@ describe('setupModuleRuntime metrics', () => {
         manifest,
         loader: async () => {
           registerModule({ id: moduleId, manifest, init: initSpy });
-        }
-      }
+        },
+      },
     ];
 
     const metricsSpy = vi.fn();
@@ -89,7 +91,7 @@ describe('setupModuleRuntime metrics', () => {
     const sample = metricsSpy.mock.calls[0][0];
     expect(sample).toMatchObject({
       moduleId,
-      status: { attempts: 1, successes: 1, failures: 0 }
+      status: { attempts: 1, successes: 1, failures: 0 },
     });
     expect(sample.timestamps.lastAttemptAt).toBe(metrics.timestamps.lastAttemptAt);
     expect(sample.timestamps.lastSuccessAt).toBe(metrics.timestamps.lastSuccessAt);
@@ -109,7 +111,7 @@ describe('setupModuleRuntime metrics', () => {
 
     const state = createStubState({
       ui: { disabled: [] },
-      runtime: { modules: {} }
+      runtime: { modules: {} },
     });
 
     const catalog = [
@@ -122,10 +124,10 @@ describe('setupModuleRuntime metrics', () => {
             manifest,
             init: () => {
               throw new Error('init ko');
-            }
+            },
           });
-        }
-      }
+        },
+      },
     ];
 
     const metricsSpy = vi.fn();
@@ -149,7 +151,7 @@ describe('setupModuleRuntime metrics', () => {
     expect(metrics.incidents).toHaveLength(1);
     expect(metrics.incidents[0]).toMatchObject({
       type: 'error',
-      message: 'init ko'
+      message: 'init ko',
     });
     expect(metricsSpy).toHaveBeenCalledTimes(1);
     const failureSample = metricsSpy.mock.calls[0][0];

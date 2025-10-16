@@ -36,14 +36,14 @@ export const openAiWhisperEngine = {
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${apiKey}`
+          Authorization: `Bearer ${apiKey}`,
         },
         body: createPayload,
-        timeout: 30000
+        timeout: 30000,
       },
       {
         retries: 1,
-        retryDelayMs: 1000
+        retryDelayMs: 1000,
       }
     );
 
@@ -55,9 +55,9 @@ export const openAiWhisperEngine = {
 
     return {
       text: payload.text,
-      raw: payload
+      raw: payload,
     };
-  }
+  },
 };
 
 export default openAiWhisperEngine;

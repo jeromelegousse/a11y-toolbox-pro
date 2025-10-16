@@ -3,25 +3,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const { fetchWithRetryMock, parseJsonMock } = vi.hoisted(() => {
   return {
     fetchWithRetryMock: vi.fn(),
-    parseJsonMock: vi.fn()
+    parseJsonMock: vi.fn(),
   };
 });
 
 const { readFileMock } = vi.hoisted(() => ({
-  readFileMock: vi.fn()
+  readFileMock: vi.fn(),
 }));
 
 const { createSignMock } = vi.hoisted(() => {
   const update = vi.fn().mockReturnThis();
   const sign = vi.fn(() => 'signature');
   return {
-    createSignMock: vi.fn(() => ({ update, sign }))
+    createSignMock: vi.fn(() => ({ update, sign })),
   };
 });
 
 const envState = vi.hoisted(() => ({
   values: {},
-  google: { path: '/tmp/google.json', data: {} }
+  google: { path: '/tmp/google.json', data: {} },
 }));
 
 const requireEnvMock = vi.fn((key) => {
@@ -36,22 +36,22 @@ const getGoogleCredentialsMock = vi.fn(() => envState.google);
 
 vi.mock('../src/integrations/http-client.js', () => ({
   fetchWithRetry: fetchWithRetryMock,
-  parseJson: parseJsonMock
+  parseJson: parseJsonMock,
 }));
 
 vi.mock('node:fs/promises', () => ({
   readFile: readFileMock,
-  default: { readFile: readFileMock }
+  default: { readFile: readFileMock },
 }));
 
 vi.mock('node:crypto', () => ({
   createSign: createSignMock,
-  default: { createSign: createSignMock }
+  default: { createSign: createSignMock },
 }));
 
 vi.mock('../scripts/integrations/env.js', () => ({
   requireEnv: requireEnvMock,
-  getGoogleCredentials: getGoogleCredentialsMock
+  getGoogleCredentials: getGoogleCredentialsMock,
 }));
 
 function resetEnv() {
@@ -88,12 +88,10 @@ describe('clients STT', () => {
       results: {
         channels: [
           {
-            alternatives: [
-              { transcript: 'Bonjour tout le monde' }
-            ]
-          }
-        ]
-      }
+            alternatives: [{ transcript: 'Bonjour tout le monde' }],
+          },
+        ],
+      },
     });
     fetchWithRetryMock.mockResolvedValueOnce({});
 
@@ -103,7 +101,7 @@ describe('clients STT', () => {
       language: 'fr',
       channels: 2,
       diarize: true,
-      model: 'test-model'
+      model: 'test-model',
     });
 
     expect(requireEnvMock).toHaveBeenCalledWith('DEEPGRAM_API_KEY');
@@ -134,7 +132,7 @@ describe('clients STT', () => {
       language: 'en_us',
       diarize: true,
       pollIntervalMs: 0,
-      maxPolls: 5
+      maxPolls: 5,
     });
 
     expect(requireEnvMock).toHaveBeenCalledWith('ASSEMBLYAI_API_KEY');
@@ -149,18 +147,16 @@ describe('clients STT', () => {
       path: '/tmp/google.json',
       data: {
         client_email: 'service@example.com',
-        private_key: '-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----\n'
-      }
+        private_key: '-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----\n',
+      },
     };
 
-    parseJsonMock
-      .mockResolvedValueOnce({ access_token: 'token-123' })
-      .mockResolvedValueOnce({
-        results: [
-          { alternatives: [{ transcript: 'Bonjour' }] },
-          { alternatives: [{ transcript: 'monde' }] }
-        ]
-      });
+    parseJsonMock.mockResolvedValueOnce({ access_token: 'token-123' }).mockResolvedValueOnce({
+      results: [
+        { alternatives: [{ transcript: 'Bonjour' }] },
+        { alternatives: [{ transcript: 'monde' }] },
+      ],
+    });
 
     const audioBuffer = Buffer.from('audio');
     readFileMock.mockResolvedValueOnce(audioBuffer);
@@ -174,7 +170,7 @@ describe('clients STT', () => {
       channels: 2,
       diarize: true,
       sampleRate: 44100,
-      encoding: 'FLAC'
+      encoding: 'FLAC',
     });
 
     expect(getGoogleCredentialsMock).toHaveBeenCalled();
@@ -204,7 +200,7 @@ describe('clients STT', () => {
       language: 'fr-FR',
       channels: 1,
       diarize: true,
-      region: 'francecentral'
+      region: 'francecentral',
     });
 
     expect(requireEnvMock).toHaveBeenCalledWith('AZURE_SPEECH_KEY');

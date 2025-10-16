@@ -1,16 +1,22 @@
 export const IMPACT_ORDER = ['critical', 'serious', 'moderate', 'minor'];
 
 export function normalizeAxeReport(raw = {}, { now = Date.now(), url } = {}) {
-  const safeUrl = typeof raw.url === 'string' && raw.url.trim()
-    ? raw.url.trim()
-    : (typeof url === 'string' ? url : (typeof window !== 'undefined' ? window.location?.href : ''));
+  const safeUrl =
+    typeof raw.url === 'string' && raw.url.trim()
+      ? raw.url.trim()
+      : typeof url === 'string'
+        ? url
+        : typeof window !== 'undefined'
+          ? window.location?.href
+          : '';
 
   const violations = Array.isArray(raw.violations) ? raw.violations : [];
 
   const normalizedViolations = violations.map((violation) => {
-    const impact = typeof violation.impact === 'string' && violation.impact.trim()
-      ? violation.impact.trim().toLowerCase()
-      : 'unknown';
+    const impact =
+      typeof violation.impact === 'string' && violation.impact.trim()
+        ? violation.impact.trim().toLowerCase()
+        : 'unknown';
     const nodes = Array.isArray(violation.nodes) ? violation.nodes : [];
     return {
       id: violation.id || 'violation',
@@ -23,8 +29,11 @@ export function normalizeAxeReport(raw = {}, { now = Date.now(), url } = {}) {
         target: Array.isArray(node.target) ? node.target.map(String) : [],
         html: node.html || '',
         failureSummary: node.failureSummary || '',
-        impact: typeof node.impact === 'string' && node.impact.trim() ? node.impact.trim().toLowerCase() : impact
-      }))
+        impact:
+          typeof node.impact === 'string' && node.impact.trim()
+            ? node.impact.trim().toLowerCase()
+            : impact,
+      })),
     };
   });
 
@@ -38,7 +47,7 @@ export function normalizeAxeReport(raw = {}, { now = Date.now(), url } = {}) {
     violations: normalizedViolations,
     passes,
     incomplete,
-    stats: summarizeViolations(normalizedViolations)
+    stats: summarizeViolations(normalizedViolations),
   };
 }
 
@@ -49,11 +58,12 @@ export function summarizeViolations(violations = []) {
     moderate: 0,
     minor: 0,
     unknown: 0,
-    total: 0
+    total: 0,
   };
 
   violations.forEach((violation) => {
-    const impact = typeof violation.impact === 'string' ? violation.impact.toLowerCase() : 'unknown';
+    const impact =
+      typeof violation.impact === 'string' ? violation.impact.toLowerCase() : 'unknown';
     const key = IMPACT_ORDER.includes(impact) ? impact : 'unknown';
     totals[key] += 1;
     totals.total += 1;
@@ -76,8 +86,10 @@ function determineOutcomeFromTotals(totals = {}) {
 
 function totalsToDetail(totals) {
   const parts = [];
-  if ((totals.critical ?? 0) > 0) parts.push(`${totals.critical} critique${totals.critical > 1 ? 's' : ''}`);
-  if ((totals.serious ?? 0) > 0) parts.push(`${totals.serious} majeure${totals.serious > 1 ? 's' : ''}`);
+  if ((totals.critical ?? 0) > 0)
+    parts.push(`${totals.critical} critique${totals.critical > 1 ? 's' : ''}`);
+  if ((totals.serious ?? 0) > 0)
+    parts.push(`${totals.serious} majeure${totals.serious > 1 ? 's' : ''}`);
   if ((totals.moderate ?? 0) > 0 || (totals.minor ?? 0) > 0) {
     const recos = (totals.moderate ?? 0) + (totals.minor ?? 0);
     if (recos > 0) parts.push(`${recos} recommandation${recos > 1 ? 's' : ''}`);
@@ -88,7 +100,10 @@ function totalsToDetail(totals) {
 
 export function summarizeReport(normalizedReport = {}) {
   const stats = normalizedReport.stats ?? summarizeViolations(normalizedReport.violations ?? []);
-  const totalNodes = (normalizedReport.violations ?? []).reduce((acc, violation) => acc + (violation.nodes?.length ?? 0), 0);
+  const totalNodes = (normalizedReport.violations ?? []).reduce(
+    (acc, violation) => acc + (violation.nodes?.length ?? 0),
+    0
+  );
   const outcome = determineOutcomeFromTotals(stats);
 
   let tone = 'info';
@@ -140,7 +155,7 @@ export function summarizeReport(normalizedReport = {}) {
     severity,
     headline,
     detail: totalsToDetail(stats),
-    logMessage
+    logMessage,
   };
 }
 
@@ -173,7 +188,7 @@ export function formatTimestamp(timestamp) {
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
     return formatter.format(new Date(timestamp));
   } catch (error) {

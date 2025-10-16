@@ -23,7 +23,7 @@ export function buildRuntimePanel() {
     ['Désactivés', 'disabled'],
     ['Chargés', 'loaded'],
     ['Tentatives', 'attempts'],
-    ['Échecs', 'failures']
+    ['Échecs', 'failures'],
   ];
 
   const counterRefs = {};
@@ -82,7 +82,7 @@ export function buildRuntimePanel() {
     status: liveRegion,
     sparkline: path,
     caption: figCaption,
-    history: []
+    history: [],
   };
 }
 
@@ -91,7 +91,9 @@ export function updateRuntimePanel(panel, entries) {
   const active = entries.filter((entry) => entry.enabled).length;
   const pinned = entries.filter((entry) => entry.isPinned).length;
   const disabled = entries.filter((entry) => entry.isDisabled || !entry.enabled).length;
-  const loaded = entries.filter((entry) => entry.runtime.loaded || entry.runtime.state === 'ready').length;
+  const loaded = entries.filter(
+    (entry) => entry.runtime.loaded || entry.runtime.state === 'ready'
+  ).length;
   const attempts = entries.reduce((acc, entry) => acc + (entry.metrics.attempts || 0), 0);
   const successes = entries.reduce((acc, entry) => acc + (entry.metrics.successes || 0), 0);
   const failures = entries.reduce((acc, entry) => acc + (entry.metrics.failures || 0), 0);
@@ -108,7 +110,10 @@ export function updateRuntimePanel(panel, entries) {
   const successRatio = totalOutcomes > 0 ? Math.round((successes / totalOutcomes) * 100) : 0;
   panel.meter.style.setProperty('--a11ytb-meter-progress', `${successRatio}%`);
   panel.meter.setAttribute('aria-valuenow', successRatio.toString());
-  panel.meter.setAttribute('aria-valuetext', `${successes} chargement(s) réussi(s) sur ${totalOutcomes}`);
+  panel.meter.setAttribute(
+    'aria-valuetext',
+    `${successes} chargement(s) réussi(s) sur ${totalOutcomes}`
+  );
   panel.status.textContent = total
     ? `Modules actifs : ${active} sur ${total}. Chargements réussis à ${successRatio} %.`
     : 'En attente de données runtime.';
@@ -127,5 +132,8 @@ export function updateRuntimePanel(panel, entries) {
   if (!panel.history.length) {
     panel.caption.textContent = 'Latence moyenne en attente de données.';
   }
-  panel.sparkline.setAttribute('d', buildSparklinePath(panel.history, SPARKLINE_WIDTH, SPARKLINE_HEIGHT));
+  panel.sparkline.setAttribute(
+    'd',
+    buildSparklinePath(panel.history, SPARKLINE_WIDTH, SPARKLINE_HEIGHT)
+  );
 }

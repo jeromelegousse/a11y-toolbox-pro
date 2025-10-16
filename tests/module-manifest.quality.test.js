@@ -6,22 +6,23 @@ describe('assessManifestQuality', () => {
     const manifest = {
       id: 'demo-module',
       name: 'Module démo complet',
-      description: 'Ce module fictif illustre toutes les métadonnées attendues pour rivaliser avec les suites professionnelles.',
+      description:
+        'Ce module fictif illustre toutes les métadonnées attendues pour rivaliser avec les suites professionnelles.',
       category: 'vision',
       keywords: ['demo', 'accessibilite'],
       config: {
-        fields: [{ type: 'toggle', path: 'demo.enabled', label: 'Activer' }]
+        fields: [{ type: 'toggle', path: 'demo.enabled', label: 'Activer' }],
       },
       defaults: {
-        state: { demo: { enabled: true } }
+        state: { demo: { enabled: true } },
       },
       compat: {
-        features: ['SpeechSynthesis']
+        features: ['SpeechSynthesis'],
       },
       permissions: ['speechSynthesis'],
       guides: [{ id: 'demo-guide', steps: [{ id: 'step-1', label: 'Étape 1' }] }],
       authors: ['Équipe Accessibilité'],
-      license: 'MIT'
+      license: 'MIT',
     };
 
     const quality = assessManifestQuality(manifest);

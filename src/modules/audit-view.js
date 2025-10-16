@@ -77,17 +77,20 @@ export function renderAuditViolations(report = {}) {
 
   return `
     <ol class="a11ytb-list" data-count="${violations.length}">
-      ${violations.map((violation) => {
-        const title = escapeHtml(violation.help || violation.description || violation.id);
-        const description = violation.description ? `<p>${escapeHtml(violation.description)}</p>` : '';
-        const nodes = Array.isArray(violation.nodes) ? violation.nodes : [];
-        const nodesMarkup = nodes.length
-          ? `<ul class="a11ytb-sublist">${nodes.map((node, index) => renderNode(node, index)).join('')}</ul>`
-          : '<p class="a11ytb-note">Aucune cible fournie par axe-core.</p>';
-        const helpLink = violation.helpUrl
-          ? `<p><a href="${escapeAttribute(violation.helpUrl)}" target="_blank" rel="noopener noreferrer">En savoir plus (axe-core)</a></p>`
-          : '';
-        return `
+      ${violations
+        .map((violation) => {
+          const title = escapeHtml(violation.help || violation.description || violation.id);
+          const description = violation.description
+            ? `<p>${escapeHtml(violation.description)}</p>`
+            : '';
+          const nodes = Array.isArray(violation.nodes) ? violation.nodes : [];
+          const nodesMarkup = nodes.length
+            ? `<ul class="a11ytb-sublist">${nodes.map((node, index) => renderNode(node, index)).join('')}</ul>`
+            : '<p class="a11ytb-note">Aucune cible fournie par axe-core.</p>';
+          const helpLink = violation.helpUrl
+            ? `<p><a href="${escapeAttribute(violation.helpUrl)}" target="_blank" rel="noopener noreferrer">En savoir plus (axe-core)</a></p>`
+            : '';
+          return `
           <li>
             <h3>${title} <span class="a11ytb-badge">${formatImpactLabel(violation.impact)}</span></h3>
             ${description}
@@ -95,7 +98,8 @@ export function renderAuditViolations(report = {}) {
             ${helpLink}
           </li>
         `;
-      }).join('')}
+        })
+        .join('')}
     </ol>
   `;
 }
@@ -105,13 +109,15 @@ export function buildAuditStatusText(auditState = {}) {
   if (status === 'running') {
     return {
       label: 'Analyse en cours…',
-      detail: 'axe-core inspecte la page pour détecter les violations.'
+      detail: 'axe-core inspecte la page pour détecter les violations.',
     };
   }
   if (status === 'error') {
     return {
       label: 'Erreur lors de l’audit',
-      detail: auditState?.error ? String(auditState.error) : 'Impossible de finaliser l’analyse. Réessayez.'
+      detail: auditState?.error
+        ? String(auditState.error)
+        : 'Impossible de finaliser l’analyse. Réessayez.',
     };
   }
   const summary = auditState?.summary ?? {};
@@ -131,7 +137,7 @@ export function buildAuditStatusText(auditState = {}) {
   if (!parts.length) parts.push('Lancez une analyse pour générer un rapport.');
   return {
     label,
-    detail: parts.join(' · ')
+    detail: parts.join(' · '),
   };
 }
 

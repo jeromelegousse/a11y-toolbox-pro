@@ -1,10 +1,8 @@
 import process from 'node:process';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import process from 'node:process';
 import { openAiWhisperEngine } from './openai-whisper.js';
 
 const projectRoot = dirname(dirname(dirname(fileURLToPath(new URL('.', import.meta.url)))));
@@ -42,7 +40,7 @@ export class LocalSpeechEngine {
 
     const subprocess = spawn(this.command, runtimeArgs, {
       env: { ...process.env, ...this.env },
-      stdio: ['ignore', 'pipe', 'pipe']
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
 
     let stdout = '';
@@ -96,26 +94,26 @@ const pythonExecutable = process.env.A11Y_TOOLBOX_STT_PYTHON || 'python3';
 export const fasterWhisperEngine = new LocalSpeechEngine({
   id: 'faster-whisper',
   command: pythonExecutable,
-  args: [resolveScript('whisper_local.py')]
+  args: [resolveScript('whisper_local.py')],
 });
 
 export const voskEngine = new LocalSpeechEngine({
   id: 'vosk',
   command: process.execPath,
-  args: [resolveScript('vosk-transcribe.js')]
+  args: [resolveScript('vosk-transcribe.js')],
 });
 
 export const parakeetEngine = new LocalSpeechEngine({
   id: 'parakeet',
   command: pythonExecutable,
-  args: [resolveScript('parakeet.py')]
+  args: [resolveScript('parakeet.py')],
 });
 
 export const speechEngines = new Map([
   [openAiWhisperEngine.id, openAiWhisperEngine],
   [fasterWhisperEngine.id, fasterWhisperEngine],
   [voskEngine.id, voskEngine],
-  [parakeetEngine.id, parakeetEngine]
+  [parakeetEngine.id, parakeetEngine],
 ]);
 
 export function getSpeechEngine(engineId) {

@@ -5,7 +5,7 @@ function createScriptStub(registry = []) {
     _src: '',
     async: false,
     onload: null,
-    onerror: null
+    onerror: null,
   };
   Object.defineProperty(script, 'src', {
     get() {
@@ -13,7 +13,7 @@ function createScriptStub(registry = []) {
     },
     set(value) {
       this._src = value;
-    }
+    },
   });
   registry.push(script);
   return script;
@@ -32,7 +32,7 @@ describe('audit module — axe loader fallback', () => {
           throw new Error(`Unexpected tag ${tag}`);
         }
         return createScriptStub([]);
-      })
+      }),
     };
     ({ __testing: testing } = await import('../src/modules/audit.js'));
     testing.resetAxeLoaders();

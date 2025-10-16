@@ -2,19 +2,19 @@ import {
   getModule,
   listBlocks,
   listModuleManifests,
-  listModuleManifestHistory
+  listModuleManifestHistory,
 } from './registry.js';
 import { compareSemver } from './utils/semver.js';
 
 const DEPENDENCY_STATUS_LABELS = {
   ok: 'OK',
   missing: 'Manquant',
-  incompatible: 'Version incompatible'
+  incompatible: 'Version incompatible',
 };
 
 const DEPENDENCY_STATUS_TONE = {
   missing: 'alert',
-  incompatible: 'warning'
+  incompatible: 'warning',
 };
 
 function now() {
@@ -30,12 +30,17 @@ function createEmptyCompat() {
     missing: { features: [], browsers: [] },
     unknown: { features: [], browsers: [] },
     status: 'none',
-    score: 'AAA'
+    score: 'AAA',
   };
 }
 
 function safeClone(value) {
-  const scope = typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : undefined);
+  const scope =
+    typeof globalThis !== 'undefined'
+      ? globalThis
+      : typeof window !== 'undefined'
+        ? window
+        : undefined;
   if (scope?.structuredClone) {
     try {
       return scope.structuredClone(value);
@@ -120,7 +125,7 @@ function appendIncident(metrics, incident) {
     type: incident?.type || 'error',
     severity: incident?.severity || (incident?.type === 'warning' ? 'warning' : 'error'),
     message: incident?.message || '',
-    at: Number.isFinite(incident?.at) ? incident.at : Date.now()
+    at: Number.isFinite(incident?.at) ? incident.at : Date.now(),
   };
   metrics.incidents.push(entry);
   if (metrics.incidents.length > METRICS_INCIDENT_LIMIT) {
@@ -134,21 +139,24 @@ function buildLatencySnapshot(internal) {
   const initSamples = internal.initTimings.samples || 0;
   const loadAverage = loadSamples > 0 ? internal.loadTimings.total / loadSamples : null;
   const initAverage = initSamples > 0 ? internal.initTimings.total / initSamples : null;
-  const combinedAverage = (Number.isFinite(loadAverage) ? loadAverage : 0) + (Number.isFinite(initAverage) ? initAverage : 0);
+  const combinedAverage =
+    (Number.isFinite(loadAverage) ? loadAverage : 0) +
+    (Number.isFinite(initAverage) ? initAverage : 0);
   return {
     load: {
       last: internal.loadTimings.last,
       total: internal.loadTimings.total,
       average: Number.isFinite(loadAverage) ? loadAverage : null,
-      samples: loadSamples
+      samples: loadSamples,
     },
     init: {
       last: internal.initTimings.last,
       total: internal.initTimings.total,
       average: Number.isFinite(initAverage) ? initAverage : null,
-      samples: initSamples
+      samples: initSamples,
     },
-    combinedAverage: Number.isFinite(combinedAverage) && combinedAverage > 0 ? combinedAverage : null
+    combinedAverage:
+      Number.isFinite(combinedAverage) && combinedAverage > 0 ? combinedAverage : null,
   };
 }
 
@@ -157,11 +165,11 @@ function serializeMetrics(internal, { collectedAt }) {
   const compatSnapshot = internal.compat ? safeClone(internal.compat) : createEmptyCompat();
   const incidents = Array.isArray(internal.incidents)
     ? internal.incidents.map((incident) => ({
-      type: incident.type,
-      severity: incident.severity || (incident.type === 'warning' ? 'warning' : 'error'),
-      message: incident.message || '',
-      at: incident.at
-    }))
+        type: incident.type,
+        severity: incident.severity || (incident.type === 'warning' ? 'warning' : 'error'),
+        message: incident.message || '',
+        at: incident.at,
+      }))
     : [];
   return {
     attempts: internal.attempts,
@@ -182,8 +190,8 @@ function serializeMetrics(internal, { collectedAt }) {
       lastAttemptAt: internal.lastAttemptAt,
       lastSuccessAt: internal.lastSuccessAt,
       lastFailureAt: internal.lastFailureAt,
-      lastIncidentAt: internal.lastIncidentAt
-    }
+      lastIncidentAt: internal.lastIncidentAt,
+    },
   };
 }
 
@@ -198,13 +206,13 @@ function createMetricsSample(moduleId, internal, { collectedAt = Date.now() } = 
       successes: snapshot.successes,
       failures: snapshot.failures,
       retryCount: snapshot.retryCount,
-      lastError: snapshot.lastError
+      lastError: snapshot.lastError,
     },
     timings: snapshot.timings,
     latency: snapshot.latency,
     compat: snapshot.compat,
     incidents: snapshot.incidents,
-    timestamps: snapshot.timestamps
+    timestamps: snapshot.timestamps,
   };
   return { snapshot, exportSample };
 }
@@ -345,8 +353,13 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
     if (!entry) return;
     if (entry.strategy === 'idle') {
       if (typeof entry.cancel === 'function') {
-        try { entry.cancel(); } catch (error) {
-          console.error(`a11ytb: échec de l’annulation du préchargement idle pour ${moduleId}.`, error);
+        try {
+          entry.cancel();
+        } catch (error) {
+          console.error(
+            `a11ytb: échec de l’annulation du préchargement idle pour ${moduleId}.`,
+            error
+          );
         }
       }
     } else if (entry.strategy === 'visible') {
@@ -357,7 +370,10 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
           element.removeEventListener('pointerenter', pointerHandler);
           element.removeEventListener('focusin', focusHandler);
         } catch (error) {
-          console.error(`a11ytb: impossible de retirer un écouteur de préchargement pour ${moduleId}.`, error);
+          console.error(
+            `a11ytb: impossible de retirer un écouteur de préchargement pour ${moduleId}.`,
+            error
+          );
         }
       });
     }
@@ -375,7 +391,13 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
   }
 
   function scheduleIdlePreload(moduleId) {
-    if (initialized.has(moduleId) || loading.has(moduleId) || preloadedModules.has(moduleId) || scheduledPreloads.has(moduleId)) return;
+    if (
+      initialized.has(moduleId) ||
+      loading.has(moduleId) ||
+      preloadedModules.has(moduleId) ||
+      scheduledPreloads.has(moduleId)
+    )
+      return;
     const supportsIdle = typeof requestIdleCallback === 'function';
     if (supportsIdle) {
       const handle = requestIdleCallback(() => triggerPreload(moduleId), { timeout: 2000 });
@@ -393,7 +415,13 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
   }
 
   function scheduleVisibilityPreload(moduleId, element) {
-    if (!element || initialized.has(moduleId) || loading.has(moduleId) || preloadedModules.has(moduleId)) return;
+    if (
+      !element ||
+      initialized.has(moduleId) ||
+      loading.has(moduleId) ||
+      preloadedModules.has(moduleId)
+    )
+      return;
     if (!('IntersectionObserver' in window)) {
       scheduleIdlePreload(moduleId);
       return;
@@ -406,17 +434,26 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
       return;
     }
     const observed = new Set([element]);
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        triggerPreload(moduleId);
-      }
-    }, { root: document.querySelector('#a11ytb-root') || null, threshold: 0.2 });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          triggerPreload(moduleId);
+        }
+      },
+      { root: document.querySelector('#a11ytb-root') || null, threshold: 0.2 }
+    );
     scheduledPreloads.set(moduleId, { strategy: 'visible', observer, observed });
     observer.observe(element);
   }
 
   function schedulePointerPreload(moduleId, element) {
-    if (!element || initialized.has(moduleId) || loading.has(moduleId) || preloadedModules.has(moduleId)) return;
+    if (
+      !element ||
+      initialized.has(moduleId) ||
+      loading.has(moduleId) ||
+      preloadedModules.has(moduleId)
+    )
+      return;
     let entry = scheduledPreloads.get(moduleId);
     if (!entry || entry.strategy !== 'pointer') {
       entry = { strategy: 'pointer', records: new Map() };
@@ -435,7 +472,8 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
     const manifest = manifests.get(moduleId);
     const strategy = manifest?.runtime?.preload;
     if (!strategy) return;
-    if (initialized.has(moduleId) || loading.has(moduleId) || preloadedModules.has(moduleId)) return;
+    if (initialized.has(moduleId) || loading.has(moduleId) || preloadedModules.has(moduleId))
+      return;
     const hasBlocks = (moduleToBlocks.get(moduleId) || []).length > 0;
     if (strategy === 'idle') {
       scheduleIdlePreload(moduleId);
@@ -470,7 +508,7 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
       loadTimings: { last: null, total: 0, samples: 0 },
       initTimings: { last: null, total: 0, samples: 0 },
       compat: createEmptyCompat(),
-      incidents: []
+      incidents: [],
     };
     const manifest = manifests.get(moduleId);
     if (manifest) {
@@ -489,15 +527,19 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
 
     return dependencies.map((dep) => {
       const depId = dep.id;
-      const requiredVersion = typeof dep.version === 'string' && dep.version.trim() ? dep.version.trim() : null;
+      const requiredVersion =
+        typeof dep.version === 'string' && dep.version.trim() ? dep.version.trim() : null;
       const targetManifest = manifests.get(depId);
       const dependencyName = targetManifest?.name || depId;
       const currentVersion = targetManifest?.version || null;
       let status = 'missing';
       if (targetManifest) {
-        status = requiredVersion && currentVersion
-          ? (compareSemver(currentVersion, requiredVersion) >= 0 ? 'ok' : 'incompatible')
-          : 'ok';
+        status =
+          requiredVersion && currentVersion
+            ? compareSemver(currentVersion, requiredVersion) >= 0
+              ? 'ok'
+              : 'incompatible'
+            : 'ok';
       }
 
       let message = '';
@@ -530,7 +572,7 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
         requiredVersion,
         currentVersion,
         message,
-        aria
+        aria,
       };
     });
   }
@@ -542,7 +584,7 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
       {
         tone: 'info',
         module: moduleId,
-        tags: ['modules', 'versions']
+        tags: ['modules', 'versions'],
       }
     );
   }
@@ -555,14 +597,11 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
       if (entry.status === prevStatus) return;
       if (entry.status === 'ok') {
         if (prevStatus && prevStatus !== 'ok') {
-          window.a11ytb?.logActivity?.(
-            `Conflit résolu pour ${moduleName} : ${entry.label}`,
-            {
-              tone: 'confirm',
-              module: moduleId,
-              tags: ['modules', 'dependencies', `dependency:${entry.id}`]
-            }
-          );
+          window.a11ytb?.logActivity?.(`Conflit résolu pour ${moduleName} : ${entry.label}`, {
+            tone: 'confirm',
+            module: moduleId,
+            tags: ['modules', 'dependencies', `dependency:${entry.id}`],
+          });
         }
         return;
       }
@@ -570,7 +609,7 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
       window.a11ytb?.logActivity?.(entry.aria, {
         tone,
         module: moduleId,
-        tags: ['modules', 'dependencies', `dependency:${entry.id}`]
+        tags: ['modules', 'dependencies', `dependency:${entry.id}`],
       });
     });
   }
@@ -580,19 +619,21 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
     const previousLevel = previousQuality?.level ?? null;
     const nextLevel = nextQuality.level;
     if (!nextLevel || previousLevel === nextLevel) return;
-    const tone = nextLevel === 'AAA' ? 'confirm' : (nextLevel === 'AA' ? 'info' : 'warning');
+    const tone = nextLevel === 'AAA' ? 'confirm' : nextLevel === 'AA' ? 'info' : 'warning';
     const coverageLabel = Number.isFinite(nextQuality.coveragePercent)
       ? `${nextQuality.coveragePercent} %`
       : null;
-    const summary = nextQuality.summary || (coverageLabel
-      ? `Mise à jour métadonnées ${nextLevel} (${coverageLabel})`
-      : `Mise à jour métadonnées ${nextLevel}`);
+    const summary =
+      nextQuality.summary ||
+      (coverageLabel
+        ? `Mise à jour métadonnées ${nextLevel} (${coverageLabel})`
+        : `Mise à jour métadonnées ${nextLevel}`);
     const detail = nextQuality.detail ? ` ${nextQuality.detail}` : '';
     const message = `${moduleName} · ${summary}${detail}`;
     window.a11ytb?.logActivity?.(message, {
       tone,
       module: moduleId,
-      tags: ['modules', 'metadata', `metadata:${nextLevel}`]
+      tags: ['modules', 'metadata', `metadata:${nextLevel}`],
     });
   }
 
@@ -607,13 +648,18 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
       manifestVersion,
       manifestName: moduleName,
       dependencies,
-      metadataQuality: manifest.metadataQuality
+      metadataQuality: manifest.metadataQuality,
     });
     logVersionChange(moduleId, previous.manifestVersion, manifestVersion, moduleName);
     const prevDependencies = Array.isArray(previous.dependencies) ? previous.dependencies : [];
     logDependencyChanges(moduleId, moduleName, prevDependencies, dependencies);
     if (manifest.metadataQuality) {
-      logMetadataQualityChange(moduleId, moduleName, previous.metadataQuality, manifest.metadataQuality);
+      logMetadataQualityChange(
+        moduleId,
+        moduleName,
+        previous.metadataQuality,
+        manifest.metadataQuality
+      );
     }
   }
 
@@ -630,9 +676,9 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
     const historyList = listModuleManifestHistory();
     const historyBuckets = Array.isArray(historyList)
       ? historyList.map((bucket) => ({
-        id: bucket.id,
-        history: Array.isArray(bucket.history) ? bucket.history.slice() : []
-      }))
+          id: bucket.id,
+          history: Array.isArray(bucket.history) ? bucket.history.slice() : [],
+        }))
       : [];
 
     const bucketsById = new Map(historyBuckets.map((bucket) => [bucket.id, bucket]));
@@ -722,7 +768,7 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
                 type: 'error',
                 message: metrics.lastError,
                 at: metrics.lastFailureAt,
-                severity: 'error'
+                severity: 'error',
               });
               error.__a11ytbTracked = true;
               publishMetrics(moduleId);
@@ -755,12 +801,15 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
             type: 'error',
             message: metrics.lastError,
             at: metrics.lastFailureAt,
-            severity: 'error'
+            severity: 'error',
           });
           publishMetrics(moduleId);
         }
         console.error(`a11ytb: impossible de charger le module ${moduleId}.`, error);
-        updateModuleRuntime(moduleId, { state: 'error', error: metrics.lastError || 'Échec de chargement' });
+        updateModuleRuntime(moduleId, {
+          state: 'error',
+          error: metrics.lastError || 'Échec de chargement',
+        });
         throw error;
       })
       .finally(() => {
@@ -778,14 +827,13 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
 
   let lastDisabled = new Set(state.get('ui.disabled') ?? []);
   const initialCollections = state.get('ui.collections.disabled');
-  let lastDisabledCollections = new Set(Array.isArray(initialCollections) ? initialCollections : []);
+  let lastDisabledCollections = new Set(
+    Array.isArray(initialCollections) ? initialCollections : []
+  );
 
   function refreshManifestGovernance() {
     snapshotManifestGovernance();
-    const knownModuleIds = new Set([
-      ...moduleToBlocks.keys(),
-      ...catalog.map((entry) => entry.id)
-    ]);
+    const knownModuleIds = new Set([...moduleToBlocks.keys(), ...catalog.map((entry) => entry.id)]);
     knownModuleIds.forEach((moduleId) => {
       if (!moduleId) return;
       applyModuleMetadata(moduleId);
@@ -795,7 +843,11 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
   moduleToBlocks.forEach((blockIds, moduleId) => {
     const enabled = isModuleEnabled(blockIds, lastDisabled, lastDisabledCollections, moduleId);
     applyModuleMetadata(moduleId);
-    updateModuleRuntime(moduleId, { blockIds, collections: getCollectionsForModule(moduleId), enabled });
+    updateModuleRuntime(moduleId, {
+      blockIds,
+      collections: getCollectionsForModule(moduleId),
+      enabled,
+    });
     if (enabled) {
       ensureModuleMounted(moduleId);
     } else {
@@ -810,7 +862,11 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
   modulesWithoutBlocks.forEach((moduleId) => {
     const enabled = isModuleCollectionEnabled(moduleId, lastDisabledCollections);
     applyModuleMetadata(moduleId);
-    updateModuleRuntime(moduleId, { blockIds: [], collections: getCollectionsForModule(moduleId), enabled });
+    updateModuleRuntime(moduleId, {
+      blockIds: [],
+      collections: getCollectionsForModule(moduleId),
+      enabled,
+    });
     if (enabled) {
       ensureModuleMounted(moduleId);
     } else {
@@ -821,7 +877,9 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
   state.on((snapshot) => {
     const nextDisabled = new Set(snapshot?.ui?.disabled ?? []);
     const nextCollectionList = snapshot?.ui?.collections?.disabled;
-    const nextDisabledCollections = new Set(Array.isArray(nextCollectionList) ? nextCollectionList : []);
+    const nextDisabledCollections = new Set(
+      Array.isArray(nextCollectionList) ? nextCollectionList : []
+    );
     moduleToBlocks.forEach((blockIds, moduleId) => {
       const wasEnabled = isModuleEnabled(blockIds, lastDisabled, lastDisabledCollections, moduleId);
       const isEnabled = isModuleEnabled(blockIds, nextDisabled, nextDisabledCollections, moduleId);
@@ -861,7 +919,8 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
     const manifest = manifests.get(moduleId);
     const strategy = manifest?.runtime?.preload;
     if (!strategy) return;
-    if (initialized.has(moduleId) || loading.has(moduleId) || preloadedModules.has(moduleId)) return;
+    if (initialized.has(moduleId) || loading.has(moduleId) || preloadedModules.has(moduleId))
+      return;
     if (strategy === 'visible') {
       scheduleVisibilityPreload(moduleId, element);
     } else if (strategy === 'pointer') {
@@ -871,7 +930,7 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
   window.a11ytb.runtime.moduleStatus = (id) => ({
     loaded: initialized.has(id),
     blockIds: moduleToBlocks.get(id) ?? [],
-    ...(state.get(`runtime.modules.${id}`) || {})
+    ...(state.get(`runtime.modules.${id}`) || {}),
   });
   if (window.a11ytb.registry) {
     window.a11ytb.registry.loadModule = loadModule;
@@ -879,6 +938,6 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
 
   return {
     loadModule,
-    isModuleLoaded: (id) => initialized.has(id)
+    isModuleLoaded: (id) => initialized.has(id),
   };
 }

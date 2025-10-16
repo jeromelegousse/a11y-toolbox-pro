@@ -3,7 +3,9 @@ import { flattenedModuleCollections } from '../module-collections.js';
 import { NAMESPACE_TO_MODULE } from './constants.js';
 import { ensureArray } from './utils.js';
 
-export const collectionLookup = new Map(flattenedModuleCollections.map((collection) => [collection.id, collection]));
+export const collectionLookup = new Map(
+  flattenedModuleCollections.map((collection) => [collection.id, collection])
+);
 
 const moduleToCollections = new Map();
 flattenedModuleCollections.forEach((collection) => {
@@ -39,7 +41,7 @@ export function computeProfiles(snapshot = {}) {
       return {
         id,
         label: profile?.name || id,
-        modules: Array.from(modules)
+        modules: Array.from(modules),
       };
     })
     .filter((entry) => entry.modules.length > 0);
@@ -56,7 +58,7 @@ export function computeProfiles(snapshot = {}) {
 
   return {
     list: entries,
-    moduleToProfiles
+    moduleToProfiles,
   };
 }
 
@@ -91,11 +93,14 @@ function buildFlags(isCollectionDisabled, runtimeEntry, compat) {
     flags.push({ tone: 'warning', label: 'Collection désactivée' });
   }
   const dependencies = ensureArray(runtimeEntry.dependencies);
-  const blockingDependencies = dependencies.filter((dependency) => dependency.status && dependency.status !== 'ok');
+  const blockingDependencies = dependencies.filter(
+    (dependency) => dependency.status && dependency.status !== 'ok'
+  );
   if (blockingDependencies.length) {
-    const label = blockingDependencies.length > 1
-      ? `${blockingDependencies.length} dépendances à résoudre`
-      : `${blockingDependencies[0].label} à vérifier`;
+    const label =
+      blockingDependencies.length > 1
+        ? `${blockingDependencies.length} dépendances à résoudre`
+        : `${blockingDependencies[0].label} à vérifier`;
     flags.push({ tone: 'alert', label });
   }
   if (compat?.status === 'unknown') {
@@ -134,24 +139,30 @@ export function buildModuleEntries(snapshot = {}) {
     const status = resolveStatus(runtimeEntry, {
       disabled: disabledSet,
       hidden: hiddenSet,
-      disabledCollections: collectionsDisabled
+      disabledCollections: collectionsDisabled,
     });
 
     const collections = moduleToCollections.get(entry.id);
     const collectionIds = collections ? Array.from(collections) : [];
-    const isCollectionDisabled = collectionIds.some((collectionId) => collectionsDisabled.has(collectionId));
+    const isCollectionDisabled = collectionIds.some((collectionId) =>
+      collectionsDisabled.has(collectionId)
+    );
     const pinned = blockIds.some((blockId) => pinnedSet.has(blockId));
-    const compat = runtimeEntry.metrics?.compat || runtimeEntry.compat || manifest.compat || { status: 'none' };
+    const compat = runtimeEntry.metrics?.compat ||
+      runtimeEntry.compat ||
+      manifest.compat || { status: 'none' };
     const compatStatus = compat.status || 'none';
 
     const dependencies = ensureArray(runtimeEntry.dependencies);
 
-    const metrics = runtimeEntry.metrics ? { ...runtimeEntry.metrics } : {
-      attempts: 0,
-      successes: 0,
-      failures: 0,
-      timings: { load: {}, init: {}, combinedAverage: null }
-    };
+    const metrics = runtimeEntry.metrics
+      ? { ...runtimeEntry.metrics }
+      : {
+          attempts: 0,
+          successes: 0,
+          failures: 0,
+          timings: { load: {}, init: {}, combinedAverage: null },
+        };
     if (!Number.isFinite(metrics.lastAttemptAt) && Number.isFinite(runtimeEntry.lastAttemptAt)) {
       metrics.lastAttemptAt = runtimeEntry.lastAttemptAt;
     }
@@ -179,7 +190,7 @@ export function buildModuleEntries(snapshot = {}) {
       collections: collectionIds,
       dependencies,
       flags,
-      searchText: buildSearchText({ id: entry.id, manifest })
+      searchText: buildSearchText({ id: entry.id, manifest }),
     };
   });
 }
@@ -223,6 +234,8 @@ export function sortModules(entries, sortKey) {
       return list.sort((a, b) => a.compatStatus.localeCompare(b.compatStatus, 'fr'));
     case 'alpha':
     default:
-      return list.sort((a, b) => (a.manifest.name || a.id).localeCompare(b.manifest.name || b.id, 'fr'));
+      return list.sort((a, b) =>
+        (a.manifest.name || a.id).localeCompare(b.manifest.name || b.id, 'fr')
+      );
   }
 }

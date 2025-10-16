@@ -25,9 +25,9 @@ export const manifest = {
   permissions: ['speechSynthesis'],
   defaults: {
     state: {
-      exemple: { enabled: false }
-    }
-  }
+      exemple: { enabled: false },
+    },
+  },
 };
 ```
 
@@ -47,7 +47,7 @@ registerModule({
   manifest,
   init({ state, registry, ui }) {
     // Votre code d'initialisation
-  }
+  },
 });
 ```
 
@@ -97,8 +97,8 @@ const metadata = {
   keywords: ['vision', 'zoom'],
   permissions: ['speechSynthesis'],
   compat: {
-    browsers: ['chrome >= 100', 'firefox >= 115']
-  }
+    browsers: ['chrome >= 100', 'firefox >= 115'],
+  },
 };
 ```
 
@@ -106,9 +106,10 @@ Exposez-les temporairement via `window.a11ytb.registry?.define(metadata)` ou ajo
 
 4. **Tests & automatisation** :
    - `npm run lint` exécute ESLint et Stylelint (obligatoire avant commit, lancé en CI).
-  - `npm run test:visual` vérifie les captures Playwright. Utilisez `UPDATE_VISUAL_BASELINE=1 npm run test:visual` quand un changement visuel est volontaire et documentez-le.
-   - Vérifications clavier uniquement (navigation Tab/Shift+Tab) et narration (NVDA/VoiceOver) restent indispensables.
-   - Les stratégies détaillées sont décrites dans `docs/testing-strategy.md`.
+
+- `npm run test:visual` vérifie les captures Playwright. Utilisez `UPDATE_VISUAL_BASELINE=1 npm run test:visual` quand un changement visuel est volontaire et documentez-le.
+- Vérifications clavier uniquement (navigation Tab/Shift+Tab) et narration (NVDA/VoiceOver) restent indispensables.
+- Les stratégies détaillées sont décrites dans `docs/testing-strategy.md`.
 
 5. **PR checklist** :
    - Captures d'écran avant/après si UI + vérifier les snapshots Playwright.

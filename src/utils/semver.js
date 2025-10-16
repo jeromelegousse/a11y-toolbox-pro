@@ -1,4 +1,5 @@
-const SEMVER_REGEX = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-.]+)?(?:\+[0-9A-Za-z-.]+)?$/;
+const SEMVER_REGEX =
+  /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-.]+)?(?:\+[0-9A-Za-z-.]+)?$/;
 
 const PRERELEASE_REGEX = /^(?:0|[1-9]\d*|[0-9A-Za-z-]+)$/;
 
@@ -43,7 +44,7 @@ export function parseSemver(version) {
     minor,
     patch,
     prerelease: Object.freeze(prerelease),
-    build: Object.freeze(build)
+    build: Object.freeze(build),
   });
 }
 
@@ -98,5 +99,5 @@ export default {
   SEMVER_REGEX,
   isValidSemver,
   parseSemver,
-  compareSemver
+  compareSemver,
 };

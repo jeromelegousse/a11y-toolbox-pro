@@ -1,10 +1,14 @@
-const globalScope = typeof globalThis !== 'undefined'
-  ? globalThis
-  : (typeof window !== 'undefined' ? window : undefined);
+const globalScope =
+  typeof globalThis !== 'undefined'
+    ? globalThis
+    : typeof window !== 'undefined'
+      ? window
+      : undefined;
 
-const structuredCloneFn = typeof globalScope?.structuredClone === 'function'
-  ? globalScope.structuredClone.bind(globalScope)
-  : null;
+const structuredCloneFn =
+  typeof globalScope?.structuredClone === 'function'
+    ? globalScope.structuredClone.bind(globalScope)
+    : null;
 
 let hasWarnedFallback = false;
 
@@ -44,7 +48,7 @@ function cloneWithFallback(value, seen = new WeakMap()) {
   if (value instanceof Set) {
     const result = new Set();
     seen.set(value, result);
-    value.forEach(item => {
+    value.forEach((item) => {
       result.add(cloneWithFallback(item, seen));
     });
     return result;
@@ -71,7 +75,7 @@ function cloneWithFallback(value, seen = new WeakMap()) {
   if (proto === Object.prototype || proto === null) {
     const result = {};
     seen.set(value, result);
-    Object.keys(value).forEach(key => {
+    Object.keys(value).forEach((key) => {
       result[key] = cloneWithFallback(value[key], seen);
     });
     return result;
@@ -90,8 +94,9 @@ function safeClone(value) {
 
 export function createStore(key, initial, options = {}) {
   const { storage: providedStorage, global: providedGlobal } = options;
-  const storage = providedStorage
-    ?? (typeof globalScope?.localStorage !== 'undefined' ? globalScope.localStorage : null);
+  const storage =
+    providedStorage ??
+    (typeof globalScope?.localStorage !== 'undefined' ? globalScope.localStorage : null);
   const hasStorage = Boolean(
     storage && typeof storage.getItem === 'function' && typeof storage.setItem === 'function'
   );
@@ -121,7 +126,11 @@ export function createStore(key, initial, options = {}) {
     try {
       const snapshot = safeClone(state);
       if (snapshot && typeof snapshot === 'object') {
-        if (initial && typeof initial === 'object' && Object.prototype.hasOwnProperty.call(initial, 'runtime')) {
+        if (
+          initial &&
+          typeof initial === 'object' &&
+          Object.prototype.hasOwnProperty.call(initial, 'runtime')
+        ) {
           snapshot.runtime = safeClone(initial.runtime);
         } else {
           delete snapshot.runtime;
@@ -159,24 +168,33 @@ export function createStore(key, initial, options = {}) {
       if (shouldPersist) {
         persist();
       }
-      subs.forEach(fn => fn(safeClone(state)));
+      subs.forEach((fn) => fn(safeClone(state)));
     },
     tx(patch) {
       state = { ...state, ...patch };
       persist();
-      subs.forEach(fn => fn(safeClone(state)));
+      subs.forEach((fn) => fn(safeClone(state)));
     },
-    on(fn) { subs.add(fn); return () => subs.delete(fn); },
-    reset() { state = safeClone(initial); persist(); subs.forEach(fn => fn(safeClone(state))); },
-    serialize() { return JSON.stringify(state, null, 2); }
+    on(fn) {
+      subs.add(fn);
+      return () => subs.delete(fn);
+    },
+    reset() {
+      state = safeClone(initial);
+      persist();
+      subs.forEach((fn) => fn(safeClone(state)));
+    },
+    serialize() {
+      return JSON.stringify(state, null, 2);
+    },
   };
 
   const exposeTargets = [
     providedGlobal,
     typeof window !== 'undefined' ? window : null,
-    globalScope && typeof globalScope.window === 'object' ? globalScope.window : null
+    globalScope && typeof globalScope.window === 'object' ? globalScope.window : null,
   ];
-  const target = exposeTargets.find(candidate => candidate && typeof candidate === 'object');
+  const target = exposeTargets.find((candidate) => candidate && typeof candidate === 'object');
   if (target) {
     if (!target.a11ytb || typeof target.a11ytb !== 'object') {
       target.a11ytb = {};

@@ -36,11 +36,14 @@ export function applyInertToSiblings(container, options = {}) {
 
     const record = {
       element: child,
-      hadAriaHidden: typeof child.hasAttribute === 'function' ? child.hasAttribute('aria-hidden') : false,
-      ariaHidden: typeof child.getAttribute === 'function' ? child.getAttribute('aria-hidden') : null,
-      hadInertAttribute: typeof child.hasAttribute === 'function' ? child.hasAttribute('inert') : false,
+      hadAriaHidden:
+        typeof child.hasAttribute === 'function' ? child.hasAttribute('aria-hidden') : false,
+      ariaHidden:
+        typeof child.getAttribute === 'function' ? child.getAttribute('aria-hidden') : null,
+      hadInertAttribute:
+        typeof child.hasAttribute === 'function' ? child.hasAttribute('inert') : false,
       hadInertProperty: 'inert' in child,
-      inertValue: 'inert' in child ? child.inert : undefined
+      inertValue: 'inert' in child ? child.inert : undefined,
     };
 
     if (record.hadInertProperty) {
@@ -63,7 +66,10 @@ export function applyInertToSiblings(container, options = {}) {
 
       if (record.hadInertProperty) {
         element.inert = record.inertValue;
-      } else if (typeof element.setAttribute === 'function' || typeof element.removeAttribute === 'function') {
+      } else if (
+        typeof element.setAttribute === 'function' ||
+        typeof element.removeAttribute === 'function'
+      ) {
         if (record.hadInertAttribute) {
           if (typeof element.setAttribute === 'function') {
             element.setAttribute('inert', '');
@@ -73,7 +79,10 @@ export function applyInertToSiblings(container, options = {}) {
         }
       }
 
-      if (typeof element.setAttribute === 'function' || typeof element.removeAttribute === 'function') {
+      if (
+        typeof element.setAttribute === 'function' ||
+        typeof element.removeAttribute === 'function'
+      ) {
         if (record.hadAriaHidden) {
           if (typeof element.setAttribute === 'function') {
             element.setAttribute('aria-hidden', record.ariaHidden ?? 'true');

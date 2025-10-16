@@ -17,7 +17,7 @@ export function createAdminLayout(runtimePanel) {
   [
     'Ouvrez n’importe quelle page publique pour afficher la boîte à outils.',
     'Utilisez Alt+Shift+A ou le bouton flottant pour la barre latérale.',
-    'Explorez les vues Modules, Options & Profils puis Organisation.'
+    'Explorez les vues Modules, Options & Profils puis Organisation.',
   ].forEach((text) => {
     const item = document.createElement('li');
     item.textContent = text;
@@ -33,7 +33,7 @@ export function createAdminLayout(runtimePanel) {
   [
     'Alt+Shift+O : Options & Profils',
     'Alt+Shift+G : Organisation des modules',
-    'Alt+Shift+H : Raccourcis complets'
+    'Alt+Shift+H : Raccourcis complets',
   ].forEach((text) => {
     const item = document.createElement('li');
     item.textContent = text;
@@ -42,7 +42,8 @@ export function createAdminLayout(runtimePanel) {
 
   const compareNote = document.createElement('p');
   compareNote.className = 'a11ytb-admin-compare';
-  compareNote.textContent = 'Inspiré des workflows guidés d’Accessibility Insights et de Stark : suivez les indicateurs pour prioriser les correctifs rapides.';
+  compareNote.textContent =
+    'Inspiré des workflows guidés d’Accessibility Insights et de Stark : suivez les indicateurs pour prioriser les correctifs rapides.';
 
   introSection.append(introTitle, introList, tipsTitle, tipsList, compareNote);
 
@@ -58,7 +59,8 @@ export function createAdminLayout(runtimePanel) {
 
   const dashboardDescription = document.createElement('p');
   dashboardDescription.className = 'a11ytb-admin-section-description';
-  dashboardDescription.textContent = 'Filtrez le catalogue, examinez la compatibilité et déclenchez les actions directes sur les modules.';
+  dashboardDescription.textContent =
+    'Filtrez le catalogue, examinez la compatibilité et déclenchez les actions directes sur les modules.';
 
   dashboardHeader.append(dashboardTitle, dashboardDescription);
 
@@ -160,7 +162,8 @@ export function createAdminLayout(runtimePanel) {
 
   const syncDescription = document.createElement('p');
   syncDescription.className = 'a11ytb-admin-section-description';
-  syncDescription.textContent = 'Suivez les envois automatiques (webhook, Jira, Linear, Slack) et vérifiez les dernières tentatives.';
+  syncDescription.textContent =
+    'Suivez les envois automatiques (webhook, Jira, Linear, Slack) et vérifiez les dernières tentatives.';
 
   const syncStatus = document.createElement('p');
   syncStatus.className = 'a11ytb-admin-live';
@@ -193,7 +196,8 @@ export function createAdminLayout(runtimePanel) {
 
   const exportDescription = document.createElement('p');
   exportDescription.className = 'a11ytb-admin-section-description';
-  exportDescription.textContent = 'Historique des exports JSON/CSV et copies du journal d’activité.';
+  exportDescription.textContent =
+    'Historique des exports JSON/CSV et copies du journal d’activité.';
 
   const exportStatus = document.createElement('p');
   exportStatus.className = 'a11ytb-admin-live';
@@ -238,7 +242,7 @@ export function createAdminLayout(runtimePanel) {
       compatibility: compatibilityFilter.control,
       sort: sortFilter.control,
       search: searchInput,
-      pinned: pinnedCheckbox
-    }
+      pinned: pinnedCheckbox,
+    },
   };
 }

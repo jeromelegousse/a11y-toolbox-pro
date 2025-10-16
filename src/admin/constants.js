@@ -2,14 +2,14 @@ export const COMPATIBILITY_LABELS = {
   full: 'Compatibles',
   partial: 'À risques',
   unknown: 'À vérifier',
-  none: 'Non déclarées'
+  none: 'Non déclarées',
 };
 
 export const COMPATIBILITY_TONES = {
   full: 'confirm',
   partial: 'alert',
   unknown: 'warning',
-  none: 'muted'
+  none: 'muted',
 };
 
 export const NAMESPACE_TO_MODULE = new Map([
@@ -19,5 +19,5 @@ export const NAMESPACE_TO_MODULE = new Map([
   ['stt', 'stt'],
   ['braille', 'braille'],
   ['audio', 'audio-feedback'],
-  ['audit', 'audit']
+  ['audit', 'audit'],
 ]);
