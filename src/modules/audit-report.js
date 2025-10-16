@@ -180,7 +180,7 @@ export function formatNodeTargets(node = {}) {
   return targets.map((target) => String(target)).join(', ');
 }
 
-export function formatTimestamp(timestamp) {
+export function formatTimestamp(timestamp, { timeZone = 'UTC' } = {}) {
   if (!timestamp) return '';
   try {
     const formatter = new Intl.DateTimeFormat('fr-FR', {
@@ -189,9 +189,14 @@ export function formatTimestamp(timestamp) {
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
+      timeZone,
     });
     return formatter.format(new Date(timestamp));
   } catch (error) {
-    return new Date(timestamp).toLocaleString?.('fr-FR') || String(timestamp);
+    try {
+      return new Date(timestamp).toLocaleString?.('fr-FR', { timeZone }) || String(timestamp);
+    } catch (fallbackError) {
+      return String(timestamp);
+    }
   }
 }
