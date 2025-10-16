@@ -67,11 +67,9 @@ test.describe('Panneau Options & Profils', () => {
     }, FIXED_SCHEDULE_TIMESTAMP);
 
     await page.goto('/');
-    const fab = page.getByRole('button', {
-      name: 'Open the accessibility toolbox',
-    });
-    await expect(fab).toBeVisible();
-    await fab.click();
+    const panelToggle = page.locator('.a11ytb-fab:not(.a11ytb-fab--status)');
+    await expect(panelToggle).toBeVisible();
+    await panelToggle.click();
     await expect(page.locator('.a11ytb-panel')).toHaveAttribute('data-open', 'true');
 
     const optionsButton = page.getByRole('tab', { name: 'Options & Profils' });
