@@ -1017,6 +1017,9 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   let resetLabel = null;
   let closeButton = null;
   let closeLabel = null;
+  let statusLauncherLabel = null;
+  let statusLauncherBaseTitle = '';
+  let statusLauncherBaseLabel = '';
   let statusTitle = null;
   let statusDescription = null;
   let statusCenter = null;
@@ -1047,6 +1050,22 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       '<svg viewBox="0 0 24 24" focusable="false"><path d="M8 4v2H6v4H4V4h4zm14 4h-4V6h-2V4h6v4zM4 20v-6h2v4h2v2H4zm18-6v6h-6v-2h4v-4h2z"/></svg>',
   };
 
+  const statusLauncherIconMarkup =
+    '<svg viewBox="0 0 24 24" focusable="false"><path d="M11.25 3a.75.75 0 011.5 0v1.33a8.92 8.92 0 015.92 5.92H20a.75.75 0 010 1.5h-1.33a8.92 8.92 0 01-5.92 5.92V20a.75.75 0 01-1.5 0v-1.33a8.92 8.92 0 01-5.92-5.92H4a.75.75 0 010-1.5h1.33a8.92 8.92 0 015.92-5.92zm.75 4.5a4.5 4.5 0 104.5 4.5 4.5 4.5 0 00-4.5-4.5zm0 2a2.5 2.5 0 11-2.5 2.5 2.5 2.5 0 012.5-2.5z"/></svg>';
+
+  const statusLauncher = document.createElement('button');
+  statusLauncher.type = 'button';
+  statusLauncher.className = 'a11ytb-fab a11ytb-fab--status';
+  statusLauncher.dataset.tone = 'default';
+  statusLauncher.dataset.badge = '';
+  statusLauncher.setAttribute('aria-expanded', 'false');
+  statusLauncher.innerHTML = `
+    <span class="a11ytb-status-launcher__pulse" aria-hidden="true"></span>
+    <span class="a11ytb-status-launcher__icon" aria-hidden="true">${statusLauncherIconMarkup}</span>
+    <span class="a11ytb-sr-only" data-ref="status-launcher-label"></span>
+  `;
+  statusLauncherLabel = statusLauncher.querySelector('[data-ref="status-launcher-label"]');
+
   const overlay = document.createElement('div');
   overlay.className = 'a11ytb-overlay';
   overlay.setAttribute('aria-hidden', 'true');
@@ -1062,6 +1081,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   panel.tabIndex = -1;
   panel.dataset.fullscreen = String(!!state.get('ui.fullscreen'));
   fab.setAttribute('aria-controls', panel.id);
+  statusLauncher.setAttribute('aria-controls', panel.id);
 
   notificationsContainer = document.createElement('div');
   notificationsContainer.className = 'a11ytb-notifications';
@@ -1340,6 +1360,15 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     updateLocaleFormatters();
     fab.setAttribute('aria-label', i18n.t('panel.openFab'));
     panel.setAttribute('aria-label', i18n.t('panel.title'));
+    statusLauncherBaseTitle = i18n.t('status.launcherTitle') || i18n.t('status.title') || '';
+    statusLauncherBaseLabel = i18n.t('status.launcherLabel') || statusLauncherBaseTitle;
+    if (statusLauncher) {
+      statusLauncher.setAttribute('title', statusLauncherBaseTitle || statusLauncherBaseLabel);
+      statusLauncher.setAttribute('aria-label', statusLauncherBaseTitle || statusLauncherBaseLabel);
+    }
+    if (statusLauncherLabel) {
+      statusLauncherLabel.textContent = statusLauncherBaseLabel || statusLauncherBaseTitle;
+    }
     if (headerTitle) {
       headerTitle.textContent = i18n.t('panel.title');
     }
@@ -1423,6 +1452,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       aggregationCollectionLabel.textContent = i18n.t('status.collectionLabel');
     }
     aggregationCollectionSelect.setAttribute('aria-label', i18n.t('status.collectionFilter'));
+    updateStatusLauncherFromSummaries(summarizeStatuses(snapshot));
   }
 
   applyLocaleToStaticUI();
@@ -1870,8 +1900,31 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     return entry;
   }
 
+  function updateStatusLauncherFromSummaries(summaries) {
+    if (!statusLauncher) return;
+    const entries = Array.isArray(summaries) ? summaries : summarizeStatuses(state.get());
+    const auditSummary = entries.find((entry) => entry && entry.id === 'audit');
+    const tone = auditSummary?.tone || 'default';
+    statusLauncher.dataset.tone = tone;
+    statusLauncher.dataset.badge = auditSummary?.badge || '';
+    const baseTitle = statusLauncherBaseTitle || statusLauncherBaseLabel;
+    const baseLabel = statusLauncherBaseLabel || statusLauncherBaseTitle;
+    const detailParts = [];
+    const label = auditSummary?.label || baseLabel || baseTitle || 'Audit accessibilité';
+    if (auditSummary?.value) detailParts.push(auditSummary.value);
+    if (auditSummary?.detail) detailParts.push(auditSummary.detail);
+    const combinedLabel = [label, ...detailParts].filter(Boolean).join(' — ');
+    const finalLabel = combinedLabel || baseTitle || baseLabel || label;
+    statusLauncher.setAttribute('title', finalLabel);
+    statusLauncher.setAttribute('aria-label', finalLabel);
+    if (statusLauncherLabel) {
+      statusLauncherLabel.textContent = finalLabel;
+    }
+  }
+
   function updateStatusCards(snapshot) {
     const summaries = summarizeStatuses(snapshot || state.get());
+    updateStatusLauncherFromSummaries(summaries);
     summaries.forEach((summary) => {
       const entry = ensureStatusCard(summary);
       entry.card.dataset.tone = summary.tone || 'info';
@@ -1947,26 +2000,31 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       id: 'modules',
       label: 'Modules',
       icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 5h6v6H5zm8 0h6v6h-6zm0 8h6v6h-6zm-8 0h6v6H5z"/></svg>',
+      description: 'Activez, épinglez ou recherchez des modules essentiels.',
     },
     {
       id: 'options',
       label: 'Options & Profils',
       icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 6h14v2H5zm0 5h10v2H5zm0 5h14v2H5z"/></svg>',
+      description: 'Créez des profils personnalisés et ajustez les réglages globaux.',
     },
     {
       id: 'organize',
       label: 'Organisation',
       icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h9v4H4zm0 5h6v4H4zm0 5h11v4H4zm12-5l4-3v10z"/></svg>',
+      description: 'Priorisez, masquez ou classez les modules pour vos équipes.',
     },
     {
       id: 'guides',
       label: 'Guides',
       icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M6 4h9l3 3v13H6zm2 4v2h8V8zm0 4v2h5v-2z"/></svg>',
+      description: 'Suivez des checklists et scénarios de conformité RGAA.',
     },
     {
       id: 'shortcuts',
       label: 'Raccourcis',
       icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 7a3 3 0 013-3h10a3 3 0 013 3v10a3 3 0 01-3 3H7a3 3 0 01-3-3zm5 2v6h2V9zm4 0v6h2V9z"/></svg>',
+      description: 'Apprenez ou reconfigurez les raccourcis d’activation rapides.',
     },
   ];
   const viewOrder = viewDefinitions.map((view) => view.id);
@@ -1980,9 +2038,20 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     btn.type = 'button';
     btn.className = 'a11ytb-chip a11ytb-chip--view';
     btn.dataset.view = view.id;
+    const shortcutDefinition = CUSTOM_SHORTCUT_DEFINITIONS.find((item) => item.view === view.id);
+    const shortcutLabel = shortcutDefinition?.default || '';
+    const descriptionText = view.description || '';
     btn.innerHTML = `
       <span class="a11ytb-view-icon" aria-hidden="true">${view.icon}</span>
-      <span class="a11ytb-view-label">${view.label}</span>
+      <span class="a11ytb-view-content">
+        <span class="a11ytb-view-label">${view.label}</span>
+        ${descriptionText ? `<span class="a11ytb-view-description">${descriptionText}</span>` : ''}
+        ${
+          shortcutLabel
+            ? `<span class="a11ytb-view-shortcut">Raccourci&nbsp;: <strong>${shortcutLabel}</strong></span>`
+            : ''
+        }
+      </span>
     `;
     btn.id = tabId;
     btn.setAttribute('role', 'tab');
@@ -7353,7 +7422,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     toCSV: () => serializeActivityToCSV(getActivityEntries()),
   };
 
-  root.append(overlay, fab, panel, notificationsContainer);
+  root.append(overlay, statusLauncher, fab, panel, notificationsContainer);
 
   let lastFocusedElement = null;
   let releaseOutsideInert = null;
@@ -7488,6 +7557,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     panel.dataset.open = String(shouldOpen);
     panel.setAttribute('aria-hidden', String(!shouldOpen));
     fab.setAttribute('aria-expanded', String(shouldOpen));
+    statusLauncher.setAttribute('aria-expanded', String(shouldOpen));
     overlay.dataset.open = String(shouldOpen);
     overlay.setAttribute('aria-hidden', String(!shouldOpen));
     document.body.classList.toggle('a11ytb-modal-open', shouldOpen);
@@ -7538,6 +7608,20 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       window.setTimeout(() => toggle(true), 120);
     }
   }
+
+  statusLauncher.addEventListener('click', () => {
+    if (state.get('ui.view') !== 'modules') {
+      state.set('ui.view', 'modules');
+    }
+    toggle(true);
+    window.setTimeout(() => {
+      focusModuleCard('audit');
+    }, 180);
+    logActivity('Consultation de l’audit temps réel', {
+      module: 'audit',
+      tags: ['audit', 'status'],
+    });
+  });
 
   fab.addEventListener('click', () => toggle(true));
   header.querySelector('[data-action="close"]').addEventListener('click', () => toggle(false));
