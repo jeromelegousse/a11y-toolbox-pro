@@ -10,6 +10,7 @@ import { createMetricsSyncService } from './status-center.js';
 import { moduleCollections } from './module-collections.js';
 import { setupAudioFeedback } from './audio-feedback.js';
 import { buildAuditStatusText, renderAuditStats, renderAuditViolations } from './modules/audit-view.js';
+import { resolveLocale } from '../languages/index.js';
 
 const profilePresets = {
   'vision-basse': {
@@ -93,6 +94,12 @@ const normalizedManifests = [
   ...moduleCatalog.map(({ id, manifest }) => registerModuleManifest(manifest, id))
 ];
 
+const pluginConfig = window.a11ytbPluginConfig || {};
+const resolvedDefaultLocale = resolveLocale(
+  pluginConfig?.defaults?.locale
+    || (typeof navigator !== 'undefined' && typeof navigator.language === 'string' ? navigator.language : undefined)
+);
+
 const baseInitial = {
   ui: {
     dock: 'right',
@@ -136,7 +143,8 @@ const baseInitial = {
     shortcuts: {
       overrides: {},
       lastRecorded: null
-    }
+    },
+    locale: resolvedDefaultLocale
   },
   profiles: profilePresets,
   runtime: {
@@ -180,7 +188,6 @@ const initial = normalizedManifests.reduce(
   baseInitial
 );
 
-const pluginConfig = window.a11ytbPluginConfig || {};
 const defaultConfig = pluginConfig?.defaults || {};
 const allowedDocks = new Set(['left', 'right', 'bottom']);
 const allowedViews = new Set(['modules', 'options', 'organize', 'guides', 'shortcuts']);

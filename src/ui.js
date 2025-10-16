@@ -1,3 +1,4 @@
+import { createI18n } from '../languages/index.js';
 import { listBlocks, renderBlock, listModuleManifests } from './registry.js';
 import { moduleCatalog } from './module-catalog.js';
 import { applyInertToSiblings } from './utils/inert.js';
@@ -939,9 +940,36 @@ export function mountUI({ root, state, config = {} }) {
     }
   }
 
+  const i18n = createI18n({ initialLocale: state.get('ui.locale') });
+  if (state.get('ui.locale') !== i18n.getLocale()) {
+    state.set('ui.locale', i18n.getLocale());
+  }
+
+  let languageSelect = null;
+  let languageLabelEl = null;
+  let headerTitle = null;
+  let actionsToolbar = null;
+  let fullscreenLabel = null;
+  let fullscreenIcon = null;
+  let resetLabel = null;
+  let closeButton = null;
+  let closeLabel = null;
+  let statusTitle = null;
+  let statusDescription = null;
+  let statusCenter = null;
+  let aggregationSection = null;
+  let aggregationTitle = null;
+  let aggregationDescription = null;
+  let aggregationProfileLabel = null;
+  let aggregationCollectionLabel = null;
+  let aggregationTimeFormatter = null;
+  let aggregationDayFormatter = null;
+
+  const dockLabelRefs = new Map();
+
   const fab = document.createElement('button');
   fab.className = 'a11ytb-fab';
-  fab.setAttribute('aria-label', 'Ouvrir la boîte à outils d’accessibilité');
+  fab.type = 'button';
   fab.setAttribute('aria-expanded', 'false');
   fab.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
     <path d="M12 8a4 4 0 100 8 4 4 0 000-8zm8.94 3a8.94 8.94 0 00-.5-1.47l2.06-1.5-2-3.46-2.44 1a9.09 9.09 0 00-2.02-1.17l-.37-2.6h-4l-.37 2.6A9.09 9.09 0 007.93 4.6l-2.44-1-2 3.46 2.06 1.5A8.94 8.94 0 005.06 11H2v4h3.06c.12.51.29 1 .5 1.47l-2.06 1.5 2 3.46 2.44-1c.62.47 1.3.86 2.02 1.17l.37 2.6h4l.37-2.6c.72-.31 1.4-.7 2.02-1.17l2.44 1 2-3.46-2.06-1.5c.21-.47.38-.96.5-1.47H22v-4h-3.06z"/>
@@ -964,71 +992,114 @@ export function mountUI({ root, state, config = {} }) {
   panel.id = 'a11ytb-panel';
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-modal', 'true');
-  panel.setAttribute('aria-label', 'A11y Toolbox Pro');
   panel.tabIndex = -1;
   panel.dataset.fullscreen = String(!!state.get('ui.fullscreen'));
   fab.setAttribute('aria-controls', panel.id);
 
   const header = document.createElement('div');
   header.className = 'a11ytb-header';
-  header.innerHTML = `
-    <div class="a11ytb-title">A11y Toolbox Pro</div>
-    <div class="a11ytb-actions" role="toolbar" aria-label="Actions d’interface">
-      <button class="a11ytb-button" data-action="dock-left" aria-pressed="false">
-        <span class="a11ytb-button-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm8 1H6v12h6V6zm2 0v12h5V6h-5z"/></svg>
-        </span>
-        Dock gauche
-      </button>
-      <button class="a11ytb-button" data-action="dock-right" aria-pressed="false">
-        <span class="a11ytb-button-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false"><path d="M5 4a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V5a1 1 0 00-1-1H5zm11 2h3v12h-3V6zm-2 0H6v12h8V6z"/></svg>
-        </span>
-        Dock droite
-      </button>
-      <button class="a11ytb-button" data-action="dock-bottom" aria-pressed="false">
-        <span class="a11ytb-button-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm1 8v5h14v-5H5zm0-2h14V6H5v5z"/></svg>
-        </span>
-        Dock bas
-      </button>
-      <button class="a11ytb-button" data-action="toggle-fullscreen" aria-pressed="false">
-        <span class="a11ytb-button-icon" data-ref="fullscreen-icon" aria-hidden="true">${fullscreenIcons.expand}</span>
-        <span class="a11ytb-button-label" data-ref="fullscreen-label">Plein écran</span>
-      </button>
-      <button class="a11ytb-button" data-action="reset">
-        <span class="a11ytb-button-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false"><path d="M12 5a7 7 0 015.917 10.777l1.52 1.318A9 9 0 103 12H1l3.5 3.5L8 12H5a7 7 0 017-7z"/></svg>
-        </span>
-        Réinitialiser
-      </button>
-      <button class="a11ytb-button" data-action="close" aria-label="Fermer">
-        <span class="a11ytb-button-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false"><path d="M6.343 5.343L5.343 6.343 10.999 12l-5.656 5.657 1 1L12 13l5.657 5.657 1-1L13.001 12l5.656-5.657-1-1L12 11l-5.657-5.657z"/></svg>
-        </span>
-        <span class="a11ytb-button-label">Fermer</span>
-      </button>
-    </div>
-  `;
 
-  const fullscreenToggle = header.querySelector('[data-action="toggle-fullscreen"]');
-  const fullscreenIcon = fullscreenToggle?.querySelector('[data-ref="fullscreen-icon"]');
-  const fullscreenLabel = fullscreenToggle?.querySelector('[data-ref="fullscreen-label"]');
+  headerTitle = document.createElement('div');
+  headerTitle.className = 'a11ytb-title';
+  header.append(headerTitle);
 
-  const dockControls = new Map([
-    ['left', header.querySelector('[data-action="dock-left"]')],
-    ['right', header.querySelector('[data-action="dock-right"]')],
-    ['bottom', header.querySelector('[data-action="dock-bottom"]')]
-  ]);
+  actionsToolbar = document.createElement('div');
+  actionsToolbar.className = 'a11ytb-actions';
+  actionsToolbar.setAttribute('role', 'toolbar');
+  header.append(actionsToolbar);
 
-  dockControls.forEach((button, position) => {
-    if (!button) return;
+  function createDockButton(position, iconMarkup) {
+    const button = document.createElement('button');
     button.type = 'button';
+    button.className = 'a11ytb-button';
+    button.dataset.action = `dock-${position}`;
     button.setAttribute('aria-pressed', 'false');
+    const icon = document.createElement('span');
+    icon.className = 'a11ytb-button-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.innerHTML = iconMarkup;
+    const label = document.createElement('span');
+    label.className = 'a11ytb-button-label';
+    button.append(icon, label);
     button.addEventListener('click', () => {
       state.set('ui.dock', position);
     });
+    dockLabelRefs.set(position, label);
+    return button;
+  }
+
+  const dockButtons = new Map([
+    ['left', createDockButton('left', '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm8 1H6v12h6V6zm2 0v12h5V6h-5z"/></svg>')],
+    ['right', createDockButton('right', '<svg viewBox="0 0 24 24" focusable="false"><path d="M5 4a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V5a1 1 0 00-1-1H5zm11 2h3v12h-3V6zm-2 0H6v12h8V6z"/></svg>')],
+    ['bottom', createDockButton('bottom', '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm1 8v5h14v-5H5zm0-2h14V6H5v5z"/></svg>')]
+  ]);
+
+  dockButtons.forEach((button) => actionsToolbar.append(button));
+
+  const fullscreenToggle = document.createElement('button');
+  fullscreenToggle.type = 'button';
+  fullscreenToggle.className = 'a11ytb-button';
+  fullscreenToggle.dataset.action = 'toggle-fullscreen';
+  fullscreenToggle.setAttribute('aria-pressed', 'false');
+  fullscreenIcon = document.createElement('span');
+  fullscreenIcon.className = 'a11ytb-button-icon';
+  fullscreenIcon.setAttribute('data-ref', 'fullscreen-icon');
+  fullscreenIcon.setAttribute('aria-hidden', 'true');
+  fullscreenIcon.innerHTML = fullscreenIcons.expand;
+  fullscreenLabel = document.createElement('span');
+  fullscreenLabel.className = 'a11ytb-button-label';
+  fullscreenLabel.dataset.ref = 'fullscreen-label';
+  fullscreenToggle.append(fullscreenIcon, fullscreenLabel);
+  actionsToolbar.append(fullscreenToggle);
+
+  const resetButton = document.createElement('button');
+  resetButton.type = 'button';
+  resetButton.className = 'a11ytb-button';
+  resetButton.dataset.action = 'reset';
+  const resetIconEl = document.createElement('span');
+  resetIconEl.className = 'a11ytb-button-icon';
+  resetIconEl.setAttribute('aria-hidden', 'true');
+  resetIconEl.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 5a7 7 0 015.917 10.777l1.52 1.318A9 9 0 103 12H1l3.5 3.5L8 12H5a7 7 0 017-7z"/></svg>';
+  resetLabel = document.createElement('span');
+  resetLabel.className = 'a11ytb-button-label';
+  resetButton.append(resetIconEl, resetLabel);
+  actionsToolbar.append(resetButton);
+
+  const languagePicker = document.createElement('div');
+  languagePicker.className = 'a11ytb-language-picker';
+  languageLabelEl = document.createElement('label');
+  languageLabelEl.className = 'a11ytb-sr-only';
+  const languageSelectId = 'a11ytb-language-select';
+  languageLabelEl.setAttribute('for', languageSelectId);
+  languageSelect = document.createElement('select');
+  languageSelect.id = languageSelectId;
+  languageSelect.className = 'a11ytb-language-select';
+  i18n.getAvailableLocales().forEach(({ code, label }) => {
+    const option = document.createElement('option');
+    option.value = code;
+    option.textContent = label;
+    languageSelect.append(option);
   });
+  languageSelect.value = i18n.getLocale();
+  languageSelect.addEventListener('change', (event) => {
+    const nextLocale = event.target.value || i18n.getLocale();
+    state.set('ui.locale', nextLocale);
+  });
+  languagePicker.append(languageLabelEl, languageSelect);
+  actionsToolbar.append(languagePicker);
+
+  closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.className = 'a11ytb-button';
+  closeButton.dataset.action = 'close';
+  const closeIconEl = document.createElement('span');
+  closeIconEl.className = 'a11ytb-button-icon';
+  closeIconEl.setAttribute('aria-hidden', 'true');
+  closeIconEl.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M6.343 5.343L5.343 6.343 10.999 12l-5.656 5.657 1 1L12 13l5.657 5.657 1-1L13.001 12l5.656-5.657-1-1L12 11l-5.657-5.657z"/></svg>';
+  closeLabel = document.createElement('span');
+  closeLabel.className = 'a11ytb-button-label';
+  closeButton.append(closeIconEl, closeLabel);
+  actionsToolbar.append(closeButton);
 
   const body = document.createElement('div');
   body.className = 'a11ytb-body';
@@ -1042,57 +1113,47 @@ export function mountUI({ root, state, config = {} }) {
   const shellMain = document.createElement('div');
   shellMain.className = 'a11ytb-shell-main';
 
-  const statusCenter = document.createElement('section');
+  statusCenter = document.createElement('section');
   statusCenter.className = 'a11ytb-status-center';
   statusCenter.setAttribute('role', 'region');
-  statusCenter.setAttribute('aria-label', 'État en temps réel des modules vocaux, braille et vision');
 
   const statusHeader = document.createElement('div');
   statusHeader.className = 'a11ytb-status-header';
-  const statusTitle = document.createElement('h2');
+  statusTitle = document.createElement('h2');
   statusTitle.className = 'a11ytb-status-title';
-  statusTitle.textContent = 'État en temps réel';
-  const statusDescription = document.createElement('p');
+  statusDescription = document.createElement('p');
   statusDescription.className = 'a11ytb-status-description';
-  statusDescription.textContent = 'Consultez l’indice global de conformité et l’état des modules Lecture vocale, Dictée, Braille, Contraste et Espacements.';
   statusHeader.append(statusTitle, statusDescription);
 
   const statusGrid = document.createElement('div');
   statusGrid.className = 'a11ytb-status-grid';
 
-  const aggregationSection = document.createElement('section');
+  aggregationSection = document.createElement('section');
   aggregationSection.className = 'a11ytb-status-aggregations';
   aggregationSection.setAttribute('role', 'region');
-  aggregationSection.setAttribute('aria-label', 'Synthèse agrégée des métriques');
 
   const aggregationHeader = document.createElement('div');
   aggregationHeader.className = 'a11ytb-status-header';
-  const aggregationTitle = document.createElement('h3');
+  aggregationTitle = document.createElement('h3');
   aggregationTitle.className = 'a11ytb-status-title';
-  aggregationTitle.textContent = 'Tendances consolidées';
-  const aggregationDescription = document.createElement('p');
+  aggregationDescription = document.createElement('p');
   aggregationDescription.className = 'a11ytb-status-description';
-  aggregationDescription.textContent = 'Comparez les performances des modules par profil ou collection.';
   aggregationHeader.append(aggregationTitle, aggregationDescription);
 
   const aggregationFilters = document.createElement('div');
   aggregationFilters.className = 'a11ytb-status-filters';
 
   const profileFilterId = 'a11ytb-status-filter-profile';
-  const aggregationProfileLabel = document.createElement('label');
+  aggregationProfileLabel = document.createElement('label');
   aggregationProfileLabel.setAttribute('for', profileFilterId);
-  aggregationProfileLabel.textContent = 'Profil';
   const aggregationProfileSelect = document.createElement('select');
   aggregationProfileSelect.id = profileFilterId;
-  aggregationProfileSelect.setAttribute('aria-label', 'Filtrer les métriques agrégées par profil');
 
   const collectionFilterId = 'a11ytb-status-filter-collection';
-  const aggregationCollectionLabel = document.createElement('label');
+  aggregationCollectionLabel = document.createElement('label');
   aggregationCollectionLabel.setAttribute('for', collectionFilterId);
-  aggregationCollectionLabel.textContent = 'Collection';
   const aggregationCollectionSelect = document.createElement('select');
   aggregationCollectionSelect.id = collectionFilterId;
-  aggregationCollectionSelect.setAttribute('aria-label', 'Filtrer les métriques agrégées par collection');
 
   aggregationFilters.append(
     aggregationProfileLabel,
@@ -1113,6 +1174,104 @@ export function mountUI({ root, state, config = {} }) {
 
   statusCenter.append(statusHeader, statusGrid, aggregationSection);
 
+  function applyLocaleToStaticUI(snapshot = state.get()) {
+    updateLocaleFormatters();
+    fab.setAttribute('aria-label', i18n.t('panel.openFab'));
+    panel.setAttribute('aria-label', i18n.t('panel.title'));
+    if (headerTitle) {
+      headerTitle.textContent = i18n.t('panel.title');
+    }
+    if (actionsToolbar) {
+      actionsToolbar.setAttribute('aria-label', i18n.t('toolbar.ariaLabel'));
+    }
+    dockButtons.forEach((button, position) => {
+      const key = position === 'left'
+        ? 'toolbar.dockLeft'
+        : position === 'right'
+          ? 'toolbar.dockRight'
+          : 'toolbar.dockBottom';
+      const labelText = i18n.t(key);
+      const labelEl = dockLabelRefs.get(position);
+      if (labelEl) {
+        labelEl.textContent = labelText;
+      }
+      button.setAttribute('aria-label', labelText);
+    });
+    const fullscreenState = !!(snapshot?.ui?.fullscreen ?? state.get('ui.fullscreen'));
+    if (fullscreenLabel) {
+      fullscreenLabel.textContent = fullscreenState
+        ? i18n.t('toolbar.fullscreenExit')
+        : i18n.t('toolbar.fullscreenEnter');
+    }
+    if (fullscreenToggle) {
+      fullscreenToggle.setAttribute('title', fullscreenState
+        ? i18n.t('toolbar.fullscreenExitTitle')
+        : i18n.t('toolbar.fullscreenEnterTitle'));
+    }
+    if (resetLabel) {
+      resetLabel.textContent = i18n.t('toolbar.reset');
+    }
+    if (closeLabel) {
+      closeLabel.textContent = i18n.t('toolbar.close');
+    }
+    if (closeButton) {
+      closeButton.setAttribute('aria-label', i18n.t('toolbar.close'));
+    }
+    if (languageLabelEl) {
+      languageLabelEl.textContent = i18n.t('language.label');
+    }
+    if (languageSelect) {
+      const helper = i18n.t('language.helper');
+      languageSelect.setAttribute('aria-label', helper);
+      languageSelect.title = helper;
+      if (languageSelect.value !== i18n.getLocale()) {
+        languageSelect.value = i18n.getLocale();
+      }
+    }
+    if (statusCenter) {
+      statusCenter.setAttribute('aria-label', i18n.t('status.regionLabel'));
+    }
+    if (statusTitle) {
+      statusTitle.textContent = i18n.t('status.title');
+    }
+    if (statusDescription) {
+      statusDescription.textContent = i18n.t('status.description');
+    }
+    if (aggregationSection) {
+      aggregationSection.setAttribute('aria-label', i18n.t('status.aggregatedRegionLabel'));
+    }
+    if (aggregationTitle) {
+      aggregationTitle.textContent = i18n.t('status.aggregatedTitle');
+    }
+    if (aggregationDescription) {
+      aggregationDescription.textContent = i18n.t('status.aggregatedDescription');
+    }
+    if (aggregationProfileLabel) {
+      aggregationProfileLabel.textContent = i18n.t('status.profileLabel');
+    }
+    aggregationProfileSelect.setAttribute('aria-label', i18n.t('status.profileFilter'));
+    if (aggregationCollectionLabel) {
+      aggregationCollectionLabel.textContent = i18n.t('status.collectionLabel');
+    }
+    aggregationCollectionSelect.setAttribute('aria-label', i18n.t('status.collectionFilter'));
+  }
+
+  applyLocaleToStaticUI();
+
+  let currentLocale = i18n.getLocale();
+
+  state.on((snapshot) => {
+    const nextLocale = snapshot?.ui?.locale;
+    if (!nextLocale || nextLocale === currentLocale) {
+      return;
+    }
+    currentLocale = i18n.setLocale(nextLocale);
+    if (languageSelect && languageSelect.value !== currentLocale) {
+      languageSelect.value = currentLocale;
+    }
+    applyLocaleToStaticUI(snapshot);
+  });
+
   let collectionDefinitions = [];
   let collectionById = new Map();
   let moduleCollectionsIndex = new Map();
@@ -1121,12 +1280,17 @@ export function mountUI({ root, state, config = {} }) {
   const statusCards = new Map();
 
   const aggregationFilterState = { profile: 'all', collection: 'all' };
-  const aggregationTimeFormatter = typeof Intl?.DateTimeFormat === 'function'
-    ? new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' })
-    : null;
-  const aggregationDayFormatter = typeof Intl?.DateTimeFormat === 'function'
-    ? new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short' })
-    : null;
+
+  function updateLocaleFormatters() {
+    if (typeof Intl?.DateTimeFormat !== 'function') {
+      aggregationTimeFormatter = null;
+      aggregationDayFormatter = null;
+      return;
+    }
+    const locale = i18n.getLocale();
+    aggregationTimeFormatter = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' });
+    aggregationDayFormatter = new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'short' });
+  }
 
   function setAggregationSelectOptions(select, options, preferredValue = 'all') {
     const allowedValues = new Set(options.map((option) => option.value));
@@ -1149,19 +1313,26 @@ export function mountUI({ root, state, config = {} }) {
 
   function formatAggregationWindow(start, end) {
     if (!Number.isFinite(start) || !Number.isFinite(end)) {
-      return 'Fenêtre temporelle indisponible';
+      return i18n.t('status.windowUnavailable');
     }
+    const locale = i18n.getLocale();
     if (aggregationTimeFormatter && aggregationDayFormatter) {
       const startDate = new Date(start);
       const endDate = new Date(end);
       const sameDay = startDate.toDateString() === endDate.toDateString();
+      const startDay = aggregationDayFormatter.format(startDate);
+      const endDay = aggregationDayFormatter.format(endDate);
       const dayLabel = sameDay
-        ? aggregationDayFormatter.format(startDate)
-        : `${aggregationDayFormatter.format(startDate)} → ${aggregationDayFormatter.format(endDate)}`;
-      const timeLabel = `${aggregationTimeFormatter.format(startDate)} → ${aggregationTimeFormatter.format(endDate)}`;
-      return `${dayLabel} · ${timeLabel}`;
+        ? i18n.t('status.windowDaySingle', { day: startDay })
+        : i18n.t('status.windowDayRange', { start: startDay, end: endDay });
+      const startTime = aggregationTimeFormatter.format(startDate);
+      const endTime = aggregationTimeFormatter.format(endDate);
+      const timeLabel = i18n.t('status.windowTimeRange', { start: startTime, end: endTime });
+      return i18n.t('status.windowCombined', { days: dayLabel, times: timeLabel });
     }
-    return `Fenêtre ${new Date(start).toLocaleString()} → ${new Date(end).toLocaleString()}`;
+    const fallbackStart = new Date(start).toLocaleString(locale);
+    const fallbackEnd = new Date(end).toLocaleString(locale);
+    return i18n.t('status.windowFallback', { start: fallbackStart, end: fallbackEnd });
   }
 
   function toneFromAggregatedScore(score) {
@@ -1182,10 +1353,10 @@ export function mountUI({ root, state, config = {} }) {
     svg.setAttribute('role', 'img');
     const labelParts = [];
     if (total > 0) {
-      labelParts.push(`${Math.round(successRatio)} % succès`);
-      labelParts.push(`${Math.round(failureRatio)} % échecs`);
+      labelParts.push(i18n.t('status.chartSuccessShare', { percent: Math.round(successRatio) }));
+      labelParts.push(i18n.t('status.chartFailureShare', { percent: Math.round(failureRatio) }));
     } else {
-      labelParts.push('Aucun échantillon');
+      labelParts.push(i18n.t('status.chartNoSamples'));
     }
     svg.setAttribute('aria-label', labelParts.join(' · '));
     const successRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -1240,7 +1411,7 @@ export function mountUI({ root, state, config = {} }) {
     scoreBadge.className = 'a11ytb-status-risk';
     scoreBadge.dataset.score = windowData.score || 'AAA';
     scoreBadge.textContent = windowData.score || 'AAA';
-    scoreBadge.setAttribute('aria-label', `Indice ${windowData.score || 'AAA'}`);
+    scoreBadge.setAttribute('aria-label', i18n.t('status.scoreLabel', { score: windowData.score || 'AAA' }));
     header.append(scoreBadge);
 
     const chart = createAggregationChart(windowData.successes, windowData.failures);
@@ -1249,8 +1420,12 @@ export function mountUI({ root, state, config = {} }) {
     const counters = document.createElement('p');
     counters.className = 'a11ytb-status-detail';
     const sampleCount = windowData.samples || 0;
-    const sampleLabel = sampleCount === 1 ? '1 échantillon' : `${sampleCount} échantillons`;
-    counters.textContent = `${windowData.successes || 0} succès · ${windowData.failures || 0} échecs · ${sampleLabel}`;
+    const successCount = Number(windowData.successes) || 0;
+    const failureCount = Number(windowData.failures) || 0;
+    const successLabel = i18n.t('status.successCount', { count: successCount });
+    const failureLabel = i18n.t('status.failureCount', { count: failureCount });
+    const sampleLabel = i18n.t('status.samples', { count: sampleCount });
+    counters.textContent = `${successLabel} · ${failureLabel} · ${sampleLabel}`;
 
     const timeframe = document.createElement('p');
     timeframe.className = 'a11ytb-status-detail';
@@ -1259,14 +1434,14 @@ export function mountUI({ root, state, config = {} }) {
     const meta = document.createElement('dl');
     meta.className = 'a11ytb-status-meta';
     const latencyTerm = document.createElement('dt');
-    latencyTerm.textContent = 'Latence combinée';
+    latencyTerm.textContent = i18n.t('status.latencyCombined');
     const latencyValue = document.createElement('dd');
     const combinedAverage = windowData.latency?.combinedAverage;
     latencyValue.textContent = Number.isFinite(combinedAverage)
       ? `${Math.round(combinedAverage)} ms`
-      : 'Non mesuré';
+      : i18n.t('status.notMeasured');
     const retryTerm = document.createElement('dt');
-    retryTerm.textContent = 'Retentatives';
+    retryTerm.textContent = i18n.t('status.retries');
     const retryValue = document.createElement('dd');
     retryValue.textContent = String(windowData.retryCount ?? 0);
     meta.append(latencyTerm, latencyValue, retryTerm, retryValue);
@@ -1306,7 +1481,7 @@ export function mountUI({ root, state, config = {} }) {
     const preferredProfile = filterPrefs.profile || 'all';
     const preferredCollection = filterPrefs.collection || 'all';
 
-    const profileOptions = [{ value: 'all', label: 'Tous les profils' }];
+    const profileOptions = [{ value: 'all', label: i18n.t('status.allProfiles') }];
     const moduleProfileIndex = new Map();
     const profilesData = data?.profiles || {};
     Object.entries(profilesData).forEach(([profileId, profile]) => {
@@ -1327,7 +1502,7 @@ export function mountUI({ root, state, config = {} }) {
       state.set('ui.statusFilters.profile', nextProfile);
     }
 
-    const collectionOptions = [{ value: 'all', label: 'Toutes les collections' }];
+    const collectionOptions = [{ value: 'all', label: i18n.t('status.allCollections') }];
     collectionDefinitions.forEach((definition) => {
       collectionOptions.push(formatCollectionOption(definition));
     });
@@ -1344,9 +1519,9 @@ export function mountUI({ root, state, config = {} }) {
     if (!windows.length) {
       const empty = document.createElement('p');
       empty.className = 'a11ytb-empty-state';
-      empty.textContent = 'Aucune mesure agrégée pour les filtres sélectionnés.';
+      empty.textContent = i18n.t('status.empty');
       aggregationList.append(empty);
-      aggregationLive.textContent = 'Aucune alerte consolidée.';
+      aggregationLive.textContent = i18n.t('status.noAlerts');
       return;
     }
 
@@ -1373,9 +1548,9 @@ export function mountUI({ root, state, config = {} }) {
     if (!filteredWindows.length) {
       const empty = document.createElement('p');
       empty.className = 'a11ytb-empty-state';
-      empty.textContent = 'Aucune mesure agrégée pour les filtres sélectionnés.';
+      empty.textContent = i18n.t('status.empty');
       aggregationList.append(empty);
-      aggregationLive.textContent = 'Aucune alerte consolidée.';
+      aggregationLive.textContent = i18n.t('status.noAlerts');
       return;
     }
 
@@ -1395,14 +1570,14 @@ export function mountUI({ root, state, config = {} }) {
 
     const alertParts = [];
     if (criticalCount > 0) {
-      alertParts.push(`${criticalCount} alerte${criticalCount > 1 ? 's' : ''} critiques`);
+      alertParts.push(i18n.t('status.alertCritical', { count: criticalCount }));
     }
     if (warningCount > 0) {
-      alertParts.push(`${warningCount} avertissement${warningCount > 1 ? 's' : ''}`);
+      alertParts.push(i18n.t('status.alertWarning', { count: warningCount }));
     }
     aggregationLive.textContent = alertParts.length
-      ? `Alertes consolidées : ${alertParts.join(' · ')}.`
-      : 'Aucune alerte consolidée.';
+      ? i18n.t('status.alertSummary', { alerts: alertParts.join(' · ') })
+      : i18n.t('status.noAlerts');
   }
 
   aggregationProfileSelect.addEventListener('change', () => {
@@ -1458,16 +1633,16 @@ export function mountUI({ root, state, config = {} }) {
       meta.className = 'a11ytb-status-meta';
 
       const latencyTerm = document.createElement('dt');
-      latencyTerm.textContent = 'Latence moyenne';
+      latencyTerm.textContent = i18n.t('status.latencyAverage');
       const latencyValue = document.createElement('dd');
       latencyValue.dataset.ref = 'latency';
-      latencyValue.textContent = 'Non mesuré';
+      latencyValue.textContent = i18n.t('status.notMeasured');
 
       const compatTerm = document.createElement('dt');
-      compatTerm.textContent = 'Compatibilité';
+      compatTerm.textContent = i18n.t('status.compatibility');
       const compatValue = document.createElement('dd');
       compatValue.dataset.ref = 'compat';
-      compatValue.textContent = 'Pré-requis non déclarés';
+      compatValue.textContent = i18n.t('status.compatibilityUnknown');
 
       meta.append(latencyTerm, latencyValue, compatTerm, compatValue);
 
@@ -1525,13 +1700,13 @@ export function mountUI({ root, state, config = {} }) {
         entry.latencyTerm.textContent = summary.metaLabels.latency;
       }
       if (entry.latencyValue) {
-        entry.latencyValue.textContent = insights.latencyLabel || 'Non mesuré';
+        entry.latencyValue.textContent = insights.latencyLabel || i18n.t('status.notMeasured');
       }
       if (entry.compatTerm && summary.metaLabels?.compat) {
         entry.compatTerm.textContent = summary.metaLabels.compat;
       }
       if (entry.compatValue) {
-        entry.compatValue.textContent = insights.compatLabel || 'Pré-requis non déclarés';
+        entry.compatValue.textContent = insights.compatLabel || i18n.t('status.compatibilityUnknown');
       }
       if (entry.announcement) {
         entry.announcement.textContent = insights.announcement || '';
@@ -6862,18 +7037,22 @@ export function mountUI({ root, state, config = {} }) {
       fullscreenToggle.setAttribute('aria-pressed', String(fullscreen));
       fullscreenToggle.classList.toggle('is-active', fullscreen);
       if (fullscreenLabel) {
-        fullscreenLabel.textContent = fullscreen ? 'Vue compacte' : 'Plein écran';
+        fullscreenLabel.textContent = fullscreen
+          ? i18n.t('toolbar.fullscreenExit')
+          : i18n.t('toolbar.fullscreenEnter');
       }
       if (fullscreenIcon) {
         fullscreenIcon.innerHTML = fullscreen ? fullscreenIcons.collapse : fullscreenIcons.expand;
       }
-      fullscreenToggle.setAttribute('title', fullscreen ? 'Revenir à la vue compacte' : 'Agrandir la boîte à outils');
+      fullscreenToggle.setAttribute('title', fullscreen
+        ? i18n.t('toolbar.fullscreenExitTitle')
+        : i18n.t('toolbar.fullscreenEnterTitle'));
     }
   }
 
   function syncDockControls(snapshot) {
     const dock = snapshot?.ui?.dock || state.get('ui.dock') || 'right';
-    dockControls.forEach((button, position) => {
+    dockButtons.forEach((button, position) => {
       if (!button) return;
       const active = position === dock;
       button.classList.toggle('is-active', active);
