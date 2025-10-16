@@ -2,5 +2,13 @@
   "singleQuote": true,
   "trailingComma": "es5",
   "printWidth": 100,
-  "arrowParens": "always"
+  "arrowParens": "always",
+  "overrides": [
+    {
+      "files": "src/css/styles.css",
+      "options": {
+        "printWidth": 140
+      }
+    }
+  ]
 }
