@@ -6680,7 +6680,11 @@ export function mountUI({ root, state, config = {} }) {
     config: activityIntegrationConfig,
     fetchFn,
     notify: appendIntegrationFeedback,
-    onSyncEvent: recordSyncTimeline
+    onSyncEvent: recordSyncTimeline,
+    onConnectorsChange() {
+      renderActivityConnectors();
+      updateManualSendAvailability();
+    }
   });
   renderActivityConnectors();
   updateManualSendAvailability();
