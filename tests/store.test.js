@@ -145,6 +145,53 @@ describe('createStore', () => {
     }, null, 2));
   });
 
+  it('continue de fonctionner quand window et localStorage sont absents', () => {
+    const previousWindow = globalThis.window;
+    const previousStorage = globalThis.localStorage;
+    try {
+      delete globalThis.window;
+      delete globalThis.localStorage;
+
+      const store = createStore(KEY, makeInitialState());
+
+      expect(store.get()).toEqual(makeInitialState());
+      expect(() => store.set('foo', 'stateless')).not.toThrow();
+      expect(store.get('foo')).toBe('stateless');
+    } finally {
+      if (previousWindow === undefined) {
+        delete globalThis.window;
+      } else {
+        globalThis.window = previousWindow;
+      }
+      if (previousStorage === undefined) {
+        delete globalThis.localStorage;
+      } else {
+        globalThis.localStorage = previousStorage;
+      }
+    }
+  });
+
+  it('accepte un adaptateur de stockage injecté', () => {
+    const previousStorage = globalThis.localStorage;
+    delete globalThis.localStorage;
+
+    const adapter = new MemoryStorage();
+    const store = createStore(KEY, makeInitialState(), { storage: adapter });
+
+    store.set('nested.value', 7);
+
+    expect(JSON.parse(adapter.getItem(KEY))).toEqual({
+      foo: 'bar',
+      nested: { value: 7 }
+    });
+
+    if (previousStorage === undefined) {
+      delete globalThis.localStorage;
+    } else {
+      globalThis.localStorage = previousStorage;
+    }
+  });
+
   it('préserve les structures complexes quand structuredClone est indisponible', async () => {
     await importStore({ disableStructuredClone: true });
     globalThis.localStorage = new MemoryStorage();
