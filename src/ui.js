@@ -7824,6 +7824,13 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   window.addEventListener('keydown', (event) => {
     if (event.defaultPrevented) return;
     if (recordingShortcutId) return;
+    if (state.get('tts.reader.open')) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        state.set('tts.reader.open', false);
+      }
+      return;
+    }
     const active = document.activeElement;
     if (active && typeof active.closest === 'function') {
       const isEditable = active.closest('input, textarea, select, [contenteditable="true"]');
@@ -7979,6 +7986,17 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   window.stopSpeaking = () => window.a11ytb?.tts?.stop?.();
   window.speakPage = () => window.a11ytb?.tts?.speakPage?.();
   window.speakSelection = () => window.a11ytb?.tts?.speakSelection?.();
+  window.openTtsReader = () => {
+    if (!state.get('tts.reader.open')) {
+      logActivity('Lecteur vocal ouvert', { module: 'tts', tags: ['tts', 'reader'] });
+    }
+    state.set('tts.reader.open', true);
+  };
+  window.closeTtsReader = () => {
+    if (state.get('tts.reader.open')) {
+      state.set('tts.reader.open', false);
+    }
+  };
   window.brailleSelection = () => {
     window.a11ytb?.braille?.transcribeSelection?.();
     logActivity('Transcription braille demandée', { tone: 'confirm' });
@@ -8014,6 +8032,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     syncView();
     syncFullscreenMode(snapshot);
     syncDockControls(snapshot);
+    syncTtsOverlay(snapshot);
     renderProfiles(snapshot);
     updateActiveShortcuts(snapshot);
     refreshShortcutDisplays(snapshot);
@@ -8035,6 +8054,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   syncView();
   syncFullscreenMode(initialSnapshot);
   syncDockControls(initialSnapshot);
+  syncTtsOverlay(initialSnapshot);
   renderProfiles(initialSnapshot);
   updateActiveShortcuts(initialSnapshot);
   refreshShortcutDisplays(initialSnapshot);

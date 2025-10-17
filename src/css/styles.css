@@ -373,6 +373,174 @@ body {
   outline-offset: 1px;
 }
 
+.a11ytb-tts-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--a11ytb-z) + 40);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(16px, 6vw, 56px);
+  background: color-mix(in srgb, var(--a11ytb-overlay) 88%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.a11ytb-tts-overlay[data-open='true'] {
+  display: flex;
+}
+
+.a11ytb-tts-overlay__panel {
+  width: min(760px, 92vw);
+  max-height: min(82vh, 640px);
+  background: var(--a11ytb-surface);
+  border-radius: var(--a11ytb-radius);
+  box-shadow: var(--a11ytb-shadow);
+  border: 1px solid color-mix(in srgb, var(--a11ytb-border) 72%, transparent);
+  padding: clamp(20px, 3vw, 36px);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  outline: none;
+}
+
+.a11ytb-tts-overlay__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.a11ytb-tts-overlay__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.a11ytb-tts-overlay__close {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--a11ytb-surface-alt) 70%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-fg) 80%, transparent);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.a11ytb-tts-overlay__close:hover,
+.a11ytb-tts-overlay__close:focus-visible {
+  background: color-mix(in srgb, var(--a11ytb-accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--a11ytb-accent) 60%, transparent);
+  color: var(--a11ytb-accent-strong);
+}
+
+.a11ytb-tts-overlay__close:focus-visible {
+  outline: var(--a11ytb-focus-ring-tight);
+  outline-offset: 2px;
+}
+
+.a11ytb-tts-overlay__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  font-size: 14px;
+  color: color-mix(in srgb, var(--a11ytb-fg) 78%, transparent);
+}
+
+.a11ytb-tts-overlay__text {
+  flex: 1;
+  min-height: 200px;
+  max-height: min(48vh, 420px);
+  overflow: auto;
+  padding: clamp(12px, 2vw, 20px);
+  border-radius: calc(var(--a11ytb-radius) * 0.85);
+  background: color-mix(in srgb, var(--a11ytb-surface-alt) 75%, transparent);
+  border: 1px solid color-mix(in srgb, var(--a11ytb-border) 65%, transparent);
+  line-height: 1.7;
+  font-size: 16px;
+  scroll-padding: 40px;
+}
+
+.a11ytb-tts-overlay__text[data-empty='true'] {
+  display: grid;
+  place-items: center;
+  color: color-mix(in srgb, var(--a11ytb-fg) 65%, transparent);
+}
+
+.a11ytb-tts-overlay__paragraph {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.a11ytb-tts-overlay__placeholder {
+  margin: 0;
+  font-style: italic;
+}
+
+.a11ytb-tts-word {
+  position: relative;
+  border-radius: calc(var(--a11ytb-radius) * 0.4);
+  padding: 2px 4px;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.a11ytb-tts-word.is-active {
+  background: color-mix(in srgb, var(--a11ytb-accent) 26%, transparent);
+  color: color-mix(in srgb, var(--a11ytb-accent-strong) 92%, white 8%);
+}
+
+.a11ytb-tts-word.is-active::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: -6px;
+  height: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--a11ytb-accent-strong) 85%, transparent);
+}
+
+.a11ytb-tts-overlay__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.a11ytb-tts-overlay__slider {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.a11ytb-tts-overlay__slider-label {
+  font-size: 14px;
+  color: color-mix(in srgb, var(--a11ytb-fg) 72%, transparent);
+}
+
+.a11ytb-tts-overlay__slider input[type='range'] {
+  width: 100%;
+  accent-color: var(--a11ytb-accent);
+}
+
+
+.a11ytb-tts-overlay__action {
+  white-space: nowrap;
+}
+
+body.a11ytb-tts-overlay-open {
+  overflow: hidden;
+}
+
 .a11ytb-modal-actions {
   display: flex;
   flex-wrap: wrap;
@@ -4278,6 +4446,26 @@ body {
   gap: 8px;
   align-items: center;
   font-size: 12px;
+}
+
+.a11ytb-audio-source {
+  padding: 4px 12px;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.a11ytb-audio-source svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+  fill: currentColor;
+}
+
+.a11ytb-audio-source [data-ref='source-label'] {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .a11ytb-badge {
