@@ -10,6 +10,9 @@
 - Vue « Raccourcis » (Alt+Shift+H) listant les commandes clavier globales et contextuelles
 - Centre d’état vocal/braille en temps réel pour signaler disponibilités, erreurs et modules désactivés
 - Journal d'activité exportable (JSON/CSV) avec tags module/sévérité (`window.a11ytb.activity`)
+- Synchronisation des préférences utilisateurs (REST + meta `user_meta`) pour retrouver ses réglages sur tous les appareils
+- Blocs Gutenberg & shortcodes prêts à l’emploi (TTS, STT, Braille, Contraste, Espacements) pour intégrer les contrôles dans le contenu
+- Jobs WP-Cron + commande `wp a11ytb activity-sync` pour automatiser l’envoi vers Jira/Linear/Slack/webhooks
 - Menu admin avancé : activation globale, dock par défaut, vue initiale, ouverture automatique et intégration Gemini (clé API + suivi de quota)
 - Store observable + localStorage (`a11ytb/v1`)
 - Compat : fonctions globales `speakSelection`, `speakPage`, `stopSpeaking`, `brailleSelection`, `clearBraille`, `resetAll` + getters `sttStatus`, `brailleOut`

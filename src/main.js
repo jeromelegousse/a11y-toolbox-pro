@@ -17,6 +17,7 @@ import {
 import { resolveLocale } from '../languages/index.js';
 import { createI18nService } from './i18n-service.js';
 import { createNotificationCenter } from './notifications.js';
+import { createPreferenceSync } from './integrations/preferences.js';
 
 const profilePresets = {
   'vision-basse': {
@@ -391,22 +392,40 @@ if (Number.isFinite(metricsTimeoutMs) && metricsTimeoutMs > 0) {
 const metricsSync = createMetricsSyncService(metricsOptions);
 metricsSync.start();
 
+const preferenceSync = createPreferenceSync({
+  state,
+  config: pluginConfig?.integrations?.preferences || {},
+});
+
+const controls = createPublicControls({ state, markProfileCustom });
+
 if (!window.a11ytb) window.a11ytb = {};
 window.a11ytb.feedback = feedback;
 window.a11ytb.metricsSync = metricsSync;
+if (preferenceSync) {
+  const existing = typeof window.a11ytb.preferences === 'object' ? window.a11ytb.preferences : {};
+  window.a11ytb.preferences = { ...existing, sync: preferenceSync };
+}
+window.a11ytb.controls = controls;
 
 window.addEventListener('beforeunload', () => {
   metricsSync.stop();
   metricsSync.flush({ force: true }).catch(() => {});
+  if (preferenceSync) {
+    preferenceSync.flush({ force: true }).catch(() => {});
+    preferenceSync.dispose?.();
+  }
 });
 window.addEventListener('online', () => {
   metricsSync.flush().catch(() => {});
+  preferenceSync?.flush?.().catch(() => {});
 });
 
 if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
       metricsSync.flush({ force: true }).catch(() => {});
+      preferenceSync?.flush?.({ force: true }).catch(() => {});
     }
   });
 }
@@ -457,6 +476,83 @@ function markProfileCustom() {
   if (state.get('ui.activeProfile') !== 'custom') {
     state.set('ui.activeProfile', 'custom');
   }
+}
+
+function createPublicControls({ state, markProfileCustom: markCustom }) {
+  async function ensureModuleLoaded(moduleId) {
+    if (!moduleId) return;
+    try {
+      await window.a11ytb?.runtime?.loadModule?.(moduleId);
+    } catch (error) {
+      console.warn(`a11ytb: impossible de charger le module ${moduleId}`, error);
+    }
+  }
+
+  return {
+    async toggleContrast(force) {
+      await ensureModuleLoaded('contrast');
+      const current = !!state.get('contrast.enabled');
+      const next = typeof force === 'boolean' ? force : !current;
+      state.set('contrast.enabled', next);
+      markCustom?.();
+      window.a11ytb?.feedback?.play('toggle');
+      window.a11ytb?.logActivity?.(`Contraste élevé ${next ? 'activé' : 'désactivé'}`);
+      return next;
+    },
+    async speakSelection() {
+      await ensureModuleLoaded('tts');
+      window.a11ytb?.tts?.speakSelection?.();
+    },
+    async speakPage() {
+      await ensureModuleLoaded('tts');
+      window.a11ytb?.tts?.speakPage?.();
+    },
+    stopSpeaking() {
+      window.a11ytb?.tts?.stop?.();
+    },
+    async startDictation() {
+      await ensureModuleLoaded('stt');
+      window.a11ytb?.stt?.start?.();
+    },
+    stopDictation() {
+      window.a11ytb?.stt?.stop?.();
+    },
+    async transcribeSelection() {
+      await ensureModuleLoaded('braille');
+      if (typeof window.brailleSelection === 'function') {
+        window.brailleSelection();
+      } else {
+        window.a11ytb?.braille?.transcribeSelection?.();
+      }
+    },
+    clearBraille() {
+      if (typeof window.clearBraille === 'function') {
+        window.clearBraille();
+      } else {
+        window.a11ytb?.braille?.clear?.();
+      }
+    },
+    openPanel(view) {
+      window.a11ytb?.panel?.open?.();
+      if (view) {
+        state.set('ui.view', view);
+      }
+    },
+    setView(view) {
+      if (view) {
+        state.set('ui.view', view);
+      }
+    },
+    getState() {
+      return state.get();
+    },
+    subscribe(fn) {
+      if (typeof fn !== 'function') {
+        return () => {};
+      }
+      return state.on((snapshot) => fn(snapshot));
+    },
+  };
 }
 
 registerBlock({
