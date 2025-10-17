@@ -77,6 +77,7 @@ describe('intégrations activité', () => {
   const originalFetch = globalThis.fetch;
   let fetchMock;
   const proxyUrl = 'https://example.test/wp-json/a11ytb/v1/activity/sync';
+  const proxyNonce = 'nonce-123';
   const serverConnectors = [
     {
       id: 'webhook',
@@ -145,6 +146,7 @@ describe('intégrations activité', () => {
     fetchMock = vi.fn(async (url, options = {}) => {
       const method = (options?.method || 'GET').toUpperCase();
       if (url === proxyUrl && method === 'GET') {
+        expect(options?.headers?.['X-WP-Nonce']).toBe(proxyNonce);
         return {
           ok: true,
           status: 200,
@@ -152,6 +154,7 @@ describe('intégrations activité', () => {
         };
       }
       if (url === proxyUrl && method === 'POST') {
+        expect(options?.headers?.['X-WP-Nonce']).toBe(proxyNonce);
         postPayloads.push(JSON.parse(options.body));
         return {
           ok: true,
@@ -178,6 +181,7 @@ describe('intégrations activité', () => {
             webhookUrl: 'https://example.test/hook',
             hasAuthToken: true,
             proxyUrl,
+            proxyNonce,
           },
         },
       },

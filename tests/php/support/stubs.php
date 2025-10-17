@@ -340,6 +340,20 @@ if (!function_exists('wp_nonce_field')) {
     }
 }
 
+if (!function_exists('wp_create_nonce')) {
+    function wp_create_nonce($action = -1)
+    {
+        return 'nonce-' . md5((string) $action);
+    }
+}
+
+if (!function_exists('wp_verify_nonce')) {
+    function wp_verify_nonce($nonce, $action = -1)
+    {
+        return $nonce === 'nonce-' . md5((string) $action);
+    }
+}
+
 if (!function_exists('wp_referer_field')) {
     function wp_referer_field(...$args)
     {
