@@ -1095,6 +1095,41 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   fab.setAttribute('aria-controls', panel.id);
   statusLauncher.setAttribute('aria-controls', panel.id);
 
+  const ttsOverlayState = {
+    overlay: null,
+    panel: null,
+    closeButton: null,
+    textContainer: null,
+    placeholder: null,
+    statusNode: null,
+    voiceNode: null,
+    progressMetaNode: null,
+    lengthMetaNode: null,
+    progressInput: null,
+    progressValue: null,
+    progressFormatter: null,
+    rateInput: null,
+    rateValue: null,
+    rateFormatter: null,
+    pitchInput: null,
+    pitchValue: null,
+    pitchFormatter: null,
+    volumeInput: null,
+    volumeValue: null,
+    volumeFormatter: null,
+    stopButton: null,
+    wordNodes: [],
+    lastText: '',
+    lastWordsSignature: '',
+    lastActiveWord: -1,
+    lastScrollTime: 0,
+    releaseInert: null,
+    releaseFocusTrap: null,
+    previousFocus: null,
+    progressInteracting: false,
+    ownerDocument: null,
+  };
+
   notificationsContainer = document.createElement('div');
   notificationsContainer.className = 'a11ytb-notifications';
   notificationsContainer.setAttribute('role', 'region');
@@ -1187,6 +1222,703 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
 
     controls.append(createButton('backward'), createButton('forward'));
     return controls;
+  }
+
+  function ensureTtsOverlay() {
+    if (ttsOverlayState.overlay && ttsOverlayState.ownerDocument) {
+      const host =
+        ttsOverlayState.ownerDocument.body ||
+        ttsOverlayState.ownerDocument.documentElement ||
+        ttsOverlayState.ownerDocument;
+      if (host && !host.contains(ttsOverlayState.overlay)) {
+        host.append(ttsOverlayState.overlay);
+      }
+      return ttsOverlayState;
+    }
+
+    const ownerDocument = root?.ownerDocument || document;
+    ttsOverlayState.ownerDocument = ownerDocument;
+
+    const overlay = ownerDocument.createElement('div');
+    overlay.className = 'a11ytb-tts-overlay';
+    overlay.dataset.open = 'false';
+    overlay.setAttribute('aria-hidden', 'true');
+    overlay.hidden = true;
+
+    const panel = ownerDocument.createElement('section');
+    panel.className = 'a11ytb-tts-overlay__panel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    const titleId = `a11ytb-tts-overlay-title-${Math.random().toString(16).slice(2)}`;
+    panel.setAttribute('aria-labelledby', titleId);
+    panel.tabIndex = -1;
+
+    const header = ownerDocument.createElement('header');
+    header.className = 'a11ytb-tts-overlay__header';
+
+    const title = ownerDocument.createElement('h2');
+    title.className = 'a11ytb-tts-overlay__title';
+    title.id = titleId;
+    title.textContent = 'Lecteur vocal';
+    header.append(title);
+
+    const closeBtn = ownerDocument.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'a11ytb-tts-overlay__close';
+    closeBtn.setAttribute('aria-label', 'Fermer le lecteur vocal');
+    closeBtn.innerHTML = '<span aria-hidden="true">&times;</span>';
+    closeBtn.addEventListener('click', () => {
+      state.set('tts.reader.open', false);
+    });
+    header.append(closeBtn);
+
+    panel.append(header);
+
+    const metaList = ownerDocument.createElement('dl');
+    metaList.className = 'a11ytb-tts-overlay__meta';
+
+    const createMetaEntry = (label, { live = false } = {}) => {
+      const wrapper = ownerDocument.createElement('div');
+      const term = ownerDocument.createElement('dt');
+      term.textContent = label;
+      const detail = ownerDocument.createElement('dd');
+      if (live) {
+        detail.setAttribute('aria-live', 'polite');
+      }
+      wrapper.append(term, detail);
+      metaList.append(wrapper);
+      return detail;
+    };
+
+    const statusNode = createMetaEntry('Statut', { live: true });
+    const voiceNode = createMetaEntry('Voix');
+    const progressMetaNode = createMetaEntry('Progression');
+    const lengthMetaNode = createMetaEntry('Longueur');
+
+    panel.append(metaList);
+
+    const textContainer = ownerDocument.createElement('div');
+    textContainer.className = 'a11ytb-tts-overlay__text';
+    textContainer.dataset.empty = 'true';
+
+    const placeholder = ownerDocument.createElement('p');
+    placeholder.className = 'a11ytb-tts-overlay__placeholder';
+    placeholder.textContent = 'Le texte lu s’affichera ici.';
+    textContainer.append(placeholder);
+    panel.append(textContainer);
+
+    const controls = ownerDocument.createElement('div');
+    controls.className = 'a11ytb-tts-overlay__controls';
+
+    const createSliderControl = ({
+      id,
+      label,
+      min,
+      max,
+      step,
+      valueFormatter,
+      ariaLabel,
+      onCommit,
+    }) => {
+      const wrapper = ownerDocument.createElement('div');
+      wrapper.className = 'a11ytb-tts-overlay__slider';
+      const sliderId = `a11ytb-tts-${id}-${Math.random().toString(16).slice(2)}`;
+      const sliderLabel = ownerDocument.createElement('label');
+      sliderLabel.className = 'a11ytb-tts-overlay__slider-label';
+      sliderLabel.setAttribute('for', sliderId);
+      sliderLabel.textContent = `${label} : `;
+      const valueNode = ownerDocument.createElement('span');
+      valueNode.textContent = '';
+      sliderLabel.append(valueNode);
+      const input = ownerDocument.createElement('input');
+      input.type = 'range';
+      input.id = sliderId;
+      input.min = String(min);
+      input.max = String(max);
+      input.step = String(step);
+      if (ariaLabel) {
+        input.setAttribute('aria-label', ariaLabel);
+      }
+      const updateLabel = (rawValue) => {
+        const numeric = Number(rawValue);
+        if (!Number.isFinite(numeric)) {
+          valueNode.textContent = '';
+          return;
+        }
+        valueNode.textContent = typeof valueFormatter === 'function' ? valueFormatter(numeric) : `${numeric}`;
+      };
+      input.addEventListener('input', (event) => {
+        updateLabel(event.target.value);
+      });
+      if (typeof onCommit === 'function') {
+        input.addEventListener('change', () => onCommit(Number(input.value)));
+      }
+      wrapper.append(sliderLabel, input);
+      return { wrapper, input, valueNode, updateLabel };
+    };
+
+    const progress = createSliderControl({
+      id: 'progress',
+      label: 'Progression',
+      min: 0,
+      max: 100,
+      step: 1,
+      valueFormatter: (value) => `${Math.round(value)} %`,
+      ariaLabel: 'Position dans la lecture',
+      onCommit: (value) => {
+        if (!Number.isFinite(value)) return;
+        const clamped = Math.min(Math.max(value, 0), 100);
+        if (typeof window !== 'undefined') {
+          window.a11ytb?.tts?.seekTo?.(clamped / 100);
+        }
+      },
+    });
+    progress.input.value = '0';
+    progress.updateLabel(0);
+
+    const startScrub = () => {
+      ttsOverlayState.progressInteracting = true;
+    };
+    const stopScrub = () => {
+      ttsOverlayState.progressInteracting = false;
+    };
+    progress.input.addEventListener('pointerdown', startScrub);
+    progress.input.addEventListener('touchstart', startScrub, { passive: true });
+    progress.input.addEventListener('pointerup', stopScrub);
+    progress.input.addEventListener('touchend', stopScrub);
+    progress.input.addEventListener('keyup', stopScrub);
+    progress.input.addEventListener('blur', stopScrub);
+    progress.input.addEventListener('change', stopScrub);
+    progress.input.addEventListener('keydown', (event) => {
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
+        ttsOverlayState.progressInteracting = true;
+      }
+    });
+
+    const commitRate = (value) => {
+      if (!Number.isFinite(value)) return;
+      const clamped = Math.min(Math.max(value, 0.5), 2);
+      const current = Number(state.get('tts.rate') ?? 1);
+      if (Math.abs(current - clamped) < 0.005) {
+        return;
+      }
+      state.set('tts.rate', clamped);
+      markProfileAsCustom();
+      logActivity(`Vitesse de lecture réglée à ${clamped.toFixed(2)}×`, {
+        module: 'tts',
+        tags: ['tts', 'reader'],
+      });
+    };
+
+    const commitPitch = (value) => {
+      if (!Number.isFinite(value)) return;
+      const clamped = Math.min(Math.max(value, 0.5), 2);
+      const current = Number(state.get('tts.pitch') ?? 1);
+      if (Math.abs(current - clamped) < 0.005) {
+        return;
+      }
+      state.set('tts.pitch', clamped);
+      markProfileAsCustom();
+      logActivity(`Timbre de lecture réglé à ${clamped.toFixed(2)}`, {
+        module: 'tts',
+        tags: ['tts', 'reader'],
+      });
+    };
+
+    const commitVolume = (value) => {
+      if (!Number.isFinite(value)) return;
+      const clamped = Math.min(Math.max(value, 0), 100);
+      const normalized = Math.round(clamped) / 100;
+      const current = Number(state.get('tts.volume') ?? 1);
+      if (Math.abs(current - normalized) < 0.01) {
+        return;
+      }
+      state.set('tts.volume', normalized);
+      markProfileAsCustom();
+      logActivity(`Volume TTS réglé à ${Math.round(normalized * 100)} %`, {
+        module: 'tts',
+        tags: ['tts', 'reader'],
+      });
+    };
+
+    const rate = createSliderControl({
+      id: 'rate',
+      label: 'Vitesse',
+      min: 0.5,
+      max: 2,
+      step: 0.05,
+      valueFormatter: (value) => `${value.toFixed(2)}×`,
+      ariaLabel: 'Vitesse de lecture vocale',
+      onCommit: commitRate,
+    });
+    rate.input.value = '1';
+    rate.updateLabel(1);
+
+    const pitch = createSliderControl({
+      id: 'pitch',
+      label: 'Timbre',
+      min: 0.5,
+      max: 2,
+      step: 0.05,
+      valueFormatter: (value) => value.toFixed(2),
+      ariaLabel: 'Timbre de la voix',
+      onCommit: commitPitch,
+    });
+    pitch.input.value = '1';
+    pitch.updateLabel(1);
+
+    const volume = createSliderControl({
+      id: 'volume',
+      label: 'Volume',
+      min: 0,
+      max: 100,
+      step: 1,
+      valueFormatter: (value) => `${Math.round(value)} %`,
+      ariaLabel: 'Volume de la lecture vocale',
+      onCommit: commitVolume,
+    });
+    volume.input.value = '100';
+    volume.updateLabel(100);
+
+    controls.append(progress.wrapper, rate.wrapper, pitch.wrapper, volume.wrapper);
+
+    const speakSelectionBtn = ownerDocument.createElement('button');
+    speakSelectionBtn.type = 'button';
+    speakSelectionBtn.className = 'a11ytb-button a11ytb-tts-overlay__action';
+    speakSelectionBtn.textContent = 'Lire la sélection';
+    speakSelectionBtn.addEventListener('click', () => {
+      window.speakSelection?.();
+    });
+
+    const speakPageBtn = ownerDocument.createElement('button');
+    speakPageBtn.type = 'button';
+    speakPageBtn.className = 'a11ytb-button a11ytb-tts-overlay__action';
+    speakPageBtn.textContent = 'Lire la page';
+    speakPageBtn.addEventListener('click', () => {
+      window.speakPage?.();
+    });
+
+    const stopButton = ownerDocument.createElement('button');
+    stopButton.type = 'button';
+    stopButton.className = 'a11ytb-button a11ytb-button--ghost a11ytb-tts-overlay__action';
+    stopButton.textContent = 'Arrêter';
+    stopButton.addEventListener('click', () => {
+      window.stopSpeaking?.();
+    });
+
+    controls.append(speakSelectionBtn, speakPageBtn, stopButton);
+    panel.append(controls);
+
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) {
+        state.set('tts.reader.open', false);
+      }
+    });
+
+    overlay.append(panel);
+    const host = ownerDocument.body || ownerDocument.documentElement || ownerDocument;
+    host.append(overlay);
+
+    ttsOverlayState.overlay = overlay;
+    ttsOverlayState.panel = panel;
+    ttsOverlayState.closeButton = closeBtn;
+    ttsOverlayState.textContainer = textContainer;
+    ttsOverlayState.placeholder = placeholder;
+    ttsOverlayState.statusNode = statusNode;
+    ttsOverlayState.voiceNode = voiceNode;
+    ttsOverlayState.progressMetaNode = progressMetaNode;
+    ttsOverlayState.lengthMetaNode = lengthMetaNode;
+    ttsOverlayState.progressInput = progress.input;
+    ttsOverlayState.progressValue = progress.valueNode;
+    ttsOverlayState.progressFormatter = progress.updateLabel;
+    ttsOverlayState.rateInput = rate.input;
+    ttsOverlayState.rateValue = rate.valueNode;
+    ttsOverlayState.rateFormatter = rate.updateLabel;
+    ttsOverlayState.pitchInput = pitch.input;
+    ttsOverlayState.pitchValue = pitch.valueNode;
+    ttsOverlayState.pitchFormatter = pitch.updateLabel;
+    ttsOverlayState.volumeInput = volume.input;
+    ttsOverlayState.volumeValue = volume.valueNode;
+    ttsOverlayState.volumeFormatter = volume.updateLabel;
+    ttsOverlayState.stopButton = stopButton;
+    ttsOverlayState.wordNodes = [];
+    ttsOverlayState.lastText = '';
+    ttsOverlayState.lastWordsSignature = '';
+    ttsOverlayState.lastActiveWord = -1;
+    ttsOverlayState.lastScrollTime = 0;
+
+    return ttsOverlayState;
+  }
+
+  function setupTtsOverlayFocusTrap() {
+    const { overlay, panel, ownerDocument } = ensureTtsOverlay();
+    if (!panel || !overlay || !ownerDocument) {
+      return;
+    }
+
+    teardownTtsOverlayFocusTrap();
+
+    const getCycle = () => {
+      const focusables = collectFocusable(panel);
+      if (focusables.length) {
+        return focusables;
+      }
+      if (panel.tabIndex < 0) {
+        panel.tabIndex = 0;
+      }
+      return [panel];
+    };
+
+    const handleKeydown = (event) => {
+      if (overlay.dataset.open !== 'true') {
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        state.set('tts.reader.open', false);
+        return;
+      }
+      if (event.key !== 'Tab') {
+        return;
+      }
+      const cycle = getCycle();
+      if (!cycle.length) {
+        return;
+      }
+      const first = cycle[0];
+      const last = cycle[cycle.length - 1];
+      const active = ownerDocument.activeElement;
+      if (event.shiftKey) {
+        if (!panel.contains(active) || active === first) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    const handleFocusIn = (event) => {
+      if (overlay.dataset.open !== 'true') {
+        return;
+      }
+      if (!event.target) {
+        return;
+      }
+      if (panel.contains(event.target)) {
+        return;
+      }
+      const cycle = getCycle();
+      const fallback = cycle[0] || panel;
+      if (fallback && typeof fallback.focus === 'function') {
+        try {
+          fallback.focus({ preventScroll: true });
+        } catch (error) {
+          fallback.focus();
+        }
+      }
+    };
+
+    panel.addEventListener('keydown', handleKeydown, true);
+    ownerDocument.addEventListener('focusin', handleFocusIn);
+
+    ttsOverlayState.releaseFocusTrap = () => {
+      panel.removeEventListener('keydown', handleKeydown, true);
+      ownerDocument.removeEventListener('focusin', handleFocusIn);
+    };
+  }
+
+  function teardownTtsOverlayFocusTrap() {
+    if (typeof ttsOverlayState.releaseFocusTrap === 'function') {
+      ttsOverlayState.releaseFocusTrap();
+    }
+    ttsOverlayState.releaseFocusTrap = null;
+  }
+
+  function openTtsOverlayUI() {
+    const { overlay, panel, closeButton, ownerDocument } = ensureTtsOverlay();
+    if (!overlay || overlay.dataset.open === 'true') {
+      return;
+    }
+
+    overlay.dataset.open = 'true';
+    overlay.hidden = false;
+    overlay.setAttribute('aria-hidden', 'false');
+    const body = ownerDocument?.body;
+    if (body) {
+      body.classList.add('a11ytb-tts-overlay-open');
+    }
+    if (typeof ttsOverlayState.releaseInert === 'function') {
+      ttsOverlayState.releaseInert();
+    }
+    ttsOverlayState.releaseInert = applyInertToSiblings(overlay, { ownerDocument });
+    ttsOverlayState.previousFocus = ownerDocument?.activeElement || null;
+    setupTtsOverlayFocusTrap();
+    requestAnimationFrame(() => {
+      const cycle = collectFocusable(panel);
+      const target = cycle[0] || closeButton || panel;
+      if (target && typeof target.focus === 'function') {
+        try {
+          target.focus({ preventScroll: true });
+        } catch (error) {
+          target.focus();
+        }
+      }
+    });
+  }
+
+  function closeTtsOverlayUI() {
+    const { overlay, ownerDocument } = ensureTtsOverlay();
+    if (!overlay || overlay.dataset.open !== 'true') {
+      return;
+    }
+
+    overlay.dataset.open = 'false';
+    overlay.setAttribute('aria-hidden', 'true');
+    overlay.hidden = true;
+    const body = ownerDocument?.body;
+    if (body) {
+      body.classList.remove('a11ytb-tts-overlay-open');
+    }
+    teardownTtsOverlayFocusTrap();
+    if (typeof ttsOverlayState.releaseInert === 'function') {
+      ttsOverlayState.releaseInert();
+    }
+    ttsOverlayState.releaseInert = null;
+
+    const focusTarget = ttsOverlayState.previousFocus;
+    ttsOverlayState.previousFocus = null;
+    if (focusTarget && typeof focusTarget.focus === 'function') {
+      const host = ownerDocument?.body || ownerDocument;
+      if (!host || (typeof host.contains === 'function' && host.contains(focusTarget))) {
+        try {
+          focusTarget.focus({ preventScroll: true });
+        } catch (error) {
+          focusTarget.focus();
+        }
+      }
+    }
+  }
+
+  function renderTtsOverlayText(text, words) {
+    const { textContainer, placeholder, ownerDocument } = ensureTtsOverlay();
+    const normalizedText = typeof text === 'string' ? text : '';
+    const normalizedWords = Array.isArray(words) ? words : [];
+    const signature = normalizedWords
+      .map((word) => `${Number(word?.start) || 0}-${Number(word?.end) || 0}`)
+      .join('|');
+
+    if (
+      normalizedText === ttsOverlayState.lastText &&
+      signature === ttsOverlayState.lastWordsSignature
+    ) {
+      if (!normalizedText.trim().length && textContainer && placeholder) {
+        textContainer.dataset.empty = 'true';
+        placeholder.hidden = false;
+        if (!textContainer.contains(placeholder)) {
+          textContainer.innerHTML = '';
+          textContainer.append(placeholder);
+        }
+      }
+      return;
+    }
+
+    ttsOverlayState.lastText = normalizedText;
+    ttsOverlayState.lastWordsSignature = signature;
+    ttsOverlayState.wordNodes = [];
+    ttsOverlayState.lastActiveWord = -1;
+    ttsOverlayState.lastScrollTime = 0;
+
+    if (!textContainer) {
+      return;
+    }
+
+    textContainer.innerHTML = '';
+
+    if (!normalizedText.trim().length) {
+      textContainer.dataset.empty = 'true';
+      if (placeholder) {
+        placeholder.hidden = false;
+        textContainer.append(placeholder);
+      }
+      return;
+    }
+
+    textContainer.dataset.empty = 'false';
+    if (placeholder) {
+      placeholder.hidden = true;
+    }
+
+    const paragraph = ownerDocument?.createElement('p') || document.createElement('p');
+    paragraph.className = 'a11ytb-tts-overlay__paragraph';
+
+    const fragment = ownerDocument?.createDocumentFragment()
+      ? ownerDocument.createDocumentFragment()
+      : document.createDocumentFragment();
+
+    let index = 0;
+    normalizedWords.forEach((word, wordIndex) => {
+      const start = Math.max(0, Number(word?.start) || 0);
+      const end = Math.max(start, Number(word?.end) || 0);
+      if (start > index) {
+        fragment.append((ownerDocument || document).createTextNode(normalizedText.slice(index, start)));
+      }
+      const span = (ownerDocument || document).createElement('span');
+      span.className = 'a11ytb-tts-word';
+      span.dataset.wordIndex = String(wordIndex);
+      span.textContent = normalizedText.slice(start, end);
+      fragment.append(span);
+      ttsOverlayState.wordNodes.push(span);
+      index = end;
+    });
+
+    if (index < normalizedText.length) {
+      fragment.append((ownerDocument || document).createTextNode(normalizedText.slice(index)));
+    }
+
+    paragraph.append(fragment);
+    textContainer.append(paragraph);
+  }
+
+  function updateTtsOverlayActiveWord(nextIndex, { speaking = false } = {}) {
+    const { wordNodes, textContainer } = ensureTtsOverlay();
+    if (!Array.isArray(wordNodes) || !wordNodes.length) {
+      return;
+    }
+    const normalizedIndex = Number.isFinite(nextIndex) ? Number(nextIndex) : -1;
+    if (normalizedIndex === ttsOverlayState.lastActiveWord) {
+      return;
+    }
+
+    if (ttsOverlayState.lastActiveWord >= 0) {
+      const previous = wordNodes[ttsOverlayState.lastActiveWord];
+      if (previous) {
+        previous.classList.remove('is-active');
+      }
+    }
+
+    if (normalizedIndex >= 0) {
+      const current = wordNodes[normalizedIndex];
+      if (current) {
+        current.classList.add('is-active');
+        if (speaking && textContainer) {
+          const now = Date.now();
+          if (now - ttsOverlayState.lastScrollTime > 120) {
+            try {
+              current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            } catch (error) {
+              current.scrollIntoView({ block: 'nearest' });
+            }
+            ttsOverlayState.lastScrollTime = now;
+          }
+        }
+      }
+    }
+
+    ttsOverlayState.lastActiveWord = normalizedIndex;
+  }
+
+  function formatTtsStatusLabel(status, speaking) {
+    if (speaking) {
+      return 'Lecture en cours';
+    }
+    switch (status) {
+      case 'loading':
+        return 'Préparation de la lecture';
+      case 'error':
+        return 'Erreur de lecture';
+      case 'unsupported':
+        return 'Synthèse vocale indisponible';
+      default:
+        return 'Lecture en attente';
+    }
+  }
+
+  function syncTtsOverlay(snapshot = state.get()) {
+    const overlayContext = ensureTtsOverlay();
+    const overlay = overlayContext.overlay;
+    if (!overlay) {
+      return;
+    }
+
+    const tts = snapshot?.tts ?? {};
+    const reader = tts.reader ?? {};
+    const open = !!reader.open;
+    if (open) {
+      openTtsOverlayUI();
+    } else {
+      closeTtsOverlayUI();
+    }
+
+    const statusLabel = formatTtsStatusLabel(tts.status, tts.status === 'speaking');
+    if (overlayContext.statusNode) {
+      overlayContext.statusNode.textContent = statusLabel;
+    }
+
+    if (overlayContext.voiceNode) {
+      const voices = Array.isArray(tts.availableVoices) ? tts.availableVoices : [];
+      const selectedVoice = voices.find((voice) => voice.voiceURI === tts.voice);
+      overlayContext.voiceNode.textContent = selectedVoice
+        ? `${selectedVoice.name} (${selectedVoice.lang})`
+        : 'Voix du navigateur';
+    }
+
+    const percent = Math.round((tts.progress ?? 0) * 100);
+    if (overlayContext.progressMetaNode) {
+      overlayContext.progressMetaNode.textContent = `${percent}%`;
+    }
+
+    if (overlayContext.lengthMetaNode) {
+      const totalChars = Number.isFinite(reader.totalChars)
+        ? Math.max(0, Math.round(reader.totalChars))
+        : (reader.text || '').length;
+      overlayContext.lengthMetaNode.textContent = totalChars ? `${totalChars} caractères` : '—';
+    }
+
+    const hasText = typeof reader.text === 'string' && reader.text.trim().length > 0;
+    renderTtsOverlayText(reader.text || '', Array.isArray(reader.words) ? reader.words : []);
+
+    updateTtsOverlayActiveWord(reader.activeWord ?? -1, {
+      speaking: tts.status === 'speaking',
+    });
+
+    if (overlayContext.progressInput) {
+      overlayContext.progressInput.disabled = !hasText;
+      if (!ttsOverlayState.progressInteracting) {
+        const clampedPercent = Math.min(Math.max(percent, 0), 100);
+        overlayContext.progressInput.value = String(clampedPercent);
+        overlayContext.progressFormatter?.(clampedPercent);
+      }
+      overlayContext.progressInput.setAttribute('aria-valuemin', '0');
+      overlayContext.progressInput.setAttribute('aria-valuemax', '100');
+      overlayContext.progressInput.setAttribute('aria-valuenow', String(Math.min(Math.max(percent, 0), 100)));
+      overlayContext.progressInput.setAttribute('aria-valuetext', `${percent}%`);
+    }
+
+    if (overlayContext.rateInput) {
+      const rateValue = Number(tts.rate ?? 1);
+      overlayContext.rateInput.value = String(rateValue);
+      overlayContext.rateFormatter?.(rateValue);
+    }
+
+    if (overlayContext.pitchInput) {
+      const pitchValue = Number(tts.pitch ?? 1);
+      overlayContext.pitchInput.value = String(pitchValue);
+      overlayContext.pitchFormatter?.(pitchValue);
+    }
+
+    if (overlayContext.volumeInput) {
+      const volumeValue = Number(tts.volume ?? 1);
+      const clampedVolume = Math.min(Math.max(volumeValue, 0), 1);
+      const volumePercent = Math.round(clampedVolume * 100);
+      overlayContext.volumeInput.value = String(volumePercent);
+      overlayContext.volumeFormatter?.(volumePercent);
+    }
+
+    if (overlayContext.stopButton) {
+      overlayContext.stopButton.disabled = tts.status !== 'speaking';
+    }
   }
 
   const dockButtons = new Map([
