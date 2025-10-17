@@ -97,6 +97,7 @@ export const manifest = {
         transcript: '',
         language: 'auto',
         autoPunctuation: true,
+        inputSource: 'Micro par défaut',
       },
     },
   },

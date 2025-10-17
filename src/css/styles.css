@@ -4348,6 +4348,26 @@ body.a11ytb-tts-overlay-open {
   font-size: 12px;
 }
 
+.a11ytb-audio-source {
+  padding: 4px 12px;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.a11ytb-audio-source svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+  fill: currentColor;
+}
+
+.a11ytb-audio-source [data-ref='source-label'] {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .a11ytb-badge {
   display: inline-flex;
   align-items: center;
