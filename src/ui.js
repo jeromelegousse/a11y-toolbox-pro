@@ -7762,6 +7762,9 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     if (state.get('ui.focusSection') !== 'audit') {
       state.set('ui.focusSection', 'audit');
     }
+    if (state.get('ui.view') === 'options') {
+      state.set('ui.view', 'modules');
+    }
     toggle(true);
     window.setTimeout(() => {
       if (typeof statusCenter?.scrollIntoView === 'function') {
