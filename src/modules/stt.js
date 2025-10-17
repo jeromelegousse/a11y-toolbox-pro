@@ -27,7 +27,9 @@ async function updateInputSource({ requestPermission = false } = {}) {
     const devices = await mediaDevices.enumerateDevices();
     const activeDevice =
       devices.find((device) => device.kind === 'audioinput' && device.deviceId === 'default') ||
-      devices.find((device) => device.kind === 'audioinput' && device.deviceId === 'communications') ||
+      devices.find(
+        (device) => device.kind === 'audioinput' && device.deviceId === 'communications'
+      ) ||
       devices.find((device) => device.kind === 'audioinput');
 
     let label = activeDevice?.label?.trim();

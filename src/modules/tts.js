@@ -364,7 +364,9 @@ const tts = {
         if (!readerText) {
           readerText = store.get('tts.reader.text') || '';
           readerTotalChars = readerText.length;
-          readerWords = Array.isArray(store.get('tts.reader.words')) ? store.get('tts.reader.words') : [];
+          readerWords = Array.isArray(store.get('tts.reader.words'))
+            ? store.get('tts.reader.words')
+            : [];
         }
         if (!readerText) return;
         const total = readerTotalChars || readerText.length;
