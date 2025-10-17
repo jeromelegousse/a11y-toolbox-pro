@@ -18,6 +18,7 @@ import { resolveLocale } from '../languages/index.js';
 import { createI18nService } from './i18n-service.js';
 import { createNotificationCenter } from './notifications.js';
 import { createPreferenceSync } from './integrations/preferences.js';
+import { attachModuleTriggers } from './integrations/inline-triggers.js';
 
 const profilePresets = {
   'vision-basse': {
@@ -392,28 +393,34 @@ if (Number.isFinite(metricsTimeoutMs) && metricsTimeoutMs > 0) {
 const metricsSync = createMetricsSyncService(metricsOptions);
 metricsSync.start();
 
-const preferenceSync = createPreferenceSync({
-  state,
-  config: pluginConfig?.integrations?.preferences || {},
-});
-
-const controls = createPublicControls({ state, markProfileCustom });
+const preferencesIntegration = pluginConfig?.integrations?.preferences || {};
+let preferenceSync = null;
+if (
+  preferencesIntegration?.enabled &&
+  typeof preferencesIntegration.endpoint === 'string' &&
+  preferencesIntegration.endpoint.trim()
+) {
+  preferenceSync = createPreferenceSync({
+    state,
+    endpoint: preferencesIntegration.endpoint,
+    nonce: preferencesIntegration.nonce,
+    throttleMs: preferencesIntegration.throttleMs,
+  });
+}
 
 if (!window.a11ytb) window.a11ytb = {};
 window.a11ytb.feedback = feedback;
 window.a11ytb.metricsSync = metricsSync;
 if (preferenceSync) {
-  const existing = typeof window.a11ytb.preferences === 'object' ? window.a11ytb.preferences : {};
-  window.a11ytb.preferences = { ...existing, sync: preferenceSync };
+  window.a11ytb.preferenceSync = preferenceSync;
 }
-window.a11ytb.controls = controls;
 
 window.addEventListener('beforeunload', () => {
   metricsSync.stop();
   metricsSync.flush({ force: true }).catch(() => {});
-  if (preferenceSync) {
-    preferenceSync.flush({ force: true }).catch(() => {});
-    preferenceSync.dispose?.();
+  const pending = preferenceSync?.flush?.();
+  if (pending && typeof pending.catch === 'function') {
+    pending.catch(() => {});
   }
 });
 window.addEventListener('online', () => {
@@ -1004,3 +1011,7 @@ setupModuleRuntime({
 
 const root = document.getElementById('a11ytb-root');
 mountUI({ root, state, config: pluginConfig, i18n, notifications });
+const inlineTriggers = attachModuleTriggers({ state });
+if (inlineTriggers) {
+  window.a11ytb.inlineTriggers = inlineTriggers;
+}

@@ -14,7 +14,9 @@
 - Blocs Gutenberg & shortcodes prêts à l’emploi (TTS, STT, Braille, Contraste, Espacements) pour intégrer les contrôles dans le contenu
 - Jobs WP-Cron + commande `wp a11ytb activity-sync` pour automatiser l’envoi vers Jira/Linear/Slack/webhooks
 - Menu admin avancé : activation globale, dock par défaut, vue initiale, ouverture automatique et intégration Gemini (clé API + suivi de quota)
-- Store observable + localStorage (`a11ytb/v1`)
+- Store observable + synchronisation compte (REST `a11ytb/v1/preferences` + fallback localStorage)
+- Persistance multi-appareil : préférences liées à l'utilisateur, CRON + commande WP-CLI pour réexpédier les journaux
+- Déclencheurs inline Gutenberg/shortcode pour ouvrir un module précis (TTS, contraste…) directement dans le contenu
 - Compat : fonctions globales `speakSelection`, `speakPage`, `stopSpeaking`, `brailleSelection`, `clearBraille`, `resetAll` + getters `sttStatus`, `brailleOut`
 
 Ouvrez `index.html` dans un navigateur moderne (Alt+Shift+A pour ouvrir).

@@ -1,6 +1,16 @@
-const allowedKeys = new Set(['ui', 'profiles', 'audio', 'tts', 'audit', 'collaboration']);
+const ALLOWED_KEYS = [
+  'ui',
+  'audio',
+  'contrast',
+  'spacing',
+  'tts',
+  'stt',
+  'braille',
+  'profiles',
+  'collaboration',
+];
 
-function deepClone(value) {
+function clone(value) {
   if (value === null || value === undefined) {
     return value;
   }
@@ -8,217 +18,193 @@ function deepClone(value) {
     try {
       return structuredClone(value);
     } catch (error) {
-      /* fall through */
+      /* ignore structuredClone failure */
     }
   }
   try {
     return JSON.parse(JSON.stringify(value));
   } catch (error) {
-    return null;
+    return value;
   }
 }
 
-function sanitizeSnapshot(snapshot) {
+function extractSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== 'object') {
     return {};
   }
-  const cleaned = {};
-  allowedKeys.forEach((key) => {
+  const result = {};
+  ALLOWED_KEYS.forEach((key) => {
     if (Object.prototype.hasOwnProperty.call(snapshot, key)) {
-      const cloned = deepClone(snapshot[key]);
-      if (cloned !== null && cloned !== undefined) {
-        cleaned[key] = cloned;
+      result[key] = clone(snapshot[key]);
+    }
+  });
+  return result;
+}
+
+function applyPreferences(state, data) {
+  if (!state || typeof state.set !== 'function' || !data || typeof data !== 'object') {
+    return;
+  }
+  ALLOWED_KEYS.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(data, key)) {
+      try {
+        state.set(key, clone(data[key]));
+      } catch (error) {
+        console.warn('a11ytb: impossible d’appliquer la clé de préférences', key, error);
       }
     }
   });
-  return cleaned;
-}
-
-function computeHash(payload) {
-  try {
-    return JSON.stringify(payload);
-  } catch (error) {
-    return null;
-  }
 }
 
 export function createPreferenceSync({
   state,
-  config = {},
-  fetchFn = typeof globalThis?.fetch === 'function' ? globalThis.fetch.bind(globalThis) : null,
-  debounceMs = 3000,
-  onError,
+  endpoint,
+  nonce = '',
+  throttleMs = 4000,
+  fetchImpl = null,
 } = {}) {
-  if (!config?.enabled) {
+  if (!state || typeof state.on !== 'function' || typeof state.get !== 'function') {
     return null;
   }
 
-  if (!state || typeof state.get !== 'function' || typeof state.tx !== 'function') {
+  const url = typeof endpoint === 'string' ? endpoint.trim() : '';
+  if (!url) {
     return null;
   }
 
-  const endpoint = typeof config.endpoint === 'string' ? config.endpoint.trim() : '';
-  if (!endpoint || typeof fetchFn !== 'function') {
+  const fetchFn = fetchImpl || (typeof fetch === 'function' ? fetch.bind(window) : null);
+  if (typeof fetchFn !== 'function') {
     return null;
   }
 
-  const nonce = typeof config.nonce === 'string' ? config.nonce : '';
-  const delay = Number.isFinite(debounceMs) && debounceMs > 0 ? debounceMs : 3000;
-
+  let applying = false;
   let timer = null;
-  let disposed = false;
-  let applyingRemote = false;
+  let stopped = false;
   let unsubscribe = null;
-  let lastHash = null;
+  let pendingPayload = null;
+  let lastSignature = '';
 
-  function handleError(error) {
-    if (typeof onError === 'function') {
-      try {
-        onError(error);
-        return;
-      } catch (callbackError) {
-        console.warn('a11ytb: erreur lors du rappel de synchronisation préférences.', callbackError);
-      }
-    }
-    if (error) {
-      console.warn('a11ytb: échec de synchronisation des préférences.', error);
+  const headers = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  };
+  if (nonce) {
+    headers['X-WP-Nonce'] = nonce;
+  }
+
+  function signature(payload) {
+    try {
+      return JSON.stringify(payload);
+    } catch (error) {
+      return '';
     }
   }
 
-  function applyRemoteSnapshot(snapshot) {
-    const sanitized = sanitizeSnapshot(snapshot);
-    if (!Object.keys(sanitized).length) {
+  async function send(payload) {
+    if (!payload) {
       return;
     }
-    applyingRemote = true;
     try {
-      state.tx(sanitized);
-    } finally {
-      applyingRemote = false;
-    }
-    lastHash = computeHash(sanitizeSnapshot(state.get()));
-  }
-
-  async function pushSnapshot({ force = false } = {}) {
-    if (disposed) {
-      return;
-    }
-
-    if (timer) {
-      clearTimeout(timer);
-      timer = null;
-    }
-
-    const snapshot = sanitizeSnapshot(state.get());
-    if (!Object.keys(snapshot).length) {
-      return;
-    }
-
-    const hash = computeHash(snapshot);
-    if (!force && hash && hash === lastHash) {
-      return;
-    }
-
-    const headers = { 'Content-Type': 'application/json' };
-    if (nonce) {
-      headers['X-WP-Nonce'] = nonce;
-    }
-
-    let response;
-    try {
-      response = await fetchFn(endpoint, {
-        method: 'PUT',
-        credentials: 'same-origin',
+      const response = await fetchFn(url, {
+        method: 'POST',
         headers,
-        body: JSON.stringify({ snapshot }),
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
       });
-    } catch (error) {
-      handleError(error);
-      return;
-    }
-
-    if (!response || !response.ok) {
-      handleError(response ? new Error(`HTTP ${response.status}`) : new Error('Invalid response'));
-      return;
-    }
-
-    try {
-      const data = await response.json();
-      if (data && typeof data === 'object' && data.snapshot) {
-        applyRemoteSnapshot(data.snapshot);
-        return;
+      if (response?.ok) {
+        lastSignature = signature(payload);
+        pendingPayload = null;
       }
     } catch (error) {
-      /* absence de payload JSON valide : ignorer */
+      console.warn('a11ytb: échec de la synchronisation des préférences', error);
     }
-
-    lastHash = hash;
   }
 
-  function scheduleSync() {
-    if (disposed) {
+  async function flush() {
+    if (pendingPayload) {
+      await send(pendingPayload);
+    }
+  }
+
+  function schedule(snapshot) {
+    if (stopped) {
       return;
     }
+    const data = extractSnapshot(snapshot);
+    const payload = {
+      data,
+      meta: { updatedAt: Date.now() },
+    };
+    const sig = signature(payload);
+    if (!sig || sig === lastSignature) {
+      return;
+    }
+    pendingPayload = payload;
     if (timer) {
       clearTimeout(timer);
     }
     timer = setTimeout(() => {
       timer = null;
-      pushSnapshot().catch(handleError);
-    }, delay);
+      flush().catch(() => {});
+    }, Math.max(500, Number(throttleMs) || 0));
   }
 
-  function start() {
-    if (disposed || unsubscribe) {
-      return;
-    }
-
-    if (config.snapshot && typeof config.snapshot === 'object') {
-      applyRemoteSnapshot(config.snapshot);
-    }
-
-    lastHash = computeHash(sanitizeSnapshot(state.get()));
-
-    const handler = () => {
-      if (applyingRemote) {
+  async function load() {
+    try {
+      const response = await fetchFn(url, {
+        method: 'GET',
+        headers,
+        credentials: 'same-origin',
+      });
+      if (!response?.ok || typeof response.json !== 'function') {
         return;
       }
-      scheduleSync();
-    };
-
-    unsubscribe = typeof state.on === 'function' ? state.on(handler) : null;
-  }
-
-  function stop() {
-    if (timer) {
-      clearTimeout(timer);
-      timer = null;
-    }
-    if (unsubscribe) {
-      try {
-        unsubscribe();
-      } catch (error) {
-        /* ignore */
+      const data = await response.json();
+      if (!data || typeof data !== 'object') {
+        return;
       }
-      unsubscribe = null;
+      const payload = {
+        data: extractSnapshot(data.data ?? {}),
+        meta: {
+          updatedAt: Number.isFinite(data?.meta?.updatedAt)
+            ? Number(data.meta.updatedAt)
+            : Date.now(),
+        },
+      };
+      applying = true;
+      try {
+        applyPreferences(state, payload.data);
+        lastSignature = signature(payload);
+      } finally {
+        applying = false;
+      }
+    } catch (error) {
+      console.warn('a11ytb: impossible de charger les préférences distantes', error);
     }
   }
 
-  function dispose() {
-    if (disposed) {
+  unsubscribe = state.on((nextState) => {
+    if (applying || stopped) {
       return;
     }
-    stop();
-    disposed = true;
-  }
+    schedule(nextState);
+  });
 
-  start();
+  load().catch(() => {});
 
   return {
-    start,
-    stop,
-    dispose,
-    flush: (options) => pushSnapshot(options),
-    isRunning: () => !disposed,
+    flush,
+    stop() {
+      stopped = true;
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    },
   };
 }
+
+export default createPreferenceSync;

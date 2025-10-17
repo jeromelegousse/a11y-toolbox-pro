@@ -3,23 +3,45 @@
   "blocks": [
     {
       "id": "tts-controls",
-      "module": "tts"
+      "module": "tts",
+      "title": "Lecture vocale",
+      "description": "Déclenche la lecture de la sélection courante ou de la page.",
+      "cta": "Lire cette section",
+      "action": "tts-read"
     },
     {
       "id": "stt-controls",
-      "module": "stt"
+      "module": "stt",
+      "title": "Dictée vocale",
+      "description": "Démarre ou arrête la dictée dans le module de transcription.",
+      "cta": "Démarrer la dictée",
+      "action": "stt-toggle"
     },
     {
       "id": "braille-controls",
-      "module": "braille"
+      "module": "braille",
+      "title": "Transcription braille",
+      "description": "Convertit la sélection courante en braille pour le module dédié.",
+      "cta": "Transcrire la sélection",
+      "action": "braille-selection"
     },
     {
       "id": "contrast-controls",
-      "module": "contrast"
+      "module": "contrast",
+      "title": "Contraste élevé",
+      "description": "Active ou désactive le thème à fort contraste.",
+      "cta": "Basculer le contraste",
+      "action": "toggle",
+      "path": "contrast.enabled"
     },
     {
       "id": "spacing-controls",
-      "module": "spacing"
+      "module": "spacing",
+      "title": "Espacements",
+      "description": "Ouvre le panneau Options & Profils sur la section Espacements.",
+      "cta": "Personnaliser les espacements",
+      "action": "open-panel",
+      "view": "options"
     }
   ]
 }

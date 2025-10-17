@@ -139,16 +139,16 @@ function a11ytb_on_activation(): void
     }
 
     a11ytb_initialize_options();
-    a11ytb_schedule_activity_cron();
+    a11ytb_schedule_activity_sync();
 }
 register_activation_hook(__FILE__, 'a11ytb_on_activation');
 
 /**
- * Nettoie les programmations lors de la désactivation du plugin.
+ * Nettoie l’état planifié lors de la désactivation.
  */
 function a11ytb_on_deactivation(): void
 {
-    a11ytb_clear_activity_cron();
+    a11ytb_clear_activity_sync_schedule();
 }
 register_deactivation_hook(__FILE__, 'a11ytb_on_deactivation');
 
@@ -361,8 +361,8 @@ function a11ytb_register_assets(): void
     );
 
     wp_register_style(
-        'a11ytb/block-embed',
-        $plugin_url . 'assets/block-embed.css',
+        'a11ytb/blocks',
+        $plugin_url . 'assets/blocks.css',
         [],
         A11YTB_PLUGIN_VERSION
     );
@@ -870,215 +870,528 @@ function a11ytb_get_site_locale(): string
 }
 
 /**
- * Retourne le contexte de l’utilisateur courant exposé au frontal.
+ * Retourne la clé méta utilisée pour stocker les préférences synchronisées.
  */
-function a11ytb_get_current_user_context(): array
-{
-    if (!function_exists('is_user_logged_in') || !is_user_logged_in()) {
-        return [];
-    }
-
-    if (!function_exists('wp_get_current_user')) {
-        return [];
-    }
-
-    $user = wp_get_current_user();
-
-    if (!$user || !($user instanceof WP_User) || !$user->exists()) {
-        return [];
-    }
-
-    $context = [
-        'id' => (int) $user->ID,
-        'displayName' => $user->display_name !== '' ? $user->display_name : $user->user_login,
-        'email' => (string) $user->user_email,
-    ];
-
-    /**
-     * Permet d’ajuster les informations utilisateur exposées au frontal.
-     *
-     * @param array   $context Contexte courant.
-     * @param WP_User $user    Utilisateur actuel.
-     */
-    $filtered = apply_filters('a11ytb/current_user_context', $context, $user);
-
-    return is_array($filtered) ? $filtered : $context;
-}
-
 function a11ytb_get_preferences_meta_key(): string
 {
     return 'a11ytb_preferences';
 }
 
-function a11ytb_get_preferences_updated_meta_key(): string
-{
-    return 'a11ytb_preferences_updated_at';
-}
-
+/**
+ * Retourne la clé méta mémorisant la dernière activité synchronisée.
+ */
 function a11ytb_get_activity_last_synced_meta_key(): string
 {
     return 'a11ytb_activity_last_synced';
 }
 
 /**
- * Normalise récursivement une branche de préférences.
+ * Retourne la liste des racines autorisées dans la persistance des préférences.
  *
- * @param mixed $value
- * @return mixed
+ * @return string[]
  */
-function a11ytb_normalize_preferences_branch($value)
+function a11ytb_allowed_preference_roots(): array
 {
-    if (is_scalar($value) || $value === null) {
-        return $value;
-    }
-
-    $encoder = function_exists('wp_json_encode') ? 'wp_json_encode' : 'json_encode';
-    $encoded = $encoder($value);
-
-    if (!is_string($encoded) || $encoded === '') {
-        return null;
-    }
-
-    $decoded = json_decode($encoded, true);
-
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        return null;
-    }
-
-    return $decoded;
-}
-
-/**
- * Sanitize et limite l’instantané de préférences côté serveur.
- *
- * @param mixed $snapshot
- */
-function a11ytb_sanitize_preferences_snapshot($snapshot): array
-{
-    if (is_string($snapshot)) {
-        $decoded = json_decode($snapshot, true);
-        if (json_last_error() === JSON_ERROR_NONE) {
-            $snapshot = $decoded;
-        }
-    }
-
-    if (!is_array($snapshot)) {
-        $snapshot = [];
-    }
-
-    $allowed = ['ui', 'profiles', 'audio', 'tts', 'audit', 'collaboration'];
-    $clean = [];
-
-    foreach ($allowed as $key) {
-        if (!array_key_exists($key, $snapshot)) {
-            continue;
-        }
-
-        $normalized = a11ytb_normalize_preferences_branch($snapshot[$key]);
-        if ($normalized !== null) {
-            $clean[$key] = $normalized;
-        }
-    }
-
-    /**
-     * Permet d’ajuster l’instantané de préférences stocké côté serveur.
-     *
-     * @param array $clean Instantané filtré.
-     * @param array $snapshot Instantané original.
-     */
-    $filtered = apply_filters('a11ytb/preferences_sanitized_snapshot', $clean, $snapshot);
-
-    return is_array($filtered) ? $filtered : $clean;
-}
-
-/**
- * Retourne les préférences utilisateur enregistrées.
- */
-function a11ytb_get_user_preferences_snapshot(int $user_id): array
-{
-    if ($user_id <= 0) {
-        return [];
-    }
-
-    $raw = get_user_meta($user_id, a11ytb_get_preferences_meta_key(), true);
-
-    $snapshot = a11ytb_sanitize_preferences_snapshot($raw);
-
-    /**
-     * Permet de filtrer les préférences récupérées avant exposition.
-     *
-     * @param array $snapshot Préférences utilisateur.
-     * @param int   $user_id  Identifiant utilisateur.
-     */
-    $filtered = apply_filters('a11ytb/user_preferences_snapshot', $snapshot, $user_id);
-
-    return is_array($filtered) ? $filtered : $snapshot;
-}
-
-/**
- * Met à jour les préférences persistées pour l’utilisateur.
- */
-function a11ytb_update_user_preferences_snapshot(int $user_id, array $snapshot): array
-{
-    $sanitized = a11ytb_sanitize_preferences_snapshot($snapshot);
-    update_user_meta($user_id, a11ytb_get_preferences_meta_key(), $sanitized);
-
-    $timestamp = time();
-    update_user_meta($user_id, a11ytb_get_preferences_updated_meta_key(), $timestamp);
-
-    /**
-     * Signale qu’un instantané de préférences vient d’être enregistré.
-     *
-     * @param int   $user_id   Identifiant utilisateur.
-     * @param array $sanitized Préférences normalisées.
-     * @param int   $timestamp Timestamp UNIX associé.
-     */
-    do_action('a11ytb/preferences_snapshot_saved', $user_id, $sanitized, $timestamp);
-
     return [
-        'snapshot' => $sanitized,
-        'updatedAt' => $timestamp,
+        'ui',
+        'audio',
+        'contrast',
+        'spacing',
+        'tts',
+        'stt',
+        'braille',
+        'profiles',
+        'collaboration',
     ];
 }
 
 /**
- * Construit la configuration de synchronisation des préférences.
+ * Nettoie le tableau de préférences côté serveur.
+ *
+ * @param array|mixed $payload
+ * @return array<string, mixed>
  */
-function a11ytb_get_preferences_sync_config(): array
+function a11ytb_sanitize_preferences_payload($payload): array
 {
-    if (!function_exists('is_user_logged_in') || !is_user_logged_in()) {
-        return ['enabled' => false];
+    $allowed = a11ytb_allowed_preference_roots();
+    $result = [];
+
+    if (!is_array($payload)) {
+        return $result;
+    }
+
+    foreach ($allowed as $key) {
+        if (array_key_exists($key, $payload)) {
+            $result[$key] = $payload[$key];
+        }
+    }
+
+    return $result;
+}
+
+/**
+ * Normalise les métadonnées associées aux préférences synchronisées.
+ *
+ * @param array|mixed $meta
+ * @return array{updatedAt:int}
+ */
+function a11ytb_normalize_preferences_meta($meta): array
+{
+    $normalized = [];
+
+    if (is_array($meta) && array_key_exists('updatedAt', $meta)) {
+        $normalized['updatedAt'] = max(0, (int) $meta['updatedAt']);
+    }
+
+    if (!array_key_exists('updatedAt', $normalized)) {
+        $normalized['updatedAt'] = (int) floor(microtime(true) * 1000);
+    }
+
+    return $normalized;
+}
+
+/**
+ * Récupère les préférences synchronisées d’un utilisateur donné.
+ *
+ * @return array{data:array<string,mixed>,meta:array{updatedAt:int}}
+ */
+function a11ytb_get_user_preferences(int $user_id): array
+{
+    $raw = get_user_meta($user_id, a11ytb_get_preferences_meta_key(), true);
+    $decoded = null;
+
+    if (is_string($raw)) {
+        $decoded = json_decode($raw, true);
+    } elseif (is_array($raw)) {
+        $decoded = $raw;
+    }
+
+    if (!is_array($decoded)) {
+        $decoded = [];
+    }
+
+    $data = a11ytb_sanitize_preferences_payload($decoded['data'] ?? $decoded);
+    $meta = a11ytb_normalize_preferences_meta($decoded['meta'] ?? []);
+
+    return [
+        'data' => $data,
+        'meta' => $meta,
+    ];
+}
+
+/**
+ * Enregistre les préférences synchronisées pour un utilisateur.
+ */
+function a11ytb_store_user_preferences(int $user_id, array $data, array $meta = []): void
+{
+    $record = [
+        'data' => a11ytb_sanitize_preferences_payload($data),
+        'meta' => a11ytb_normalize_preferences_meta($meta),
+    ];
+
+    update_user_meta($user_id, a11ytb_get_preferences_meta_key(), $record);
+}
+
+/**
+ * Vérifie qu’un utilisateur authentifié peut synchroniser ses préférences.
+ */
+function a11ytb_preferences_permission_callback(): bool
+{
+    return function_exists('is_user_logged_in') ? is_user_logged_in() : false;
+}
+
+/**
+ * Construit l’URL publique d’accès aux préférences synchronisées.
+ */
+function a11ytb_get_preferences_endpoint(): string
+{
+    if (function_exists('rest_url')) {
+        return rest_url('a11ytb/v1/preferences');
+    }
+
+    if (function_exists('home_url')) {
+        return home_url('/wp-json/a11ytb/v1/preferences');
+    }
+
+    return '/wp-json/a11ytb/v1/preferences';
+}
+
+/**
+ * Retourne les préférences de l’utilisateur courant.
+ *
+ * @param WP_REST_Request|array<string,mixed>|null $request
+ * @return array|WP_Error
+ */
+function a11ytb_rest_get_preferences($request)
+{
+    if (!a11ytb_preferences_permission_callback()) {
+        $status = function_exists('rest_authorization_required_code')
+            ? rest_authorization_required_code()
+            : 401;
+
+        return new WP_Error(
+            'rest_forbidden',
+            __('Authentification requise pour accéder aux préférences.', 'a11ytb'),
+            ['status' => $status]
+        );
     }
 
     $user_id = function_exists('get_current_user_id') ? (int) get_current_user_id() : 0;
-
     if ($user_id <= 0) {
+        return new WP_Error('rest_forbidden', __('Utilisateur inconnu.', 'a11ytb'), ['status' => 401]);
+    }
+
+    $payload = a11ytb_get_user_preferences($user_id);
+
+    return rest_ensure_response([
+        'data' => $payload['data'],
+        'meta' => $payload['meta'],
+    ]);
+}
+
+/**
+ * Met à jour les préférences de l’utilisateur courant.
+ *
+ * @param WP_REST_Request|array<string,mixed>|null $request
+ * @return array|WP_Error
+ */
+function a11ytb_rest_update_preferences($request)
+{
+    if (!a11ytb_preferences_permission_callback()) {
+        $status = function_exists('rest_authorization_required_code')
+            ? rest_authorization_required_code()
+            : 401;
+
+        return new WP_Error(
+            'rest_forbidden',
+            __('Authentification requise pour synchroniser les préférences.', 'a11ytb'),
+            ['status' => $status]
+        );
+    }
+
+    $user_id = function_exists('get_current_user_id') ? (int) get_current_user_id() : 0;
+    if ($user_id <= 0) {
+        return new WP_Error('rest_forbidden', __('Utilisateur inconnu.', 'a11ytb'), ['status' => 401]);
+    }
+
+    $params = [];
+    if (is_object($request) && method_exists($request, 'get_json_params')) {
+        $params = $request->get_json_params();
+    } elseif (is_object($request) && method_exists($request, 'get_body')) {
+        $params = json_decode((string) $request->get_body(), true) ?: [];
+    } elseif (is_array($request)) {
+        $params = $request;
+    }
+
+    if (!is_array($params)) {
+        $params = [];
+    }
+
+    $data = a11ytb_sanitize_preferences_payload($params['data'] ?? []);
+    $meta = a11ytb_normalize_preferences_meta($params['meta'] ?? []);
+
+    a11ytb_store_user_preferences($user_id, $data, $meta);
+
+    return rest_ensure_response([
+        'success' => true,
+        'data' => $data,
+        'meta' => $meta,
+    ]);
+}
+
+/**
+ * Déclare la route REST permettant de lire/écrire les préférences utilisateurs.
+ */
+function a11ytb_register_preferences_route(): void
+{
+    $readable = defined('WP_REST_Server::READABLE') ? WP_REST_Server::READABLE : 'GET';
+    $creatable = defined('WP_REST_Server::CREATABLE') ? WP_REST_Server::CREATABLE : 'POST';
+
+    register_rest_route(
+        'a11ytb/v1',
+        '/preferences',
+        [
+            [
+                'methods' => $readable,
+                'callback' => 'a11ytb_rest_get_preferences',
+                'permission_callback' => 'a11ytb_preferences_permission_callback',
+            ],
+            [
+                'methods' => $creatable,
+                'callback' => 'a11ytb_rest_update_preferences',
+                'permission_callback' => 'a11ytb_preferences_permission_callback',
+            ],
+        ]
+    );
+}
+add_action('rest_api_init', 'a11ytb_register_preferences_route');
+
+/**
+ * Construit la configuration exposée au frontal pour la synchronisation des préférences.
+ */
+function a11ytb_get_preferences_integration_config(): array
+{
+    $enabled = a11ytb_preferences_permission_callback();
+
+    if (!$enabled) {
         return ['enabled' => false];
     }
 
-    $endpoint = function_exists('rest_url') ? rest_url('a11ytb/v1/preferences') : '/wp-json/a11ytb/v1/preferences';
-    $snapshot = a11ytb_get_user_preferences_snapshot($user_id);
-    $updated_at = (int) get_user_meta($user_id, a11ytb_get_preferences_updated_meta_key(), true);
-
-    $config = [
+    return [
         'enabled' => true,
-        'endpoint' => $endpoint,
+        'endpoint' => a11ytb_get_preferences_endpoint(),
         'nonce' => function_exists('wp_create_nonce') ? wp_create_nonce('wp_rest') : '',
-        'userId' => $user_id,
-        'snapshot' => $snapshot,
-        'lastSyncedAt' => $updated_at,
+        'throttleMs' => 4000,
+    ];
+}
+
+/**
+ * Retourne les définitions des déclencheurs inline à partir du manifeste JSON.
+ *
+ * @return array<string, array<string, mixed>>
+ */
+function a11ytb_get_inline_block_definitions(): array
+{
+    static $cache = null;
+    if (is_array($cache)) {
+        return $cache;
+    }
+
+    $cache = [];
+    $path = plugin_dir_path(__FILE__) . 'blocks/blocks.json';
+    if (!file_exists($path)) {
+        return $cache;
+    }
+
+    $raw = file_get_contents($path);
+    if (!is_string($raw)) {
+        return $cache;
+    }
+
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded) || empty($decoded['blocks']) || !is_array($decoded['blocks'])) {
+        return $cache;
+    }
+
+    $iconMap = [
+        'audit' => '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M3 5a2 2 0 012-2h10a2 2 0 012 2v3h3v13h-8v-3h-2v3H3zm2 2v11h4v-3h6v3h4V10h-3V7H5zm9 1V5H5v3z"/></svg>',
+        'tts' => '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 9v6h3l4 4V5L7 9H4zm13 3a3 3 0 00-3-3v6a3 3 0 003-3zm-3-6.9v2.07a5 5 0 010 9.66V18a7 7 0 000-13.9z"/></svg>',
+        'stt' => '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3zm5-3a1 1 0 012 0 7 7 0 01-6 6.92V21h3v1H8v-1h3v-3.08A7 7 0 015 11a1 1 0 012 0 5 5 0 0010 0z"/></svg>',
+        'braille' => '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M6 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 11 0-4 2 2 0 010 4zm12-14a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4zm0 7a2 2 0 110-4 2 2 0 010 4z"/></svg>',
+        'contrast' => '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 2a10 10 0 100 20V2z"/></svg>',
+        'spacing' => '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M7 4h10v2H7V4zm-2 5h14v2H5V9zm3 5h8v2H8v-2zm-3 5h14v2H5v-2z"/></svg>',
     ];
 
-    /**
-     * Filtre la configuration de synchronisation des préférences exposée.
-     *
-     * @param array $config  Configuration courante.
-     * @param int   $user_id Identifiant utilisateur.
-     */
-    $filtered = apply_filters('a11ytb/preferences_sync_config', $config, $user_id);
+    foreach ($decoded['blocks'] as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
 
-    return is_array($filtered) ? $filtered : $config;
+        $id = isset($entry['id']) ? sanitize_key($entry['id']) : '';
+        $module = isset($entry['module']) ? sanitize_key($entry['module']) : '';
+
+        if ($id === '' || $module === '') {
+            continue;
+        }
+
+        $cache[$id] = [
+            'id' => $id,
+            'module' => $module,
+            'title' => isset($entry['title']) ? (string) $entry['title'] : ucfirst($module),
+            'description' => isset($entry['description']) ? (string) $entry['description'] : '',
+            'cta' => isset($entry['cta']) ? (string) $entry['cta'] : __('Ouvrir', 'a11ytb'),
+            'action' => isset($entry['action']) ? (string) $entry['action'] : 'open-panel',
+            'path' => isset($entry['path']) ? (string) $entry['path'] : null,
+            'view' => isset($entry['view']) ? (string) $entry['view'] : null,
+            'icon' => $iconMap[$module] ?? '',
+        ];
+    }
+
+    return $cache;
 }
+
+/**
+ * Génère le HTML d’un déclencheur inline.
+ *
+ * @param array<string,mixed> $definition
+ * @param array<string,mixed> $attributes
+ */
+function a11ytb_render_inline_trigger(array $definition, array $attributes = []): string
+{
+    $title = isset($attributes['title']) ? (string) $attributes['title'] : $definition['title'];
+    $description = isset($attributes['description']) ? (string) $attributes['description'] : $definition['description'];
+    $cta = isset($attributes['cta']) ? (string) $attributes['cta'] : $definition['cta'];
+    $align = isset($attributes['align']) ? (string) $attributes['align'] : '';
+
+    $classes = ['a11ytb-inline-trigger'];
+    if ($align === 'wide' || $align === 'full') {
+        $classes[] = 'is-wide';
+    }
+    if (!empty($attributes['className'])) {
+        $classes[] = (string) $attributes['className'];
+    }
+
+    $data_attrs = sprintf(
+        ' data-a11ytb-module-trigger="%1$s" data-a11ytb-module="%2$s" data-a11ytb-action="%3$s"',
+        esc_attr($definition['id']),
+        esc_attr($definition['module']),
+        esc_attr($definition['action'])
+    );
+
+    if (!empty($definition['path'])) {
+        $data_attrs .= ' data-a11ytb-path="' . esc_attr($definition['path']) . '"';
+    }
+
+    if (!empty($definition['view'])) {
+        $data_attrs .= ' data-a11ytb-view="' . esc_attr($definition['view']) . '"';
+    }
+
+    $icon = $definition['icon'] ?? '';
+
+    $button_attrs = '';
+    if ($definition['action'] === 'toggle') {
+        $button_attrs .= ' aria-pressed="false"';
+    }
+
+    ob_start();
+    ?>
+    <div class="<?php echo esc_attr(implode(' ', array_filter($classes))); ?>"<?php echo $data_attrs; ?> role="group">
+        <div class="a11ytb-inline-trigger__header">
+            <?php if ($icon !== '') : ?>
+                <span class="a11ytb-inline-trigger__icon" aria-hidden="true"><?php echo $icon; ?></span>
+            <?php endif; ?>
+            <h3 class="a11ytb-inline-trigger__title"><?php echo esc_html($title); ?></h3>
+        </div>
+        <?php if ($description !== '') : ?>
+            <p class="a11ytb-inline-trigger__description"><?php echo esc_html($description); ?></p>
+        <?php endif; ?>
+        <button type="button" class="a11ytb-inline-trigger__button"<?php echo $button_attrs; ?>><?php echo esc_html($cta); ?></button>
+    </div>
+    <?php
+    return trim((string) ob_get_clean());
+}
+
+/**
+ * Enregistre les blocs dynamiques exposant les déclencheurs inline.
+ */
+function a11ytb_register_inline_blocks(): void
+{
+    if (!function_exists('register_block_type')) {
+        return;
+    }
+
+    foreach (a11ytb_get_inline_block_definitions() as $definition) {
+        $block_id = 'a11y-toolbox/' . $definition['id'];
+        register_block_type($block_id, [
+            'api_version' => 3,
+            'title' => __($definition['title'], 'a11ytb'),
+            'description' => __($definition['description'], 'a11ytb'),
+            'category' => 'widgets',
+            'style' => 'a11ytb/blocks',
+            'render_callback' => static function ($attributes = []) use ($definition) {
+                if (!is_array($attributes)) {
+                    $attributes = [];
+                }
+                return a11ytb_render_inline_trigger($definition, $attributes);
+            },
+            'attributes' => [
+                'title' => [
+                    'type' => 'string',
+                    'default' => $definition['title'],
+                ],
+                'description' => [
+                    'type' => 'string',
+                    'default' => $definition['description'],
+                ],
+                'cta' => [
+                    'type' => 'string',
+                    'default' => $definition['cta'],
+                ],
+                'align' => [
+                    'type' => 'string',
+                ],
+                'className' => [
+                    'type' => 'string',
+                ],
+            ],
+            'supports' => [
+                'align' => ['wide', 'full'],
+                'spacing' => [
+                    'margin' => true,
+                    'padding' => true,
+                ],
+                'html' => false,
+            ],
+        ]);
+    }
+}
+add_action('init', 'a11ytb_register_inline_blocks');
+
+/**
+ * Rendu du shortcode [a11ytb_module].
+ *
+ * @param array<string,mixed> $atts
+ */
+function a11ytb_render_module_shortcode($atts): string
+{
+    if (!is_array($atts)) {
+        $atts = [];
+    }
+
+    $atts = shortcode_atts([
+        'module' => '',
+        'title' => '',
+        'description' => '',
+        'cta' => '',
+        'align' => '',
+        'class' => '',
+    ], $atts, 'a11ytb_module');
+
+    $module = sanitize_key($atts['module']);
+    if ($module === '') {
+        return '';
+    }
+
+    $definitions = a11ytb_get_inline_block_definitions();
+    $definition = null;
+    foreach ($definitions as $entry) {
+        if ($entry['module'] === $module || $entry['id'] === $module) {
+            $definition = $entry;
+            break;
+        }
+    }
+
+    if (!$definition) {
+        return '';
+    }
+
+    if (function_exists('wp_enqueue_style')) {
+        wp_enqueue_style('a11ytb/blocks');
+    }
+
+    $attributes = [
+        'title' => $atts['title'] !== '' ? $atts['title'] : $definition['title'],
+        'description' => $atts['description'] !== '' ? $atts['description'] : $definition['description'],
+        'cta' => $atts['cta'] !== '' ? $atts['cta'] : $definition['cta'],
+        'align' => $atts['align'],
+        'className' => $atts['class'],
+    ];
+
+    return a11ytb_render_inline_trigger($definition, $attributes);
+}
+
+/**
+ * Enregistre le shortcode permettant d’insérer un déclencheur inline.
+ */
+function a11ytb_register_inline_shortcodes(): void
+{
+    if (!function_exists('add_shortcode')) {
+        return;
+    }
+
+    add_shortcode('a11ytb_module', 'a11ytb_render_module_shortcode');
+}
+add_action('init', 'a11ytb_register_inline_shortcodes');
 
 /**
  * Construit la configuration transmise au frontal.
@@ -1096,6 +1409,7 @@ function a11ytb_get_frontend_config(): array
     ];
 
     $integrations = [
+        'preferences' => a11ytb_get_preferences_integration_config(),
         'activity' => a11ytb_get_activity_integration_config(),
         'preferences' => a11ytb_get_preferences_sync_config(),
     ];
@@ -2248,6 +2562,186 @@ function a11ytb_process_activity_proxy_payload(array $payload)
             ];
         }, $active),
     ];
+}
+
+/**
+ * Regroupe les entrées activité en attente de synchronisation côté serveur.
+ *
+ * @return array{entries:array<int,array<string,mixed>>,last_ids:array<int,string>}
+ */
+function a11ytb_collect_pending_activity_entries(): array
+{
+    $result = [
+        'entries' => [],
+        'last_ids' => [],
+    ];
+
+    if (!function_exists('get_users') || !function_exists('get_user_meta')) {
+        return $result;
+    }
+
+    $users = get_users(['fields' => ['ID']]);
+    foreach ($users as $user) {
+        $user_id = isset($user->ID) ? (int) $user->ID : (int) $user;
+        if ($user_id <= 0) {
+            continue;
+        }
+
+        $preferences = a11ytb_get_user_preferences($user_id);
+        $activity = $preferences['data']['ui']['activity'] ?? [];
+        if (!is_array($activity) || !$activity) {
+            continue;
+        }
+
+        $last_synced = get_user_meta($user_id, a11ytb_get_activity_last_synced_meta_key(), true);
+        $last_synced = is_string($last_synced) ? $last_synced : '';
+
+        $ordered = array_reverse($activity);
+        $collect = $last_synced === '';
+        $found_last = $collect;
+        $collected = [];
+
+        foreach ($ordered as $entry) {
+            $entry_id = isset($entry['id']) ? (string) $entry['id'] : '';
+            if (!$collect) {
+                if ($entry_id === $last_synced) {
+                    $collect = true;
+                    $found_last = true;
+                }
+                continue;
+            }
+
+            $sanitized = a11ytb_sanitize_activity_entry($entry);
+            if ($sanitized) {
+                $collected[] = $sanitized;
+            }
+        }
+
+        if (!$found_last && $last_synced !== '') {
+            $collected = [];
+            foreach ($ordered as $entry) {
+                $sanitized = a11ytb_sanitize_activity_entry($entry);
+                if ($sanitized) {
+                    $collected[] = $sanitized;
+                }
+            }
+        }
+
+        if (!$collected) {
+            continue;
+        }
+
+        $result['entries'] = array_merge($result['entries'], $collected);
+        $last_entry = end($collected);
+        if ($last_entry && isset($last_entry['id'])) {
+            $result['last_ids'][$user_id] = (string) $last_entry['id'];
+        }
+    }
+
+    return $result;
+}
+
+/**
+ * Exécute la synchronisation programmée des entrées activité.
+ *
+ * @return array<string,mixed>|WP_Error
+ */
+function a11ytb_execute_activity_sync()
+{
+    $collected = a11ytb_collect_pending_activity_entries();
+    if (empty($collected['entries'])) {
+        return [
+            'success' => false,
+            'message' => __('Aucune nouvelle activité à synchroniser.', 'a11ytb'),
+        ];
+    }
+
+    $payload = [
+        'job' => [
+            'type' => 'bulk',
+            'entries' => $collected['entries'],
+        ],
+        'context' => [
+            'source' => 'wp-cron',
+        ],
+    ];
+
+    $result = a11ytb_process_activity_proxy_payload($payload);
+    if (is_wp_error($result)) {
+        update_option('a11ytb_activity_sync_errors', [
+            'message' => $result->get_error_message(),
+            'code' => $result->get_error_code(),
+            'time' => time(),
+        ]);
+
+        return $result;
+    }
+
+    foreach ($collected['last_ids'] as $user_id => $entry_id) {
+        update_user_meta($user_id, a11ytb_get_activity_last_synced_meta_key(), $entry_id);
+    }
+
+    update_option('a11ytb_activity_sync_last_run', time());
+    delete_option('a11ytb_activity_sync_errors');
+
+    $result['syncedEntries'] = count($collected['entries']);
+    $result['syncedUsers'] = array_keys($collected['last_ids']);
+
+    return $result;
+}
+
+/**
+ * Callback exécuté par WP-Cron pour synchroniser automatiquement les entrées.
+ */
+function a11ytb_run_scheduled_activity_sync(): void
+{
+    $result = a11ytb_execute_activity_sync();
+    if (is_wp_error($result)) {
+        error_log('a11ytb: échec de la synchronisation programmée – ' . $result->get_error_message());
+    }
+}
+add_action('a11ytb/activity_sync', 'a11ytb_run_scheduled_activity_sync');
+
+/**
+ * Planifie la tâche cron si nécessaire.
+ */
+function a11ytb_schedule_activity_sync(): void
+{
+    if (!function_exists('wp_next_scheduled') || !function_exists('wp_schedule_event')) {
+        return;
+    }
+
+    if (!wp_next_scheduled('a11ytb/activity_sync')) {
+        wp_schedule_event(time() + 300, 'hourly', 'a11ytb/activity_sync');
+    }
+}
+add_action('init', 'a11ytb_schedule_activity_sync');
+
+/**
+ * Supprime la tâche cron planifiée.
+ */
+function a11ytb_clear_activity_sync_schedule(): void
+{
+    if (!function_exists('wp_next_scheduled') || !function_exists('wp_unschedule_event')) {
+        return;
+    }
+
+    $timestamp = wp_next_scheduled('a11ytb/activity_sync');
+    if ($timestamp) {
+        wp_unschedule_event($timestamp, 'a11ytb/activity_sync');
+    }
+}
+
+if (defined('WP_CLI') && WP_CLI) {
+    WP_CLI::add_command('a11ytb activity sync', function (): void {
+        $result = a11ytb_execute_activity_sync();
+        if (is_wp_error($result)) {
+            WP_CLI::error($result->get_error_message());
+        }
+
+        $count = isset($result['syncedEntries']) ? (int) $result['syncedEntries'] : 0;
+        WP_CLI::success(sprintf('%d entrée(s) synchronisée(s).', $count));
+    });
 }
 
 /**

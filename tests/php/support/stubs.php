@@ -7,6 +7,11 @@ $GLOBALS['__a11ytb_options'] = [];
 $GLOBALS['__a11ytb_http_requests'] = [];
 $GLOBALS['__a11ytb_http_responses'] = null;
 $GLOBALS['__a11ytb_locale'] = 'fr_FR';
+$GLOBALS['__a11ytb_users'] = [];
+$GLOBALS['__a11ytb_user_meta'] = [];
+$GLOBALS['__a11ytb_current_user'] = 0;
+$GLOBALS['__a11ytb_cron_events'] = [];
+$GLOBALS['__a11ytb_shortcodes'] = [];
 $GLOBALS['wp_version'] = '6.2';
 
 if (!function_exists('get_locale')) {
@@ -90,6 +95,25 @@ if (!function_exists('add_filter')) {
     }
 }
 
+if (!function_exists('add_shortcode')) {
+    function add_shortcode($tag, $callback)
+    {
+        $GLOBALS['__a11ytb_shortcodes'][$tag] = $callback;
+    }
+}
+
+if (!function_exists('shortcode_atts')) {
+    function shortcode_atts($pairs, $atts, $shortcode = '')
+    {
+        $atts = (array) $atts;
+        $out = [];
+        foreach ($pairs as $name => $default) {
+            $out[$name] = array_key_exists($name, $atts) ? $atts[$name] : $default;
+        }
+        return $out;
+    }
+}
+
 if (!function_exists('do_action')) {
     function do_action($hook, ...$args)
     {
@@ -106,6 +130,13 @@ if (!function_exists('apply_filters')) {
 
 if (!function_exists('register_activation_hook')) {
     function register_activation_hook($file, $callback)
+    {
+        // no-op
+    }
+}
+
+if (!function_exists('register_deactivation_hook')) {
+    function register_deactivation_hook($file, $callback)
     {
         // no-op
     }
@@ -131,6 +162,96 @@ if (!function_exists('plugins_url')) {
         $base = 'https://example.test/wp-content/plugins/a11y-toolbox-pro';
         $clean = ltrim($path, '/');
         return $clean ? $base . '/' . $clean : $base;
+    }
+}
+
+if (!function_exists('wp_schedule_event')) {
+    function wp_schedule_event($timestamp, $recurrence, $hook)
+    {
+        $GLOBALS['__a11ytb_cron_events'][$hook] = (int) $timestamp;
+        return true;
+    }
+}
+
+if (!function_exists('wp_next_scheduled')) {
+    function wp_next_scheduled($hook)
+    {
+        return $GLOBALS['__a11ytb_cron_events'][$hook] ?? false;
+    }
+}
+
+if (!function_exists('wp_unschedule_event')) {
+    function wp_unschedule_event($timestamp, $hook)
+    {
+        unset($GLOBALS['__a11ytb_cron_events'][$hook]);
+        return true;
+    }
+}
+
+if (!function_exists('get_users')) {
+    function get_users($args = [])
+    {
+        $ids = array_keys($GLOBALS['__a11ytb_users']);
+        return array_map(static function ($id) {
+            return (object) ['ID' => $id];
+        }, $ids);
+    }
+}
+
+if (!function_exists('get_user_meta')) {
+    function get_user_meta($user_id, $key, $single = false)
+    {
+        $user_id = (int) $user_id;
+        if (!isset($GLOBALS['__a11ytb_user_meta'][$user_id][$key])) {
+            return $single ? '' : [];
+        }
+        $value = $GLOBALS['__a11ytb_user_meta'][$user_id][$key];
+        if ($single) {
+            return is_array($value) && isset($value[0]) ? $value[0] : $value;
+        }
+        return is_array($value) ? $value : [$value];
+    }
+}
+
+if (!function_exists('update_user_meta')) {
+    function update_user_meta($user_id, $key, $value)
+    {
+        $user_id = (int) $user_id;
+        if (!isset($GLOBALS['__a11ytb_user_meta'][$user_id])) {
+            $GLOBALS['__a11ytb_user_meta'][$user_id] = [];
+        }
+        $GLOBALS['__a11ytb_user_meta'][$user_id][$key] = $value;
+        return true;
+    }
+}
+
+if (!function_exists('delete_user_meta')) {
+    function delete_user_meta($user_id, $key)
+    {
+        $user_id = (int) $user_id;
+        unset($GLOBALS['__a11ytb_user_meta'][$user_id][$key]);
+        return true;
+    }
+}
+
+if (!function_exists('get_current_user_id')) {
+    function get_current_user_id()
+    {
+        return (int) ($GLOBALS['__a11ytb_current_user'] ?? 0);
+    }
+}
+
+if (!function_exists('wp_set_current_user')) {
+    function wp_set_current_user($user_id)
+    {
+        $GLOBALS['__a11ytb_current_user'] = (int) $user_id;
+    }
+}
+
+if (!function_exists('is_user_logged_in')) {
+    function is_user_logged_in()
+    {
+        return get_current_user_id() > 0;
     }
 }
 
@@ -460,6 +581,25 @@ function a11ytb_test_set_locale(string $locale): void
     $GLOBALS['__a11ytb_locale'] = $locale;
 }
 
+function a11ytb_test_create_user(?int $user_id = null): int
+{
+    if ($user_id === null) {
+        $user_id = count($GLOBALS['__a11ytb_users']) + 1;
+    }
+    $user_id = max(1, (int) $user_id);
+    $GLOBALS['__a11ytb_users'][$user_id] = ['ID' => $user_id];
+    if (!isset($GLOBALS['__a11ytb_user_meta'][$user_id])) {
+        $GLOBALS['__a11ytb_user_meta'][$user_id] = [];
+    }
+
+    return $user_id;
+}
+
+function a11ytb_test_set_current_user(?int $user_id): void
+{
+    $GLOBALS['__a11ytb_current_user'] = $user_id ? (int) $user_id : 0;
+}
+
 function a11ytb_test_reset_state(): void
 {
     $GLOBALS['__a11ytb_options'] = [];
@@ -467,4 +607,9 @@ function a11ytb_test_reset_state(): void
     $GLOBALS['__a11ytb_http_responses'] = null;
     $GLOBALS['__a11ytb_registered_routes'] = [];
     $GLOBALS['__a11ytb_locale'] = 'fr_FR';
+    $GLOBALS['__a11ytb_users'] = [];
+    $GLOBALS['__a11ytb_user_meta'] = [];
+    $GLOBALS['__a11ytb_cron_events'] = [];
+    $GLOBALS['__a11ytb_shortcodes'] = [];
+    $GLOBALS['__a11ytb_current_user'] = 0;
 }
