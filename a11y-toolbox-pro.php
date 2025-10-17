@@ -1411,7 +1411,6 @@ function a11ytb_get_frontend_config(): array
     $integrations = [
         'preferences' => a11ytb_get_preferences_integration_config(),
         'activity' => a11ytb_get_activity_integration_config(),
-        'preferences' => a11ytb_get_preferences_sync_config(),
     ];
 
     return [
