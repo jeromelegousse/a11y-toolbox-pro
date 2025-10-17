@@ -10,6 +10,10 @@ let voicesInterval = null;
 let voicesIntervalTimeout = null;
 let preferredLangUnsubscribe = null;
 let lastPreferredLang = '';
+let activeUtterance = null;
+let readerText = '';
+let readerWords = [];
+let readerTotalChars = 0;
 
 function clearVoicesWatchers() {
   if (
@@ -55,6 +59,19 @@ function getSelectionText() {
   return sel && sel.toString().trim().length ? sel.toString() : '';
 }
 
+function cancelCurrentUtterance() {
+  if (!('speechSynthesis' in window)) {
+    activeUtterance = null;
+    return;
+  }
+  if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+    activeUtterance = null;
+    window.speechSynthesis.cancel();
+  } else {
+    activeUtterance = null;
+  }
+}
+
 function resolveVoice(state) {
   if (!state) return null;
   const voiceId = typeof state.get === 'function' ? state.get('tts.voice') : state.tts?.voice;
@@ -63,7 +80,65 @@ function resolveVoice(state) {
   return voices.find((voice) => voice.voiceURI === voiceId) || null;
 }
 
-function speak(text, { rate = 1, pitch = 1, volume = 1 } = {}, state) {
+function computeWordBoundaries(text) {
+  if (!text) return [];
+  const words = [];
+  const regex = /\S+/g;
+  let match = regex.exec(text);
+  while (match) {
+    words.push({ start: match.index, end: match.index + match[0].length });
+    match = regex.exec(text);
+  }
+  return words;
+}
+
+function findWordIndex(words, charIndex) {
+  if (!words.length || typeof charIndex !== 'number' || Number.isNaN(charIndex)) {
+    return -1;
+  }
+  for (let i = 0; i < words.length; i += 1) {
+    const word = words[i];
+    if (charIndex < word.start) {
+      return i === 0 ? 0 : i - 1;
+    }
+    if (charIndex < word.end) {
+      return i;
+    }
+  }
+  return words.length - 1;
+}
+
+function updateReaderState(charIndex, total = readerTotalChars) {
+  if (!store) return;
+  const limitedTotal = Math.max(0, total || 0);
+  const clampedIndex = Math.min(Math.max(0, Math.floor(charIndex ?? 0)), limitedTotal);
+  store.set('tts.reader.charIndex', clampedIndex);
+  if (limitedTotal > 0) {
+    store.set('tts.progress', Math.min(1, clampedIndex / limitedTotal));
+  } else {
+    store.set('tts.progress', 0);
+  }
+  if (limitedTotal > 0 && clampedIndex >= limitedTotal) {
+    store.set('tts.reader.activeWord', -1);
+    return;
+  }
+  const wordIndex = findWordIndex(readerWords, clampedIndex);
+  store.set('tts.reader.activeWord', wordIndex);
+}
+
+function prepareReaderText(text) {
+  readerText = text || '';
+  readerTotalChars = readerText.length;
+  readerWords = computeWordBoundaries(readerText);
+  if (!store) return;
+  store.set('tts.reader.text', readerText);
+  store.set('tts.reader.totalChars', readerTotalChars);
+  store.set('tts.reader.words', readerWords);
+  store.set('tts.reader.charIndex', 0);
+  store.set('tts.reader.activeWord', -1);
+}
+
+function speak(text, { rate = 1, pitch = 1, volume = 1 } = {}, state, context = {}) {
   if (!('speechSynthesis' in window)) {
     console.warn('a11ytb: synthèse vocale indisponible sur ce navigateur.');
     if (state) {
@@ -73,28 +148,33 @@ function speak(text, { rate = 1, pitch = 1, volume = 1 } = {}, state) {
     window.a11ytb?.logActivity?.('Synthèse vocale indisponible', { tone: 'alert' });
     return false;
   }
-  window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
   utter.rate = rate;
   utter.pitch = pitch;
   utter.volume = volume;
   const voice = resolveVoice(state);
   if (voice) utter.voice = voice;
+  const { offset = 0, total = Math.max(text.length, 1) } = context;
+  const totalChars = Math.max(total, 1);
+  const baseOffset = Math.max(0, offset);
   abortedByStop = false;
   if (state) {
     state.set('tts.speaking', true);
     state.set('tts.status', 'speaking');
-    state.set('tts.progress', 0);
-    const total = Math.max(1, text.length);
+    updateReaderState(baseOffset, totalChars);
     utter.onboundary = (event) => {
-      const idx = (event.charIndex || 0) + (event.charLength || 0);
-      const progress = Math.min(1, idx / total);
-      state.set('tts.progress', progress);
+      if (activeUtterance !== utter) return;
+      const idx = baseOffset + (event.charIndex || 0);
+      updateReaderState(idx, totalChars);
     };
     utter.onend = () => {
+      if (activeUtterance !== utter) return;
+      activeUtterance = null;
       state.set('tts.progress', 1);
       state.set('tts.speaking', false);
       state.set('tts.status', 'idle');
+      store?.set('tts.reader.activeWord', -1);
+      store?.set('tts.reader.charIndex', totalChars);
       if (abortedByStop) {
         abortedByStop = false;
       } else {
@@ -102,15 +182,48 @@ function speak(text, { rate = 1, pitch = 1, volume = 1 } = {}, state) {
       }
     };
     utter.onerror = () => {
+      if (activeUtterance !== utter) return;
+      activeUtterance = null;
       state.set('tts.speaking', false);
       state.set('tts.status', 'error');
       state.set('tts.progress', 0);
+      store?.set('tts.reader.activeWord', -1);
       abortedByStop = false;
       window.a11ytb?.logActivity?.('Erreur de synthèse vocale', { tone: 'alert' });
     };
   }
+  activeUtterance = utter;
   window.speechSynthesis.speak(utter);
   window.a11ytb?.feedback?.play('confirm');
+  return true;
+}
+
+function startReaderFrom(offset = 0) {
+  if (!store) return false;
+  if (!readerText) {
+    readerText = store.get('tts.reader.text') || '';
+    readerTotalChars = readerText.length;
+    readerWords = Array.isArray(store.get('tts.reader.words')) ? store.get('tts.reader.words') : [];
+  }
+  if (!readerText) return false;
+  const total = readerTotalChars || readerText.length;
+  const safeTotal = Math.max(0, total);
+  const maxIndex = safeTotal;
+  const clampedOffset = Math.min(Math.max(0, Math.floor(offset)), maxIndex);
+  cancelCurrentUtterance();
+  const chunk = readerText.slice(clampedOffset);
+  if (!chunk.trim().length) {
+    updateReaderState(safeTotal, safeTotal);
+    store?.set('tts.speaking', false);
+    store?.set('tts.status', 'idle');
+    return false;
+  }
+  const ok = speak(chunk, store.get('tts'), store, { offset: clampedOffset, total: safeTotal });
+  if (!ok) {
+    updateReaderState(clampedOffset, safeTotal);
+    return false;
+  }
+  updateReaderState(clampedOffset, safeTotal);
   return true;
 }
 
@@ -209,27 +322,68 @@ const tts = {
     attachPreferredLangWatcher();
     const api = {
       speakSelection() {
-        const t = getSelectionText() || document.activeElement?.value || '';
-        const text = t || document.body.innerText.slice(0, 2000);
-        const ok = speak(text, store?.get('tts'), store);
+        const candidate = getSelectionText() || document.activeElement?.value || '';
+        const fallback = document.body?.innerText?.slice(0, 2000) || '';
+        const text = candidate && candidate.trim().length ? candidate : fallback;
+        if (!text || !text.trim().length) {
+          return;
+        }
+        prepareReaderText(text);
+        const ok = startReaderFrom(0);
         if (ok) {
           window.a11ytb?.logActivity?.('Lecture de la sélection lancée');
         }
       },
       speakPage() {
-        const ok = speak(document.body.innerText.slice(0, 4000), store?.get('tts'), store);
+        const text = document.body?.innerText?.slice(0, 4000) || '';
+        if (!text || !text.trim().length) {
+          return;
+        }
+        prepareReaderText(text);
+        const ok = startReaderFrom(0);
         if (ok) {
           window.a11ytb?.logActivity?.('Lecture de la page lancée');
         }
       },
       stop() {
-        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         abortedByStop = true;
+        cancelCurrentUtterance();
+        abortedByStop = false;
         store?.set('tts.speaking', false);
         store?.set('tts.status', 'idle');
         store?.set('tts.progress', 0);
+        store?.set('tts.reader.charIndex', 0);
+        store?.set('tts.reader.activeWord', -1);
         window.a11ytb?.feedback?.play('toggle');
         window.a11ytb?.logActivity?.('Lecture interrompue');
+      },
+      seekTo(progress) {
+        const numeric = Number(progress);
+        if (!Number.isFinite(numeric)) return;
+        const clamped = Math.min(Math.max(numeric, 0), 1);
+        if (!readerText) {
+          readerText = store.get('tts.reader.text') || '';
+          readerTotalChars = readerText.length;
+          readerWords = Array.isArray(store.get('tts.reader.words'))
+            ? store.get('tts.reader.words')
+            : [];
+        }
+        if (!readerText) return;
+        const total = readerTotalChars || readerText.length;
+        if (total <= 0) return;
+        const target = Math.round(clamped * total);
+        const previous = store.get('tts.reader.charIndex') ?? 0;
+        if (target === previous && store.get('tts.status') !== 'speaking') {
+          return;
+        }
+        const ok = startReaderFrom(target);
+        if (!ok) {
+          updateReaderState(target, total);
+        }
+        window.a11ytb?.logActivity?.(`Lecture repositionnée à ${Math.round(clamped * 100)} %`, {
+          module: 'tts',
+          tags: ['tts', 'scrub'],
+        });
       },
     };
     if (!window.a11ytb) window.a11ytb = {};
@@ -242,12 +396,20 @@ const tts = {
   unmount() {
     clearVoicesWatchers();
     detachPreferredLangWatcher();
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
+    cancelCurrentUtterance();
+    activeUtterance = null;
+    readerText = '';
+    readerWords = [];
+    readerTotalChars = 0;
     store?.set('tts.speaking', false);
     store?.set('tts.status', 'idle');
     store?.set('tts.progress', 0);
+    store?.set('tts.reader.open', false);
+    store?.set('tts.reader.text', '');
+    store?.set('tts.reader.words', []);
+    store?.set('tts.reader.totalChars', 0);
+    store?.set('tts.reader.charIndex', 0);
+    store?.set('tts.reader.activeWord', -1);
   },
 };
 
