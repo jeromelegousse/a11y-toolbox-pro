@@ -2574,7 +2574,20 @@ function a11ytb_collect_activity_sync_batches(array $args = []): array
     }
 
     $user_id = isset($args['user_id']) ? (int) $args['user_id'] : 0;
-    $number = isset($args['number']) ? max(1, (int) $args['number']) : 50;
+    $source = isset($args['source']) ? (string) $args['source'] : '';
+
+    if (array_key_exists('number', $args)) {
+        $number = (int) $args['number'];
+        if ($number === 0) {
+            $number = -1;
+        } elseif ($number > 0) {
+            $number = max(1, $number);
+        } else {
+            $number = -1;
+        }
+    } else {
+        $number = $source === 'cron' ? -1 : 50;
+    }
     $since = array_key_exists('since', $args) ? (int) $args['since'] : null;
 
     $query = [
