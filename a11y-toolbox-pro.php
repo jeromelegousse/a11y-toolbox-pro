@@ -143,6 +143,72 @@ function a11ytb_on_activation(): void
 register_activation_hook(__FILE__, 'a11ytb_on_activation');
 
 /**
+ * Ajoute dynamiquement la propriété manquante sur le plugin Mon Ajax Search.
+ *
+ * @param string|null $file Chemin optionnel (principalement pour les tests).
+ * @return bool True si le fichier a été modifié.
+ */
+function a11ytb_patch_mon_ajax_search_index_manager_file(?string $file = null): bool
+{
+    if ($file === null) {
+        if (!defined('WP_PLUGIN_DIR')) {
+            return false;
+        }
+
+        $file = rtrim((string) WP_PLUGIN_DIR, '/\\') . '/mon-ajax-search/inc/Search/IndexManager.php';
+    }
+
+    if ($file === '' || !is_string($file) || !file_exists($file) || !is_readable($file) || !is_writable($file)) {
+        return false;
+    }
+
+    $contents = file_get_contents($file);
+    if ($contents === false) {
+        return false;
+    }
+
+    if (strpos($contents, '$event_recorder') !== false) {
+        return false;
+    }
+
+    if (strpos($contents, 'namespace Mon_Ajax_Search\\Search') === false) {
+        return false;
+    }
+
+    if (!preg_match('/class\s+IndexManager[^\{]*\{/i', $contents, $matches, PREG_OFFSET_CAPTURE)) {
+        return false;
+    }
+
+    $insertionPoint = $matches[0][1] + strlen($matches[0][0]);
+
+    $property = "\n    /**\n     * Event recorder instance or null when disabled.\n     *\n     * @var mixed|null\n     */\n"
+        . "    public \$event_recorder = null;\n\n";
+
+    $patched = substr($contents, 0, $insertionPoint) . $property . substr($contents, $insertionPoint);
+
+    if ($patched === $contents) {
+        return false;
+    }
+
+    return file_put_contents($file, $patched) !== false;
+}
+
+/**
+ * Applique le correctif de compatibilité Mon Ajax Search si nécessaire.
+ */
+function a11ytb_maybe_patch_mon_ajax_search_index_manager(): void
+{
+    $enabled = apply_filters('a11ytb/compat/mon_ajax_search/enabled', true);
+    if (!$enabled) {
+        return;
+    }
+
+    a11ytb_patch_mon_ajax_search_index_manager_file();
+}
+
+add_action('plugins_loaded', 'a11ytb_maybe_patch_mon_ajax_search_index_manager', 5);
+
+/**
  * Ajoute un lien vers la page de réglages depuis la liste des extensions.
  *
  * @param string[] $links
