@@ -598,6 +598,7 @@ registerBlock({
         <span class="a11ytb-progress-label" data-ref="progress-label"${s.tts.status === 'speaking' ? '' : ' hidden'}>${percent}%</span>
       </div>
       <p class="a11ytb-note" role="status" data-ref="status"${statusMessage ? '' : ' hidden'}>${statusMessage}</p>
+      <button class="a11ytb-button a11ytb-button--ghost" data-action="open-reader">Ouvrir le lecteur de test</button>
       <dl class="a11ytb-summary">
         <div>
           <dt>Voix</dt>
@@ -629,6 +630,9 @@ registerBlock({
     root
       .querySelector('[data-action="stop"]')
       .addEventListener('click', () => window.stopSpeaking());
+    root
+      .querySelector('[data-action="open-reader"]')
+      .addEventListener('click', () => window.openTtsReader?.());
     const statusNode = root.querySelector('[data-ref="status"]');
     const badge = root.querySelector('[data-ref="badge"]');
     const progress = root.querySelector('[data-ref="progress"]');

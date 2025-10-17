@@ -1066,6 +1066,271 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   `;
   statusLauncherLabel = statusLauncher.querySelector('[data-ref="status-launcher-label"]');
 
+  const ttsOverlay = document.createElement('div');
+  ttsOverlay.className = 'a11ytb-tts-overlay';
+  ttsOverlay.dataset.open = 'false';
+  ttsOverlay.setAttribute('aria-hidden', 'true');
+  ttsOverlay.innerHTML = `
+    <div class="a11ytb-tts-overlay__panel" role="dialog" aria-modal="true" aria-labelledby="a11ytb-tts-overlay-title" data-ref="panel">
+      <header class="a11ytb-tts-overlay__header">
+        <h2 class="a11ytb-tts-overlay__title" id="a11ytb-tts-overlay-title">Lecteur vocal</h2>
+        <button type="button" class="a11ytb-tts-overlay__close" data-action="close-tts">
+          <span aria-hidden="true">&times;</span>
+          <span class="a11ytb-sr-only">Fermer le lecteur vocal</span>
+        </button>
+      </header>
+      <div class="a11ytb-tts-overlay__meta">
+        <span>Voix&nbsp;: <strong data-ref="tts-voice">Voix du navigateur</strong></span>
+        <span>Vitesse&nbsp;: <strong data-ref="tts-rate">1,0×</strong></span>
+        <span>Timbre&nbsp;: <strong data-ref="tts-pitch">1,0</strong></span>
+        <span>Volume&nbsp;: <strong data-ref="tts-volume">100&nbsp;%</strong></span>
+      </div>
+      <div class="a11ytb-tts-overlay__text" data-ref="tts-text" data-empty="true" role="region" aria-live="polite" aria-label="Texte en cours de lecture">
+        <p class="a11ytb-tts-overlay__placeholder">Aucun texte en lecture.</p>
+      </div>
+      <div class="a11ytb-tts-overlay__controls">
+        <label class="a11ytb-tts-overlay__slider">
+          <span class="a11ytb-tts-overlay__slider-label">Progression&nbsp;: <strong data-ref="tts-slider-value">0&nbsp;%</strong></span>
+          <input type="range" min="0" max="1000" value="0" step="1" data-ref="tts-slider" aria-label="Position de lecture">
+        </label>
+        <button type="button" class="a11ytb-button a11ytb-button--ghost a11ytb-tts-overlay__action" data-action="tts-stop">Stop</button>
+      </div>
+    </div>
+  `;
+
+  const ttsOverlayPanel = ttsOverlay.querySelector('[data-ref="panel"]');
+  const ttsOverlayClose = ttsOverlay.querySelector('[data-action="close-tts"]');
+  const ttsTextContainer = ttsOverlay.querySelector('[data-ref="tts-text"]');
+  const ttsSlider = ttsOverlay.querySelector('[data-ref="tts-slider"]');
+  const ttsSliderValue = ttsOverlay.querySelector('[data-ref="tts-slider-value"]');
+  const ttsVoiceEl = ttsOverlay.querySelector('[data-ref="tts-voice"]');
+  const ttsRateEl = ttsOverlay.querySelector('[data-ref="tts-rate"]');
+  const ttsPitchEl = ttsOverlay.querySelector('[data-ref="tts-pitch"]');
+  const ttsVolumeEl = ttsOverlay.querySelector('[data-ref="tts-volume"]');
+  const ttsStopButton = ttsOverlay.querySelector('[data-action="tts-stop"]');
+  ttsOverlayPanel.tabIndex = -1;
+
+  const HTML_ESCAPE_RE = /[&<>"']/g;
+  const HTML_ESCAPE_MAP = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+
+  let ttsOverlayRestoreFocus = null;
+  let ttsOverlayOpen = false;
+  let ttsSliderActive = false;
+  let ttsRenderedText = '';
+  let ttsRenderedWordsSignature = '';
+  let ttsWordNodes = [];
+
+  function escapeSegment(segment = '') {
+    return segment
+      .replace(HTML_ESCAPE_RE, (char) => HTML_ESCAPE_MAP[char] || char)
+      .replace(/\r?\n/g, '<br>');
+  }
+
+  function formatPercent(ratio = 0) {
+    const clamped = Math.max(0, Math.min(1, Number.isFinite(ratio) ? ratio : 0));
+    const value = clamped * 100;
+    const hasDecimals = Math.abs(value - Math.round(value)) > 0.01;
+    return `${value.toLocaleString(undefined, {
+      minimumFractionDigits: hasDecimals ? 1 : 0,
+      maximumFractionDigits: hasDecimals ? 1 : 0,
+    })} %`;
+  }
+
+  function signatureForWords(words) {
+    if (!Array.isArray(words) || !words.length) return '';
+    return words
+      .map((word) => `${Math.max(0, word.start ?? 0)}:${Math.max(0, word.end ?? 0)}`)
+      .join('|');
+  }
+
+  function renderTtsText(text, words) {
+    ttsRenderedText = text;
+    ttsRenderedWordsSignature = signatureForWords(words);
+    if (!text) {
+      ttsTextContainer.dataset.empty = 'true';
+      ttsTextContainer.innerHTML = '<p class="a11ytb-tts-overlay__placeholder">Aucun texte en lecture.</p>';
+      ttsWordNodes = [];
+      return;
+    }
+    const tokens = Array.isArray(words) ? words : [];
+    ttsTextContainer.dataset.empty = 'false';
+    if (!tokens.length) {
+      ttsTextContainer.innerHTML = `<p class="a11ytb-tts-overlay__paragraph">${escapeSegment(text)}</p>`;
+      ttsWordNodes = [];
+      ttsTextContainer.scrollTop = 0;
+      return;
+    }
+    const parts = [];
+    let cursor = 0;
+    for (let i = 0; i < tokens.length; i += 1) {
+      const token = tokens[i];
+      const start = Math.max(0, token.start ?? 0);
+      const end = Math.max(start, token.end ?? start);
+      if (start > cursor) {
+        parts.push(escapeSegment(text.slice(cursor, start)));
+      }
+      const content = escapeSegment(text.slice(start, end));
+      parts.push(`<span class="a11ytb-tts-word" data-word-index="${i}">${content}</span>`);
+      cursor = end;
+    }
+    if (cursor < text.length) {
+      parts.push(escapeSegment(text.slice(cursor)));
+    }
+    ttsTextContainer.innerHTML = `<p class="a11ytb-tts-overlay__paragraph">${parts.join('')}</p>`;
+    ttsWordNodes = Array.from(ttsTextContainer.querySelectorAll('[data-word-index]'));
+    ttsTextContainer.scrollTop = 0;
+  }
+
+  function updateTtsActiveWord(index, { smooth = true } = {}) {
+    if (!ttsWordNodes.length) {
+      return;
+    }
+    const targetIndex = Number.isFinite(index) ? index : -1;
+    if (targetIndex < 0 || targetIndex >= ttsWordNodes.length) {
+      ttsWordNodes.forEach((node) => {
+        node.classList.remove('is-active');
+        node.removeAttribute('aria-current');
+      });
+      return;
+    }
+    ttsWordNodes.forEach((node, wordIndex) => {
+      if (wordIndex === targetIndex) {
+        node.classList.add('is-active');
+        node.setAttribute('aria-current', 'true');
+        if (ttsOverlayOpen) {
+          const containerRect = ttsTextContainer.getBoundingClientRect();
+          const nodeRect = node.getBoundingClientRect();
+          const isAbove = nodeRect.top < containerRect.top + 24;
+          const isBelow = nodeRect.bottom > containerRect.bottom - 24;
+          if (isAbove || isBelow) {
+            node.scrollIntoView({ block: 'center', inline: 'nearest', behavior: smooth ? 'smooth' : 'auto' });
+          }
+        }
+      } else {
+        node.classList.remove('is-active');
+        node.removeAttribute('aria-current');
+      }
+    });
+  }
+
+  function updateSliderDisplay(ratio = 0) {
+    const clamped = Math.max(0, Math.min(1, Number.isFinite(ratio) ? ratio : 0));
+    const formatted = formatPercent(clamped);
+    ttsSliderValue.textContent = formatted;
+    ttsSlider.setAttribute('aria-valuetext', formatted);
+  }
+
+  function openTtsOverlay() {
+    if (ttsOverlay.dataset.open === 'true') return;
+    ttsOverlay.dataset.open = 'true';
+    ttsOverlay.setAttribute('aria-hidden', 'false');
+    ttsOverlayRestoreFocus = document.activeElement;
+    document.body.classList.add('a11ytb-tts-overlay-open');
+    window.requestAnimationFrame(() => {
+      try {
+        ttsOverlayPanel.focus({ preventScroll: false });
+      } catch (error) {
+        ttsOverlayPanel.focus();
+      }
+    });
+  }
+
+  function closeTtsOverlay() {
+    if (ttsOverlay.dataset.open === 'false') return;
+    ttsOverlay.dataset.open = 'false';
+    ttsOverlay.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('a11ytb-tts-overlay-open');
+    ttsSliderActive = false;
+    if (ttsOverlayRestoreFocus && typeof ttsOverlayRestoreFocus.focus === 'function') {
+      try {
+        ttsOverlayRestoreFocus.focus();
+      } catch (error) {
+        // Elément retiré : focus ignoré.
+      }
+    }
+    ttsOverlayRestoreFocus = null;
+  }
+
+  function syncTtsOverlay(snapshot) {
+    const reader = snapshot.tts?.reader ?? {};
+    const shouldOpen = Boolean(reader.open);
+    if (shouldOpen !== ttsOverlayOpen) {
+      ttsOverlayOpen = shouldOpen;
+      if (shouldOpen) {
+        openTtsOverlay();
+      } else {
+        closeTtsOverlay();
+      }
+    }
+    const text = reader.text || '';
+    const words = Array.isArray(reader.words) ? reader.words : [];
+    const signature = signatureForWords(words);
+    if (text !== ttsRenderedText || signature !== ttsRenderedWordsSignature) {
+      renderTtsText(text, words);
+    }
+    updateTtsActiveWord(reader.activeWord, { smooth: shouldOpen });
+    const progress = snapshot.tts?.progress ?? 0;
+    if (!ttsSliderActive) {
+      const sliderValue = Math.round(Math.max(0, Math.min(1, progress)) * 1000);
+      ttsSlider.value = String(sliderValue);
+      updateSliderDisplay(progress);
+    }
+    const hasText = Boolean(text && text.trim().length);
+    ttsSlider.disabled = !hasText;
+    const speaking = snapshot.tts?.status === 'speaking';
+    ttsStopButton.disabled = !speaking;
+    const voices = snapshot.tts?.availableVoices ?? [];
+    const selectedVoice = voices.find((voice) => voice.voiceURI === snapshot.tts?.voice);
+    ttsVoiceEl.textContent = selectedVoice
+      ? `${selectedVoice.name} (${selectedVoice.lang})`
+      : 'Voix du navigateur';
+    ttsRateEl.textContent = `${(snapshot.tts?.rate ?? 1).toFixed(1)}×`;
+    ttsPitchEl.textContent = `${(snapshot.tts?.pitch ?? 1).toFixed(1)}`;
+    ttsVolumeEl.textContent = `${Math.round((snapshot.tts?.volume ?? 1) * 100)} %`;
+  }
+
+  ttsOverlay.addEventListener('click', (event) => {
+    if (event.target === ttsOverlay) {
+      state.set('tts.reader.open', false);
+    }
+  });
+  ttsOverlay.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      state.set('tts.reader.open', false);
+    }
+  });
+  ttsOverlayPanel.addEventListener('click', (event) => event.stopPropagation());
+  ttsOverlayClose.addEventListener('click', () => state.set('tts.reader.open', false));
+  ttsStopButton.addEventListener('click', () => window.stopSpeaking());
+  ttsSlider.addEventListener('pointerdown', () => {
+    ttsSliderActive = true;
+  });
+  ttsSlider.addEventListener('pointerup', () => {
+    ttsSliderActive = false;
+  });
+  ttsSlider.addEventListener('pointercancel', () => {
+    ttsSliderActive = false;
+  });
+  ttsSlider.addEventListener('blur', () => {
+    ttsSliderActive = false;
+  });
+  ttsSlider.addEventListener('input', (event) => {
+    const value = Number(event.target.value || 0);
+    updateSliderDisplay(value / 1000);
+  });
+  ttsSlider.addEventListener('change', (event) => {
+    const value = Number(event.target.value || 0);
+    window.a11ytb?.tts?.seekTo?.(value / 1000);
+    ttsSliderActive = false;
+  });
+
   const overlay = document.createElement('div');
   overlay.className = 'a11ytb-overlay';
   overlay.setAttribute('aria-hidden', 'true');
@@ -7422,7 +7687,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     toCSV: () => serializeActivityToCSV(getActivityEntries()),
   };
 
-  root.append(overlay, statusLauncher, fab, panel, notificationsContainer);
+  root.append(ttsOverlay, overlay, statusLauncher, fab, panel, notificationsContainer);
 
   let lastFocusedElement = null;
   let releaseOutsideInert = null;
@@ -7655,6 +7920,13 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   window.addEventListener('keydown', (event) => {
     if (event.defaultPrevented) return;
     if (recordingShortcutId) return;
+    if (state.get('tts.reader.open')) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        state.set('tts.reader.open', false);
+      }
+      return;
+    }
     const active = document.activeElement;
     if (active && typeof active.closest === 'function') {
       const isEditable = active.closest('input, textarea, select, [contenteditable="true"]');
@@ -7803,6 +8075,17 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   window.stopSpeaking = () => window.a11ytb?.tts?.stop?.();
   window.speakPage = () => window.a11ytb?.tts?.speakPage?.();
   window.speakSelection = () => window.a11ytb?.tts?.speakSelection?.();
+  window.openTtsReader = () => {
+    if (!state.get('tts.reader.open')) {
+      logActivity('Lecteur vocal ouvert', { module: 'tts', tags: ['tts', 'reader'] });
+    }
+    state.set('tts.reader.open', true);
+  };
+  window.closeTtsReader = () => {
+    if (state.get('tts.reader.open')) {
+      state.set('tts.reader.open', false);
+    }
+  };
   window.brailleSelection = () => {
     window.a11ytb?.braille?.transcribeSelection?.();
     logActivity('Transcription braille demandée', { tone: 'confirm' });
@@ -7838,6 +8121,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     syncView();
     syncFullscreenMode(snapshot);
     syncDockControls(snapshot);
+    syncTtsOverlay(snapshot);
     renderProfiles(snapshot);
     updateActiveShortcuts(snapshot);
     refreshShortcutDisplays(snapshot);
@@ -7859,6 +8143,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   syncView();
   syncFullscreenMode(initialSnapshot);
   syncDockControls(initialSnapshot);
+  syncTtsOverlay(initialSnapshot);
   renderProfiles(initialSnapshot);
   updateActiveShortcuts(initialSnapshot);
   refreshShortcutDisplays(initialSnapshot);
