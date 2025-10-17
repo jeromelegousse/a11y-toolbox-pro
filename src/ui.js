@@ -7421,6 +7421,16 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     toJSON: () => serializeActivityToJSON(getActivityEntries()),
     toCSV: () => serializeActivityToCSV(getActivityEntries()),
   };
+  window.a11ytb.panel = {
+    open: () => toggle(true),
+    close: () => toggle(false),
+    toggle: () => toggle(),
+    setView: (view) => {
+      if (view) {
+        state.set('ui.view', view);
+      }
+    },
+  };
 
   root.append(overlay, statusLauncher, fab, panel, notificationsContainer);
 

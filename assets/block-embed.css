@@ -1,0 +1,98 @@
+.a11ytb-embed {
+  border: 1px solid var(--a11ytb-embed-border, #dfe3eb);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin: 1.5rem 0;
+  background: var(--a11ytb-embed-background, #ffffff);
+  box-shadow: var(--a11ytb-embed-shadow, 0 2px 6px rgba(15, 23, 42, 0.08));
+}
+
+.a11ytb-embed__title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.a11ytb-embed__description {
+  margin: 0 0 1rem;
+  color: var(--a11ytb-embed-description, #4b5563);
+  font-size: 0.95rem;
+}
+
+.a11ytb-embed__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.a11ytb-embed__button {
+  border: 1px solid var(--a11ytb-embed-button-border, #2563eb);
+  background: var(--a11ytb-embed-button-background, #2563eb);
+  color: #ffffff;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.a11ytb-embed__button:hover,
+.a11ytb-embed__button:focus-visible {
+  background: var(--a11ytb-embed-button-hover, #1d4ed8);
+  border-color: var(--a11ytb-embed-button-hover, #1d4ed8);
+  outline: none;
+}
+
+.a11ytb-embed__button[aria-pressed='true'] {
+  background: var(--a11ytb-embed-button-active, #1d4ed8);
+}
+
+.a11ytb-embed__status {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--a11ytb-embed-status, #1f2937);
+}
+
+.a11ytb-embed__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.a11ytb-embed__summary div {
+  margin: 0;
+}
+
+.a11ytb-embed__summary dt {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.a11ytb-embed__summary dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.a11ytb-embed__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.a11ytb-embed__textarea {
+  width: 100%;
+  min-height: 5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--a11ytb-embed-border, #dfe3eb);
+  border-radius: 8px;
+  background: var(--a11ytb-embed-background, #ffffff);
+  font-family: 'Fira Code', 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 0.95rem;
+}
+
+.a11ytb-embed__label {
+  font-weight: 600;
+}
