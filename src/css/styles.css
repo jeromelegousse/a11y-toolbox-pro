@@ -489,7 +489,9 @@ body {
   position: relative;
   border-radius: calc(var(--a11ytb-radius) * 0.4);
   padding: 2px 4px;
-  transition: background-color 0.18s ease, color 0.18s ease;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease;
 }
 
 .a11ytb-tts-word.is-active {
@@ -531,7 +533,6 @@ body {
   width: 100%;
   accent-color: var(--a11ytb-accent);
 }
-
 
 .a11ytb-tts-overlay__action {
   white-space: nowrap;
