@@ -17,6 +17,8 @@ import {
 import { resolveLocale } from '../languages/index.js';
 import { createI18nService } from './i18n-service.js';
 import { createNotificationCenter } from './notifications.js';
+import { createPreferenceSync } from './integrations/preferences.js';
+import { attachModuleTriggers } from './integrations/inline-triggers.js';
 
 const profilePresets = {
   'vision-basse': {
@@ -391,13 +393,35 @@ if (Number.isFinite(metricsTimeoutMs) && metricsTimeoutMs > 0) {
 const metricsSync = createMetricsSyncService(metricsOptions);
 metricsSync.start();
 
+const preferencesIntegration = pluginConfig?.integrations?.preferences || {};
+let preferenceSync = null;
+if (
+  preferencesIntegration?.enabled &&
+  typeof preferencesIntegration.endpoint === 'string' &&
+  preferencesIntegration.endpoint.trim()
+) {
+  preferenceSync = createPreferenceSync({
+    state,
+    endpoint: preferencesIntegration.endpoint,
+    nonce: preferencesIntegration.nonce,
+    throttleMs: preferencesIntegration.throttleMs,
+  });
+}
+
 if (!window.a11ytb) window.a11ytb = {};
 window.a11ytb.feedback = feedback;
 window.a11ytb.metricsSync = metricsSync;
+if (preferenceSync) {
+  window.a11ytb.preferenceSync = preferenceSync;
+}
 
 window.addEventListener('beforeunload', () => {
   metricsSync.stop();
   metricsSync.flush({ force: true }).catch(() => {});
+  const pending = preferenceSync?.flush?.();
+  if (pending && typeof pending.catch === 'function') {
+    pending.catch(() => {});
+  }
 });
 window.addEventListener('online', () => {
   metricsSync.flush().catch(() => {});
@@ -877,3 +901,7 @@ setupModuleRuntime({
 
 const root = document.getElementById('a11ytb-root');
 mountUI({ root, state, config: pluginConfig, i18n, notifications });
+const inlineTriggers = attachModuleTriggers({ state });
+if (inlineTriggers) {
+  window.a11ytb.inlineTriggers = inlineTriggers;
+}
