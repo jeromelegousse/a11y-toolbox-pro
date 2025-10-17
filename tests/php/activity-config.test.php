@@ -27,6 +27,10 @@ if (!is_string($activityConfig['proxyUrl'] ?? null) || $activityConfig['proxyUrl
     throw new RuntimeException('L’URL du proxy doit être fournie.');
 }
 
+if (!is_string($activityConfig['proxyNonce'] ?? null) || $activityConfig['proxyNonce'] === '') {
+    throw new RuntimeException('Le nonce du proxy doit être exposé.');
+}
+
 a11ytb_test_reset_state();
 
 update_option('a11ytb_activity_webhook_url', 'https://proxy.example.test/hook');

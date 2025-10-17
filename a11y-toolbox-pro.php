@@ -875,6 +875,7 @@ function a11ytb_get_activity_integration_config(): array
         'webhookUrl' => $normalized_url,
         'hasAuthToken' => $has_token,
         'proxyUrl' => a11ytb_get_activity_proxy_url(),
+        'proxyNonce' => function_exists('wp_create_nonce') ? wp_create_nonce('a11ytb_activity_sync') : '',
     ];
 }
 
@@ -1704,6 +1705,62 @@ function a11ytb_handle_activity_proxy_request($request)
 }
 
 /**
+ * Valide l'accès à la route REST du proxy d'activité.
+ *
+ * @param WP_REST_Request|array $request
+ * @return bool|WP_Error
+ */
+function a11ytb_activity_proxy_permissions($request)
+{
+    if (function_exists('current_user_can') && current_user_can('manage_options')) {
+        return true;
+    }
+
+    $nonce_candidates = [];
+
+    if (is_object($request)) {
+        if (method_exists($request, 'get_header')) {
+            $nonce_candidates[] = $request->get_header('X-WP-Nonce');
+        }
+        if (method_exists($request, 'get_param')) {
+            $nonce_candidates[] = $request->get_param('_wpnonce');
+        }
+    }
+
+    if (isset($_SERVER['HTTP_X_WP_NONCE'])) {
+        $nonce_candidates[] = $_SERVER['HTTP_X_WP_NONCE'];
+    }
+
+    if (isset($_REQUEST['_wpnonce'])) {
+        $nonce_candidates[] = $_REQUEST['_wpnonce'];
+    }
+
+    $nonce = '';
+    foreach ($nonce_candidates as $candidate) {
+        if (is_string($candidate) && $candidate !== '') {
+            $nonce = $candidate;
+            break;
+        }
+    }
+
+    if ($nonce !== '' && function_exists('sanitize_text_field')) {
+        $nonce = sanitize_text_field($nonce);
+    }
+
+    if ($nonce !== '' && function_exists('wp_verify_nonce') && wp_verify_nonce($nonce, 'a11ytb_activity_sync')) {
+        return true;
+    }
+
+    $status = function_exists('rest_authorization_required_code') ? rest_authorization_required_code() : 403;
+
+    return new WP_Error(
+        'rest_forbidden',
+        __('Vous n’avez pas l’autorisation d’utiliser ce proxy.', 'a11ytb'),
+        ['status' => $status]
+    );
+}
+
+/**
  * Enregistre la route REST API dédiée au proxy d’activité.
  */
 function a11ytb_register_activity_proxy_route(): void
@@ -1718,12 +1775,12 @@ function a11ytb_register_activity_proxy_route(): void
             [
                 'methods' => $readable,
                 'callback' => 'a11ytb_handle_activity_proxy_request',
-                'permission_callback' => '__return_true',
+                'permission_callback' => 'a11ytb_activity_proxy_permissions',
             ],
             [
                 'methods' => $creatable,
                 'callback' => 'a11ytb_handle_activity_proxy_request',
-                'permission_callback' => '__return_true',
+                'permission_callback' => 'a11ytb_activity_proxy_permissions',
             ],
         ]
     );

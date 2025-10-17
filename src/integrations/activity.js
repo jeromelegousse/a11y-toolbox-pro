@@ -230,6 +230,10 @@ export function createActivityIntegration({
       : typeof config?.proxy?.url === 'string'
         ? config.proxy.url.trim()
         : '';
+  const proxyNonce =
+    typeof config?.proxyNonce === 'string' && config.proxyNonce.trim()
+      ? config.proxyNonce.trim()
+      : '';
 
   const retryOptions = {
     initialDelay: Number.isFinite(retry?.initialDelay)
@@ -293,7 +297,11 @@ export function createActivityIntegration({
     try {
       const response = await fetchFn(proxyUrl, {
         method: 'GET',
-        headers: { Accept: 'application/json' },
+        headers: {
+          Accept: 'application/json',
+          ...(proxyNonce ? { 'X-WP-Nonce': proxyNonce } : {}),
+        },
+        credentials: 'same-origin',
       });
       if (response?.ok && typeof response.json === 'function') {
         try {
@@ -346,7 +354,9 @@ export function createActivityIntegration({
             headers: {
               'Content-Type': 'application/json',
               Accept: 'application/json',
+              ...(proxyNonce ? { 'X-WP-Nonce': proxyNonce } : {}),
             },
+            credentials: 'same-origin',
             body: JSON.stringify(payload),
           });
 
