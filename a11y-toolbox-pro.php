@@ -812,6 +812,31 @@ function a11ytb_apply_enable_option(bool $enabled): bool
 add_filter('a11ytb/is_enabled', 'a11ytb_apply_enable_option');
 
 /**
+ * Retourne la locale du site à exposer côté front.
+ */
+function a11ytb_get_site_locale(): string
+{
+    $locale = '';
+
+    if (function_exists('determine_locale')) {
+        $locale = (string) determine_locale();
+    } elseif (function_exists('get_locale')) {
+        $locale = (string) get_locale();
+    }
+
+    if ($locale === '') {
+        $locale = 'fr_FR';
+    }
+
+    /**
+     * Permet de modifier la locale exposée à l’application front-end.
+     *
+     * @param string $locale Locale WordPress détectée.
+     */
+    return (string) apply_filters('a11ytb/default_locale', $locale);
+}
+
+/**
  * Construit la configuration transmise au frontal.
  */
 function a11ytb_get_frontend_config(): array
@@ -819,6 +844,7 @@ function a11ytb_get_frontend_config(): array
     $defaults = [
         'dock' => a11ytb_normalize_dock_option(),
         'view' => a11ytb_normalize_view_option(),
+        'locale' => a11ytb_get_site_locale(),
     ];
 
     $behavior = [

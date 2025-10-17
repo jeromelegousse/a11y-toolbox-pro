@@ -6,7 +6,22 @@ if (!defined('ABSPATH')) {
 $GLOBALS['__a11ytb_options'] = [];
 $GLOBALS['__a11ytb_http_requests'] = [];
 $GLOBALS['__a11ytb_http_responses'] = null;
+$GLOBALS['__a11ytb_locale'] = 'fr_FR';
 $GLOBALS['wp_version'] = '6.2';
+
+if (!function_exists('get_locale')) {
+    function get_locale()
+    {
+        return $GLOBALS['__a11ytb_locale'] ?? 'en_US';
+    }
+}
+
+if (!function_exists('determine_locale')) {
+    function determine_locale()
+    {
+        return get_locale();
+    }
+}
 
 if (!class_exists('WP_Error')) {
     class WP_Error
@@ -440,10 +455,16 @@ if (!function_exists('rest_ensure_response')) {
     }
 }
 
+function a11ytb_test_set_locale(string $locale): void
+{
+    $GLOBALS['__a11ytb_locale'] = $locale;
+}
+
 function a11ytb_test_reset_state(): void
 {
     $GLOBALS['__a11ytb_options'] = [];
     $GLOBALS['__a11ytb_http_requests'] = [];
     $GLOBALS['__a11ytb_http_responses'] = null;
     $GLOBALS['__a11ytb_registered_routes'] = [];
+    $GLOBALS['__a11ytb_locale'] = 'fr_FR';
 }
