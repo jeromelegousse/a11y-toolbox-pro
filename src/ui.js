@@ -1036,9 +1036,10 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   const dockLabelRefs = new Map();
 
   const fab = document.createElement('button');
-  fab.className = 'a11ytb-fab';
+  fab.className = 'a11ytb-fab a11ytb-fab--modules';
   fab.type = 'button';
   fab.setAttribute('aria-expanded', 'false');
+  fab.setAttribute('aria-label', 'Ouvrir les modules');
   fab.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
     <path d="M12 8a4 4 0 100 8 4 4 0 000-8zm8.94 3a8.94 8.94 0 00-.5-1.47l2.06-1.5-2-3.46-2.44 1a9.09 9.09 0 00-2.02-1.17l-.37-2.6h-4l-.37 2.6A9.09 9.09 0 007.93 4.6l-2.44-1-2 3.46 2.06 1.5A8.94 8.94 0 005.06 11H2v4h3.06c.12.51.29 1 .5 1.47l-2.06 1.5 2 3.46 2.44-1c.62.47 1.3.86 2.02 1.17l.37 2.6h4l.37-2.6c.72-.31 1.4-.7 2.02-1.17l2.44 1 2-3.46-2.06-1.5c.21-.47.38-.96.5-1.47H22v-4h-3.06z"/>
   </svg>`;
@@ -1055,7 +1056,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
 
   const statusLauncher = document.createElement('button');
   statusLauncher.type = 'button';
-  statusLauncher.className = 'a11ytb-fab a11ytb-fab--status';
+  statusLauncher.className = 'a11ytb-fab a11ytb-fab--status a11ytb-fab--audit';
   statusLauncher.dataset.tone = 'default';
   statusLauncher.dataset.badge = '';
   statusLauncher.setAttribute('aria-expanded', 'false');
@@ -1065,6 +1066,17 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     <span class="a11ytb-sr-only" data-ref="status-launcher-label"></span>
   `;
   statusLauncherLabel = statusLauncher.querySelector('[data-ref="status-launcher-label"]');
+
+  const menuLauncher = document.createElement('button');
+  menuLauncher.type = 'button';
+  menuLauncher.className = 'a11ytb-fab a11ytb-fab--menu';
+  menuLauncher.setAttribute('aria-expanded', 'false');
+  menuLauncher.setAttribute('aria-label', 'Afficher les autres menus');
+  menuLauncher.innerHTML = `
+    <span aria-hidden="true">
+      <svg viewBox="0 0 24 24" focusable="false"><path d="M7 5a2 2 0 11-.001 4.001A2 2 0 017 5zm10 0a2 2 0 11-.001 4.001A2 2 0 0117 5zM7 15a2 2 0 11-.001 4.001A2 2 0 017 15zm10 0a2 2 0 11-.001 4.001A2 2 0 0117 15zm-5-5a2 2 0 11-.001 4.001A2 2 0 0112 10z"/></svg>
+    </span>
+  `;
 
   const overlay = document.createElement('div');
   overlay.className = 'a11ytb-overlay';
@@ -1120,6 +1132,61 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     });
     dockLabelRefs.set(position, label);
     return button;
+  }
+
+  const SCROLL_ICONS = {
+    up: '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 5l7 7h-4v7h-6v-7H5l7-7z"/></svg>',
+    down: '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 19l-7-7h4V5h6v7h4l-7 7z"/></svg>',
+    left: '<svg viewBox="0 0 24 24" focusable="false"><path d="M5 12l7-7v4h7v6h-7v4l-7-7z"/></svg>',
+    right:
+      '<svg viewBox="0 0 24 24" focusable="false"><path d="M19 12l-7 7v-4H5V9h7V5l7 7z"/></svg>',
+  };
+
+  function createScrollControls(target, { orientation = 'vertical' } = {}) {
+    if (!target) return null;
+    const normalizedOrientation = orientation === 'horizontal' ? 'horizontal' : 'vertical';
+    const controls = document.createElement('div');
+    controls.className = 'a11ytb-scroll-controls';
+    controls.dataset.orientation = normalizedOrientation;
+
+    const icons =
+      normalizedOrientation === 'vertical'
+        ? { backward: SCROLL_ICONS.up, forward: SCROLL_ICONS.down }
+        : { backward: SCROLL_ICONS.left, forward: SCROLL_ICONS.right };
+
+    const labels =
+      normalizedOrientation === 'vertical'
+        ? {
+            backward: 'Faire défiler vers le haut',
+            forward: 'Faire défiler vers le bas',
+          }
+        : {
+            backward: 'Faire défiler vers la gauche',
+            forward: 'Faire défiler vers la droite',
+          };
+
+    const createButton = (direction) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `a11ytb-scroll-button a11ytb-scroll-button--${direction}`;
+      button.setAttribute('aria-label', labels[direction]);
+      button.innerHTML = `<span class="a11ytb-scroll-icon" aria-hidden="true">${icons[direction]}</span>`;
+      button.addEventListener('click', () => {
+        const viewport =
+          normalizedOrientation === 'vertical' ? target.clientHeight : target.clientWidth;
+        const step = Math.max(normalizedOrientation === 'vertical' ? 120 : 160, viewport * 0.8);
+        const delta = direction === 'forward' ? step : -step;
+        target.scrollBy({
+          top: normalizedOrientation === 'vertical' ? delta : 0,
+          left: normalizedOrientation === 'horizontal' ? delta : 0,
+          behavior: 'smooth',
+        });
+      });
+      return button;
+    };
+
+    controls.append(createButton('backward'), createButton('forward'));
+    return controls;
   }
 
   const dockButtons = new Map([
@@ -1995,6 +2062,8 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   viewAnnouncement.setAttribute('aria-live', 'polite');
   viewAnnouncement.textContent = '';
   const viewButtons = new Map();
+  const MENU_VIEW_IDS = ['options', 'organize', 'guides', 'shortcuts'];
+
   const viewDefinitions = [
     {
       id: 'modules',
@@ -2372,6 +2441,11 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   helperBanner.append(helperTitle, helperText);
 
   modulesMain.append(helperBanner, filters, modulesContainer);
+
+  const modulesScrollControls = createScrollControls(modulesContainer, { orientation: 'vertical' });
+  if (modulesScrollControls) {
+    modulesMain.append(modulesScrollControls);
+  }
 
   modulesLayout.append(modulesSidebar, modulesMain);
 
@@ -3485,27 +3559,6 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
         updateDependencyDisplay(view, dependencies, { moduleName });
       });
     });
-  }
-
-  function focusModuleCard(moduleId) {
-    if (!moduleId) return;
-    const blockEntry = blocks.find((block) => block.moduleId === moduleId);
-    if (!blockEntry) return;
-    const element = moduleElements.get(blockEntry.id);
-    if (!element) return;
-    if (!element.hasAttribute('tabindex')) {
-      element.setAttribute('tabindex', '-1');
-    }
-    element.classList.add('is-highlighted');
-    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    try {
-      element.focus({ preventScroll: true });
-    } catch (error) {
-      element.focus();
-    }
-    setTimeout(() => {
-      element.classList.remove('is-highlighted');
-    }, 1600);
   }
 
   const organizeScroll = document.createElement('div');
@@ -6840,6 +6893,12 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   function syncView() {
     const prefs = getPreferences();
     const currentView = prefs.view || 'modules';
+    const focusSection = state.get('ui.focusSection') || 'modules';
+    if (MENU_VIEW_IDS.includes(currentView) && focusSection !== 'menus') {
+      state.set('ui.focusSection', 'menus');
+    } else if (currentView === 'modules' && focusSection === 'menus') {
+      state.set('ui.focusSection', 'modules');
+    }
     const viewChanged = activeViewId !== currentView;
     const focusedElement = typeof document !== 'undefined' ? document.activeElement : null;
     viewButtons.forEach((btn, id) => {
@@ -6931,6 +6990,13 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
         }
       });
     }
+    if (MENU_VIEW_IDS.includes(currentView)) {
+      const storedMenuView = state.get('ui.lastMenuView');
+      if (storedMenuView !== currentView) {
+        state.set('ui.lastMenuView', currentView);
+      }
+    }
+
     if (viewChanged && viewAnnouncement) {
       const meta = viewMetaById.get(currentView);
       viewAnnouncement.textContent = meta ? `${meta.label} affichée` : '';
@@ -7422,7 +7488,14 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     toCSV: () => serializeActivityToCSV(getActivityEntries()),
   };
 
-  root.append(overlay, statusLauncher, fab, panel, notificationsContainer);
+  const fabStack = document.createElement('div');
+  fabStack.className = 'a11ytb-fab-stack';
+  fabStack.append(fab, statusLauncher, menuLauncher);
+
+  root.append(overlay, fabStack, panel, notificationsContainer);
+
+  state.on(syncPanelFocusSection);
+  syncPanelFocusSection(state.get());
 
   let lastFocusedElement = null;
   let releaseOutsideInert = null;
@@ -7552,12 +7625,88 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     });
   }
 
+  function setElementVisibility(element, visible, { manageAriaHidden = true } = {}) {
+    if (!element) return;
+    if (visible) {
+      element.hidden = false;
+      element.removeAttribute('hidden');
+      if (manageAriaHidden) {
+        element.removeAttribute('aria-hidden');
+      }
+    } else {
+      element.hidden = true;
+      element.setAttribute('hidden', '');
+      if (manageAriaHidden) {
+        element.setAttribute('aria-hidden', 'true');
+      }
+    }
+  }
+
+  function syncPanelFocusSection(snapshot = state.get()) {
+    const focusValue = snapshot?.ui?.focusSection ?? state.get('ui.focusSection') ?? 'modules';
+    const normalized = ['audit', 'modules', 'menus'].includes(focusValue) ? focusValue : 'modules';
+    if (panel) {
+      panel.dataset.focusSection = normalized;
+    }
+
+    const panelOpen = panel?.dataset.open === 'true';
+
+    const showViewToggle = normalized === 'menus';
+    setElementVisibility(viewToggle, showViewToggle);
+    if (viewAnnouncement) {
+      viewAnnouncement.hidden = !showViewToggle;
+      viewAnnouncement.setAttribute('aria-hidden', String(!showViewToggle));
+    }
+
+    const showShellMain = normalized !== 'audit';
+    setElementVisibility(shellMain, showShellMain, { manageAriaHidden: false });
+
+    const showViewContainer = normalized !== 'audit';
+    setElementVisibility(viewContainer, showViewContainer);
+
+    if (normalized === 'modules' && state.get('ui.view') !== 'modules') {
+      state.set('ui.view', 'modules');
+    } else if (normalized === 'menus') {
+      let desiredView = state.get('ui.view');
+      if (!MENU_VIEW_IDS.includes(desiredView)) {
+        const stored = state.get('ui.lastMenuView');
+        desiredView = MENU_VIEW_IDS.includes(stored) ? stored : MENU_VIEW_IDS[0];
+      }
+      if (state.get('ui.view') !== desiredView) {
+        state.set('ui.view', desiredView);
+      }
+    }
+
+    if (activity) {
+      const showActivity = normalized !== 'modules';
+      setElementVisibility(activity, showActivity);
+      if (showActivity && normalized === 'audit') {
+        activity.open = true;
+      } else if (!showActivity) {
+        activity.open = false;
+      }
+    }
+
+    [
+      [fab, normalized === 'modules'],
+      [statusLauncher, normalized === 'audit'],
+      [menuLauncher, normalized === 'menus'],
+    ].forEach(([button, active]) => {
+      if (!button) return;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+      button.setAttribute('aria-expanded', String(panelOpen && active));
+    });
+  }
+
   function toggle(open) {
     const shouldOpen = open ?? panel.dataset.open !== 'true';
     panel.dataset.open = String(shouldOpen);
     panel.setAttribute('aria-hidden', String(!shouldOpen));
-    fab.setAttribute('aria-expanded', String(shouldOpen));
-    statusLauncher.setAttribute('aria-expanded', String(shouldOpen));
+    const focusSection = state.get('ui.focusSection') || 'modules';
+    fab.setAttribute('aria-expanded', String(shouldOpen && focusSection === 'modules'));
+    statusLauncher.setAttribute('aria-expanded', String(shouldOpen && focusSection === 'audit'));
+    menuLauncher.setAttribute('aria-expanded', String(shouldOpen && focusSection === 'menus'));
     overlay.dataset.open = String(shouldOpen);
     overlay.setAttribute('aria-hidden', String(!shouldOpen));
     document.body.classList.toggle('a11ytb-modal-open', shouldOpen);
@@ -7610,12 +7759,17 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   }
 
   statusLauncher.addEventListener('click', () => {
-    if (state.get('ui.view') !== 'modules') {
-      state.set('ui.view', 'modules');
+    if (state.get('ui.focusSection') !== 'audit') {
+      state.set('ui.focusSection', 'audit');
     }
     toggle(true);
     window.setTimeout(() => {
-      focusModuleCard('audit');
+      if (typeof statusCenter?.scrollIntoView === 'function') {
+        statusCenter.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      if (activity) {
+        activity.open = true;
+      }
     }, 180);
     logActivity('Consultation de l’audit temps réel', {
       module: 'audit',
@@ -7623,7 +7777,22 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     });
   });
 
-  fab.addEventListener('click', () => toggle(true));
+  fab.addEventListener('click', () => {
+    if (state.get('ui.focusSection') !== 'modules') {
+      state.set('ui.focusSection', 'modules');
+    }
+    if (state.get('ui.view') !== 'modules') {
+      state.set('ui.view', 'modules');
+    }
+    toggle(true);
+  });
+
+  menuLauncher.addEventListener('click', () => {
+    if (state.get('ui.focusSection') !== 'menus') {
+      state.set('ui.focusSection', 'menus');
+    }
+    toggle(true);
+  });
   header.querySelector('[data-action="close"]').addEventListener('click', () => toggle(false));
   header.querySelector('[data-action="reset"]').addEventListener('click', () => {
     state.reset();
@@ -7747,9 +7916,16 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     } else if (action.dataset.action === 'activity-send-sync') {
       triggerManualSyncSend();
     } else if (action.dataset.action === 'activity-open-audit') {
+      state.set('ui.focusSection', 'audit');
       toggle(true);
-      state.set('ui.view', 'modules');
-      focusModuleCard('audit');
+      window.setTimeout(() => {
+        if (typeof statusCenter?.scrollIntoView === 'function') {
+          statusCenter.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        if (activity) {
+          activity.open = true;
+        }
+      }, 160);
     }
   });
 
