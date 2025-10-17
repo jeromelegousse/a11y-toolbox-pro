@@ -3369,6 +3369,8 @@ function a11ytb_enqueue_admin_assets(string $hook): void
 
     wp_script_add_data('a11ytb/admin-app', 'type', 'module');
 
+    add_filter('script_loader_tag', 'a11ytb_force_admin_app_module_type', 10, 3);
+
     if (current_user_can('manage_options')) {
         $admin_data = [
             'gemini' => a11ytb_get_gemini_admin_config(),
@@ -3385,78 +3387,21 @@ function a11ytb_enqueue_admin_assets(string $hook): void
 add_action('admin_enqueue_scripts', 'a11ytb_enqueue_admin_assets');
 
 /**
- * Enregistre les options nécessaires au tableau de bord Gemini.
+ * Garantit que le script de l’application d’administration est chargé en module ES6.
  */
-function a11ytb_register_admin_settings(): void
+
+
+function a11ytb_force_admin_app_module_type(string $tag, string $handle, string $src): string
 {
-    register_setting(
-        'a11ytb_options',
-        'a11ytb_gemini_api_key',
-        [
-            'type' => 'string',
-            'sanitize_callback' => 'a11ytb_sanitize_secret',
-            'default' => '',
-        ]
-    );
-
-    register_setting(
-        'a11ytb_options',
-        'a11ytb_gemini_quota',
-        [
-            'type' => 'integer',
-            'sanitize_callback' => 'a11ytb_sanitize_quota',
-            'default' => 15,
-        ]
-    );
-
-    register_setting(
-        'a11ytb_options',
-        'a11ytb_activity_webhook_url',
-        [
-            'type' => 'string',
-            'sanitize_callback' => 'a11ytb_sanitize_webhook_url',
-            'default' => '',
-        ]
-    );
-
-    register_setting(
-        'a11ytb_options',
-        'a11ytb_activity_webhook_token',
-        [
-            'type' => 'string',
-            'sanitize_callback' => 'a11ytb_sanitize_activity_webhook_token',
-            'default' => '',
-        ]
-    );
-}
-add_action('admin_init', 'a11ytb_register_admin_settings');
-
-/**
- * Affiche les champs cachés requis par l’API Settings en évitant les ID dupliqués.
- *
- * @param string $option_group Groupe d’options ciblé.
- * @param string $nonce_suffix Suffixe optionnel pour différencier l’ID du nonce.
- */
-function a11ytb_render_settings_hidden_fields(string $option_group, string $nonce_suffix = ''): void
-{
-    $nonce_field = '_wpnonce';
-    $nonce_id = $nonce_field;
-
-    if ($nonce_suffix !== '') {
-        $nonce_id .= '_' . sanitize_key($nonce_suffix);
+    if ($handle !== 'a11ytb/admin-app') {
+        return $tag;
     }
 
-    $nonce_markup = wp_nonce_field($option_group . '-options', $nonce_field, true, false);
-
-    if ($nonce_id !== $nonce_field) {
-        $escaped_id = esc_attr($nonce_id);
-        $nonce_markup = preg_replace('/id="_wpnonce"/', 'id="' . $escaped_id . '"', $nonce_markup, 1);
+    if (strpos($tag, 'type=') === false) {
+        return str_replace('<script ', "<script type=\"module\" ", $tag);
     }
 
-    echo $nonce_markup; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-    echo wp_referer_field(false, false); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-    printf('<input type="hidden" name="option_page" value="%s" />', esc_attr($option_group));
-    echo '<input type="hidden" name="action" value="update" />';
+    return preg_replace("/type=('|\")( [^'\"]*)('|\")/i", "type=\"module\"", $tag);
 }
 
 /**
