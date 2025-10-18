@@ -1313,9 +1313,6 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   let resetLabel = null;
   let closeButton = null;
   let closeLabel = null;
-  let statusLauncherLabel = null;
-  let statusLauncherBaseTitle = '';
-  let statusLauncherBaseLabel = '';
   let statusTitle = null;
   let statusDescription = null;
   let statusCenter = null;
@@ -1347,32 +1344,8 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       '<svg viewBox="0 0 24 24" focusable="false"><path d="M8 4v2H6v4H4V4h4zm14 4h-4V6h-2V4h6v4zM4 20v-6h2v4h2v2H4zm18-6v6h-6v-2h4v-4h2z"/></svg>',
   };
 
-  const statusLauncherIconMarkup =
-    '<svg viewBox="0 0 24 24" focusable="false"><path d="M11.25 3a.75.75 0 011.5 0v1.33a8.92 8.92 0 015.92 5.92H20a.75.75 0 010 1.5h-1.33a8.92 8.92 0 01-5.92 5.92V20a.75.75 0 01-1.5 0v-1.33a8.92 8.92 0 01-5.92-5.92H4a.75.75 0 010-1.5h1.33a8.92 8.92 0 015.92-5.92zm.75 4.5a4.5 4.5 0 104.5 4.5 4.5 4.5 0 00-4.5-4.5zm0 2a2.5 2.5 0 11-2.5 2.5 2.5 2.5 0 012.5-2.5z"/></svg>';
-
-  const statusLauncher = document.createElement('button');
-  statusLauncher.type = 'button';
-  statusLauncher.className = 'a11ytb-fab a11ytb-fab--status a11ytb-fab--audit';
-  statusLauncher.dataset.tone = 'default';
-  statusLauncher.dataset.badge = '';
-  statusLauncher.setAttribute('aria-expanded', 'false');
-  statusLauncher.innerHTML = `
-    <span class="a11ytb-status-launcher__pulse" aria-hidden="true"></span>
-    <span class="a11ytb-status-launcher__icon" aria-hidden="true">${statusLauncherIconMarkup}</span>
-    <span class="a11ytb-sr-only" data-ref="status-launcher-label"></span>
-  `;
-  statusLauncherLabel = statusLauncher.querySelector('[data-ref="status-launcher-label"]');
-
-  const menuLauncher = document.createElement('button');
-  menuLauncher.type = 'button';
-  menuLauncher.className = 'a11ytb-fab a11ytb-fab--menu';
-  menuLauncher.setAttribute('aria-expanded', 'false');
-  menuLauncher.setAttribute('aria-label', 'Afficher les autres menus');
-  menuLauncher.innerHTML = `
-    <span aria-hidden="true">
-      <svg viewBox="0 0 24 24" focusable="false"><path d="M7 5a2 2 0 11-.001 4.001A2 2 0 017 5zm10 0a2 2 0 11-.001 4.001A2 2 0 0117 5zM7 15a2 2 0 11-.001 4.001A2 2 0 017 15zm10 0a2 2 0 11-.001 4.001A2 2 0 0117 15zm-5-5a2 2 0 11-.001 4.001A2 2 0 0112 10z"/></svg>
-    </span>
-  `;
+  const statusIconMarkup =
+    '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M11.25 3a.75.75 0 011.5 0v1.33a8.92 8.92 0 015.92 5.92H20a.75.75 0 010 1.5h-1.33a8.92 8.92 0 01-5.92 5.92V20a.75.75 0 01-1.5 0v-1.33a8.92 8.92 0 01-5.92-5.92H4a.75.75 0 010-1.5h1.33a8.92 8.92 0 015.92-5.92zm.75 4.5a4.5 4.5 0 104.5 4.5 4.5 4.5 0 00-4.5-4.5zm0 2a2.5 2.5 0 11-2.5 2.5 2.5 2.5 0 012.5-2.5z"/></svg>';
 
   const overlay = document.createElement('div');
   overlay.className = 'a11ytb-overlay';
@@ -1389,7 +1362,6 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   panel.tabIndex = -1;
   panel.dataset.fullscreen = String(!!state.get('ui.fullscreen'));
   fab.setAttribute('aria-controls', panel.id);
-  statusLauncher.setAttribute('aria-controls', panel.id);
 
   const ttsOverlayState = {
     overlay: null,
@@ -2333,8 +2305,8 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   const shell = document.createElement('div');
   shell.className = 'a11ytb-shell';
 
-  const shellNav = document.createElement('div');
-  shellNav.className = 'a11ytb-shell-nav';
+  const shellMenu = document.createElement('div');
+  shellMenu.className = 'a11ytb-shell-menu';
 
   const shellMain = document.createElement('div');
   shellMain.className = 'a11ytb-shell-main';
@@ -2472,15 +2444,6 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     updateLocaleFormatters();
     fab.setAttribute('aria-label', i18n.t('panel.openFab'));
     panel.setAttribute('aria-label', i18n.t('panel.title'));
-    statusLauncherBaseTitle = i18n.t('status.launcherTitle') || i18n.t('status.title') || '';
-    statusLauncherBaseLabel = i18n.t('status.launcherLabel') || statusLauncherBaseTitle;
-    if (statusLauncher) {
-      statusLauncher.setAttribute('title', statusLauncherBaseTitle || statusLauncherBaseLabel);
-      statusLauncher.setAttribute('aria-label', statusLauncherBaseTitle || statusLauncherBaseLabel);
-    }
-    if (statusLauncherLabel) {
-      statusLauncherLabel.textContent = statusLauncherBaseLabel || statusLauncherBaseTitle;
-    }
     if (headerTitle) {
       headerTitle.textContent = i18n.t('panel.title');
     }
@@ -2564,7 +2527,6 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       aggregationCollectionLabel.textContent = i18n.t('status.collectionLabel');
     }
     aggregationCollectionSelect.setAttribute('aria-label', i18n.t('status.collectionFilter'));
-    updateStatusLauncherFromSummaries(summarizeStatuses(snapshot));
   }
 
   applyLocaleToStaticUI();
@@ -3012,31 +2974,8 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     return entry;
   }
 
-  function updateStatusLauncherFromSummaries(summaries) {
-    if (!statusLauncher) return;
-    const entries = Array.isArray(summaries) ? summaries : summarizeStatuses(state.get());
-    const auditSummary = entries.find((entry) => entry && entry.id === 'audit');
-    const tone = auditSummary?.tone || 'default';
-    statusLauncher.dataset.tone = tone;
-    statusLauncher.dataset.badge = auditSummary?.badge || '';
-    const baseTitle = statusLauncherBaseTitle || statusLauncherBaseLabel;
-    const baseLabel = statusLauncherBaseLabel || statusLauncherBaseTitle;
-    const detailParts = [];
-    const label = auditSummary?.label || baseLabel || baseTitle || 'Audit accessibilité';
-    if (auditSummary?.value) detailParts.push(auditSummary.value);
-    if (auditSummary?.detail) detailParts.push(auditSummary.detail);
-    const combinedLabel = [label, ...detailParts].filter(Boolean).join(' — ');
-    const finalLabel = combinedLabel || baseTitle || baseLabel || label;
-    statusLauncher.setAttribute('title', finalLabel);
-    statusLauncher.setAttribute('aria-label', finalLabel);
-    if (statusLauncherLabel) {
-      statusLauncherLabel.textContent = finalLabel;
-    }
-  }
-
   function updateStatusCards(snapshot) {
     const summaries = summarizeStatuses(snapshot || state.get());
-    updateStatusLauncherFromSummaries(summaries);
     summaries.forEach((summary) => {
       const entry = ensureStatusCard(summary);
       entry.card.dataset.tone = summary.tone || 'info';
@@ -3107,38 +3046,55 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   viewAnnouncement.setAttribute('aria-live', 'polite');
   viewAnnouncement.textContent = '';
   const viewButtons = new Map();
-  const MENU_VIEW_IDS = ['options', 'organize', 'guides', 'shortcuts'];
 
   const viewDefinitions = [
+    {
+      id: 'status',
+      label: 'État temps réel',
+      icon: statusIconMarkup,
+      description: 'Surveillez les incidents, performances et scores d’accessibilité en direct.',
+    },
+    {
+      id: 'options',
+      label: 'Réglages des modules',
+      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 6h14v2H5zm0 5h10v2H5zm0 5h14v2H5z"/></svg>',
+      description: 'Ajustez finement les options exposées par chaque module.',
+    },
+    {
+      id: 'profiles',
+      label: 'Profils',
+      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zm-7 9a7 7 0 0114 0H5z"/></svg>',
+      description: 'Créez, partagez et appliquez des profils d’accessibilité personnalisés.',
+    },
+    {
+      id: 'activity',
+      label: 'Activités récentes',
+      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 4h2v5H5zm4 4h2v9H9zm4-3h2v12h-2zm4 6h2v6h-2z"/></svg>',
+      description: 'Consultez le journal des alertes, synchronisations et intégrations.',
+    },
     {
       id: 'modules',
       label: 'Modules',
       icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 5h6v6H5zm8 0h6v6h-6zm0 8h6v6h-6zm-8 0h6v6H5z"/></svg>',
-      description: 'Activez, épinglez ou recherchez des modules essentiels.',
-    },
-    {
-      id: 'options',
-      label: 'Options & Profils',
-      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 6h14v2H5zm0 5h10v2H5zm0 5h14v2H5z"/></svg>',
-      description: 'Créez des profils personnalisés et ajustez les réglages globaux.',
-    },
-    {
-      id: 'organize',
-      label: 'Organisation',
-      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h9v4H4zm0 5h6v4H4zm0 5h11v4H4zm12-5l4-3v10z"/></svg>',
-      description: 'Priorisez, masquez ou classez les modules pour vos équipes.',
+      description: 'Activez, épinglez ou explorez les modules par catégories.',
     },
     {
       id: 'guides',
       label: 'Guides',
       icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M6 4h9l3 3v13H6zm2 4v2h8V8zm0 4v2h5v-2z"/></svg>',
-      description: 'Suivez des checklists et scénarios de conformité RGAA.',
+      description: 'Suivez les checklists et scénarios de conformité pas à pas.',
     },
     {
       id: 'shortcuts',
       label: 'Raccourcis',
       icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 7a3 3 0 013-3h10a3 3 0 013 3v10a3 3 0 01-3 3H7a3 3 0 01-3-3zm5 2v6h2V9zm4 0v6h2V9z"/></svg>',
-      description: 'Apprenez ou reconfigurez les raccourcis d’activation rapides.',
+      description: 'Configurez les raccourcis d’activation et facilitez la navigation.',
+    },
+    {
+      id: 'organize',
+      label: 'Optimisation',
+      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h9v4H4zm0 5h6v4H4zm0 5h11v4H4zm12-5l4-3v10z"/></svg>',
+      description: 'Priorisez, regroupez et synchronisez les modules pour vos équipes.',
     },
   ];
   const viewOrder = viewDefinitions.map((view) => view.id);
@@ -3224,14 +3180,14 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   const viewContainer = document.createElement('div');
   viewContainer.className = 'a11ytb-view-container';
 
-  const modulesView = document.createElement('div');
-  modulesView.className = 'a11ytb-view a11ytb-view--modules';
-  const modulesMeta = viewMetaById.get('modules');
-  modulesView.id = modulesMeta?.panelId || 'a11ytb-panel-modules';
-  modulesView.setAttribute('role', 'tabpanel');
-  modulesView.setAttribute('aria-labelledby', modulesMeta?.tabId || 'a11ytb-tab-modules');
-  modulesView.setAttribute('aria-hidden', 'false');
-  modulesView.tabIndex = 0;
+  const statusView = document.createElement('div');
+  statusView.className = 'a11ytb-view a11ytb-view--status';
+  const statusMeta = viewMetaById.get('status');
+  statusView.id = statusMeta?.panelId || 'a11ytb-panel-status';
+  statusView.setAttribute('role', 'tabpanel');
+  statusView.setAttribute('aria-labelledby', statusMeta?.tabId || 'a11ytb-tab-status');
+  statusView.setAttribute('aria-hidden', 'false');
+  statusView.tabIndex = 0;
 
   const optionsView = document.createElement('div');
   optionsView.className = 'a11ytb-view a11ytb-view--options';
@@ -3243,15 +3199,35 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   optionsView.setAttribute('hidden', '');
   optionsView.tabIndex = -1;
 
-  const organizeView = document.createElement('div');
-  organizeView.className = 'a11ytb-view a11ytb-view--organize';
-  const organizeMeta = viewMetaById.get('organize');
-  organizeView.id = organizeMeta?.panelId || 'a11ytb-panel-organize';
-  organizeView.setAttribute('role', 'tabpanel');
-  organizeView.setAttribute('aria-labelledby', organizeMeta?.tabId || 'a11ytb-tab-organize');
-  organizeView.setAttribute('aria-hidden', 'true');
-  organizeView.setAttribute('hidden', '');
-  organizeView.tabIndex = -1;
+  const profilesView = document.createElement('div');
+  profilesView.className = 'a11ytb-view a11ytb-view--profiles';
+  const profilesMeta = viewMetaById.get('profiles');
+  profilesView.id = profilesMeta?.panelId || 'a11ytb-panel-profiles';
+  profilesView.setAttribute('role', 'tabpanel');
+  profilesView.setAttribute('aria-labelledby', profilesMeta?.tabId || 'a11ytb-tab-profiles');
+  profilesView.setAttribute('aria-hidden', 'true');
+  profilesView.setAttribute('hidden', '');
+  profilesView.tabIndex = -1;
+
+  const activityView = document.createElement('div');
+  activityView.className = 'a11ytb-view a11ytb-view--activity';
+  const activityMeta = viewMetaById.get('activity');
+  activityView.id = activityMeta?.panelId || 'a11ytb-panel-activity';
+  activityView.setAttribute('role', 'tabpanel');
+  activityView.setAttribute('aria-labelledby', activityMeta?.tabId || 'a11ytb-tab-activity');
+  activityView.setAttribute('aria-hidden', 'true');
+  activityView.setAttribute('hidden', '');
+  activityView.tabIndex = -1;
+
+  const modulesView = document.createElement('div');
+  modulesView.className = 'a11ytb-view a11ytb-view--modules';
+  const modulesMeta = viewMetaById.get('modules');
+  modulesView.id = modulesMeta?.panelId || 'a11ytb-panel-modules';
+  modulesView.setAttribute('role', 'tabpanel');
+  modulesView.setAttribute('aria-labelledby', modulesMeta?.tabId || 'a11ytb-tab-modules');
+  modulesView.setAttribute('aria-hidden', 'true');
+  modulesView.setAttribute('hidden', '');
+  modulesView.tabIndex = -1;
 
   const guidesView = document.createElement('div');
   guidesView.className = 'a11ytb-view a11ytb-view--guides';
@@ -3273,12 +3249,25 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   shortcutsView.setAttribute('hidden', '');
   shortcutsView.tabIndex = -1;
 
+  const organizeView = document.createElement('div');
+  organizeView.className = 'a11ytb-view a11ytb-view--organize';
+  const organizeMeta = viewMetaById.get('organize');
+  organizeView.id = organizeMeta?.panelId || 'a11ytb-panel-organize';
+  organizeView.setAttribute('role', 'tabpanel');
+  organizeView.setAttribute('aria-labelledby', organizeMeta?.tabId || 'a11ytb-tab-organize');
+  organizeView.setAttribute('aria-hidden', 'true');
+  organizeView.setAttribute('hidden', '');
+  organizeView.tabIndex = -1;
+
   const viewElements = new Map([
-    ['modules', modulesView],
+    ['status', statusView],
     ['options', optionsView],
-    ['organize', organizeView],
+    ['profiles', profilesView],
+    ['activity', activityView],
+    ['modules', modulesView],
     ['guides', guidesView],
     ['shortcuts', shortcutsView],
+    ['organize', organizeView],
   ]);
 
   const layoutPresets = [
@@ -3556,14 +3545,15 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   let releaseFlyoutInert = null;
   let lastFlyoutFocus = null;
 
-  shellNav.append(statusCenter, viewToggle, viewAnnouncement);
+  statusView.append(statusCenter);
+  shellMenu.append(viewToggle, viewAnnouncement);
   shellMain.append(viewContainer);
-  shell.append(shellNav, shellMain);
+  shell.append(shellMenu, shellMain);
   body.append(shell);
 
-  const optionsScroll = document.createElement('div');
-  optionsScroll.className = 'a11ytb-options-scroll';
-  optionsScroll.classList.add('a11ytb-options-scroll--panel');
+  const profilesScroll = document.createElement('div');
+  profilesScroll.className = 'a11ytb-options-scroll';
+  profilesScroll.classList.add('a11ytb-options-scroll--panel');
 
   const profilesSection = document.createElement('section');
   profilesSection.className = 'a11ytb-options-section';
@@ -3597,6 +3587,12 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   const profilesList = document.createElement('div');
   profilesList.className = 'a11ytb-profile-grid';
   profilesSection.append(profilesHeader, profilesToolbar, profilesList);
+  profilesScroll.append(profilesSection);
+  profilesView.append(profilesScroll);
+
+  const optionsScroll = document.createElement('div');
+  optionsScroll.className = 'a11ytb-options-scroll';
+  optionsScroll.classList.add('a11ytb-options-scroll--panel');
 
   const configSection = document.createElement('section');
   configSection.className = 'a11ytb-options-section';
@@ -3614,7 +3610,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   configList.className = 'a11ytb-config-grid';
   configSection.append(configHeader, configList);
 
-  optionsScroll.append(profilesSection, configSection);
+  optionsScroll.append(configSection);
   optionsView.append(optionsScroll);
 
   const guidesScroll = document.createElement('div');
@@ -4300,13 +4296,16 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   shortcutsScroll.append(shortcutsSection);
   shortcutsView.append(shortcutsScroll);
 
-  viewContainer.append(modulesView, optionsView, organizeView, guidesView, shortcutsView);
-
-  const footer = document.createElement('div');
-  footer.className = 'a11ytb-header';
-  const footerTitle = document.createElement('div');
-  footerTitle.className = 'a11ytb-title';
-  footerTitle.textContent = buildShortcutSummary(state.get());
+  viewContainer.append(
+    statusView,
+    optionsView,
+    profilesView,
+    activityView,
+    modulesView,
+    guidesView,
+    shortcutsView,
+    organizeView
+  );
 
   const activity = document.createElement('details');
   activity.className = 'a11ytb-activity';
@@ -4325,7 +4324,33 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     <ol class="a11ytb-activity-list" data-ref="activity-list"></ol>
   `;
 
-  footer.append(footerTitle, activity);
+  const activitySection = document.createElement('section');
+  activitySection.className = 'a11ytb-options-section a11ytb-options-section--activity';
+  const activityHeader = document.createElement('div');
+  activityHeader.className = 'a11ytb-section-header';
+  const activityTitle = document.createElement('h3');
+  activityTitle.className = 'a11ytb-section-title';
+  activityTitle.textContent = 'Journal des activités';
+  const activityDescription = document.createElement('p');
+  activityDescription.className = 'a11ytb-section-description';
+  activityDescription.textContent =
+    'Consultez les alertes récentes, exports et synchronisations de la boîte à outils.';
+  activityHeader.append(activityTitle, activityDescription);
+  activitySection.append(activityHeader, activity);
+
+  const activityScroll = document.createElement('div');
+  activityScroll.className = 'a11ytb-options-scroll';
+  activityScroll.classList.add('a11ytb-options-scroll--panel');
+  activityScroll.append(activitySection);
+  activityView.append(activityScroll);
+
+  const footer = document.createElement('div');
+  footer.className = 'a11ytb-header';
+  const footerTitle = document.createElement('div');
+  footerTitle.className = 'a11ytb-title';
+  footerTitle.textContent = buildShortcutSummary(state.get());
+
+  footer.append(footerTitle);
 
   panel.append(header, body, footer);
 
@@ -8049,13 +8074,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
 
   function syncView() {
     const prefs = getPreferences();
-    const currentView = prefs.view || 'modules';
-    const focusSection = state.get('ui.focusSection') || 'modules';
-    if (MENU_VIEW_IDS.includes(currentView) && focusSection !== 'menus') {
-      state.set('ui.focusSection', 'menus');
-    } else if (currentView === 'modules' && focusSection === 'menus') {
-      state.set('ui.focusSection', 'modules');
-    }
+    const currentView = prefs.view || 'status';
     const viewChanged = activeViewId !== currentView;
     const focusedElement = typeof document !== 'undefined' ? document.activeElement : null;
     viewButtons.forEach((btn, id) => {
@@ -8064,7 +8083,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       btn.setAttribute('aria-selected', String(active));
       btn.setAttribute('tabindex', active ? '0' : '-1');
     });
-    const nextViewElement = viewElements.get(currentView);
+    const nextViewElement = viewElements.get(currentView) || viewElements.get('status');
     const previousViewElement = activeViewId ? viewElements.get(activeViewId) : null;
     let shouldRefocus = Boolean(
       focusedElement &&
@@ -8147,13 +8166,6 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
         }
       });
     }
-    if (MENU_VIEW_IDS.includes(currentView)) {
-      const storedMenuView = state.get('ui.lastMenuView');
-      if (storedMenuView !== currentView) {
-        state.set('ui.lastMenuView', currentView);
-      }
-    }
-
     if (viewChanged && viewAnnouncement) {
       const meta = viewMetaById.get(currentView);
       viewAnnouncement.textContent = meta ? `${meta.label} affichée` : '';
@@ -8897,12 +8909,12 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
 
   const fabStack = document.createElement('div');
   fabStack.className = 'a11ytb-fab-stack';
-  fabStack.append(fab, statusLauncher, menuLauncher);
+  fabStack.append(fab);
 
   root.append(overlay, fabStack, panel, notificationsContainer);
 
   state.on(syncPanelFocusSection);
-  syncPanelFocusSection(state.get());
+  syncPanelFocusSection();
 
   let lastFocusedElement = null;
   let releaseOutsideInert = null;
@@ -9049,71 +9061,30 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     }
   }
 
-  function syncPanelFocusSection(snapshot = state.get()) {
-    const focusValue = snapshot?.ui?.focusSection ?? state.get('ui.focusSection') ?? 'modules';
-    const normalized = ['audit', 'modules', 'menus'].includes(focusValue) ? focusValue : 'modules';
+  function syncPanelFocusSection() {
     if (panel) {
-      panel.dataset.focusSection = normalized;
+      panel.dataset.focusSection = 'workspace';
     }
-
     const panelOpen = panel?.dataset.open === 'true';
-
-    const showViewToggle = normalized === 'menus';
-    setElementVisibility(viewToggle, showViewToggle);
+    setElementVisibility(viewToggle, true);
     if (viewAnnouncement) {
-      viewAnnouncement.hidden = !showViewToggle;
-      viewAnnouncement.setAttribute('aria-hidden', String(!showViewToggle));
+      viewAnnouncement.hidden = false;
+      viewAnnouncement.setAttribute('aria-hidden', 'false');
     }
-
-    const showShellMain = normalized !== 'audit';
-    setElementVisibility(shellMain, showShellMain, { manageAriaHidden: false });
-
-    const showViewContainer = normalized !== 'audit';
-    setElementVisibility(viewContainer, showViewContainer);
-
-    if (normalized === 'modules' && state.get('ui.view') !== 'modules') {
-      state.set('ui.view', 'modules');
-    } else if (normalized === 'menus') {
-      let desiredView = state.get('ui.view');
-      if (!MENU_VIEW_IDS.includes(desiredView)) {
-        const stored = state.get('ui.lastMenuView');
-        desiredView = MENU_VIEW_IDS.includes(stored) ? stored : MENU_VIEW_IDS[0];
-      }
-      if (state.get('ui.view') !== desiredView) {
-        state.set('ui.view', desiredView);
-      }
-    }
-
-    if (activity) {
-      const showActivity = normalized !== 'modules';
-      setElementVisibility(activity, showActivity);
-      if (showActivity && normalized === 'audit') {
-        activity.open = true;
-      } else if (!showActivity) {
-        activity.open = false;
-      }
-    }
-
-    [
-      [fab, normalized === 'modules'],
-      [statusLauncher, normalized === 'audit'],
-      [menuLauncher, normalized === 'menus'],
-    ].forEach(([button, active]) => {
-      if (!button) return;
-      button.classList.toggle('is-active', active);
-      button.setAttribute('aria-pressed', String(active));
-      button.setAttribute('aria-expanded', String(panelOpen && active));
-    });
+    setElementVisibility(shellMain, true, { manageAriaHidden: false });
+    setElementVisibility(viewContainer, true);
+    fab.classList.toggle('is-active', panelOpen);
+    fab.setAttribute('aria-pressed', String(panelOpen));
+    fab.setAttribute('aria-expanded', String(panelOpen));
   }
 
   function toggle(open) {
     const shouldOpen = open ?? panel.dataset.open !== 'true';
     panel.dataset.open = String(shouldOpen);
     panel.setAttribute('aria-hidden', String(!shouldOpen));
-    const focusSection = state.get('ui.focusSection') || 'modules';
-    fab.setAttribute('aria-expanded', String(shouldOpen && focusSection === 'modules'));
-    statusLauncher.setAttribute('aria-expanded', String(shouldOpen && focusSection === 'audit'));
-    menuLauncher.setAttribute('aria-expanded', String(shouldOpen && focusSection === 'menus'));
+    fab.setAttribute('aria-expanded', String(shouldOpen));
+    fab.setAttribute('aria-pressed', String(shouldOpen));
+    fab.classList.toggle('is-active', shouldOpen);
     overlay.dataset.open = String(shouldOpen);
     overlay.setAttribute('aria-hidden', String(!shouldOpen));
     document.body.classList.toggle('a11ytb-modal-open', shouldOpen);
@@ -9165,40 +9136,8 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     }
   }
 
-  statusLauncher.addEventListener('click', () => {
-    if (state.get('ui.focusSection') !== 'audit') {
-      state.set('ui.focusSection', 'audit');
-    }
-    toggle(true);
-    window.setTimeout(() => {
-      if (typeof statusCenter?.scrollIntoView === 'function') {
-        statusCenter.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-      if (activity) {
-        activity.open = true;
-      }
-    }, 180);
-    logActivity('Consultation de l’audit temps réel', {
-      module: 'audit',
-      tags: ['audit', 'status'],
-    });
-  });
-
   fab.addEventListener('click', () => {
-    if (state.get('ui.focusSection') !== 'modules') {
-      state.set('ui.focusSection', 'modules');
-    }
-    if (state.get('ui.view') !== 'modules') {
-      state.set('ui.view', 'modules');
-    }
-    toggle(true);
-  });
-
-  menuLauncher.addEventListener('click', () => {
-    if (state.get('ui.focusSection') !== 'menus') {
-      state.set('ui.focusSection', 'menus');
-    }
-    toggle(true);
+    toggle();
   });
   header.querySelector('[data-action="close"]').addEventListener('click', () => toggle(false));
   header.querySelector('[data-action="reset"]').addEventListener('click', () => {
@@ -9339,7 +9278,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     } else if (action.dataset.action === 'activity-send-sync') {
       triggerManualSyncSend();
     } else if (action.dataset.action === 'activity-open-audit') {
-      state.set('ui.focusSection', 'audit');
+      state.set('ui.view', 'status');
       toggle(true);
       window.setTimeout(() => {
         if (typeof statusCenter?.scrollIntoView === 'function') {
