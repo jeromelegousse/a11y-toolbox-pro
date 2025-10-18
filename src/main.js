@@ -120,7 +120,7 @@ const baseInitial = {
     search: '',
     moduleLayout: 'double-column',
     moduleFlyoutOpen: false,
-    fullscreen: false,
+    fullscreen: true,
     pinned: [],
     hidden: [],
     disabled: [],
@@ -138,7 +138,7 @@ const baseInitial = {
       collection: 'all',
     },
     activity: [],
-    view: 'modules',
+    view: 'status',
     lastProfile: null,
     guides: {
       completedSteps: {},
