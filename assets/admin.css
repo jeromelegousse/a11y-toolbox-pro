@@ -104,6 +104,18 @@
   gap: 24px;
 }
 
+.a11ytb-admin-availability {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 20px;
+  background: var(--a11ytb-admin-surface);
+  border: 1px solid var(--a11ytb-admin-border);
+  border-radius: var(--a11ytb-radius-lg, 12px);
+  padding: 20px;
+  box-shadow: 0 1px 0 rgb(15 23 42 / 6%);
+}
+
 .a11ytb-admin-section {
   background: var(--a11ytb-admin-surface);
   border: 1px solid var(--a11ytb-admin-border);
@@ -329,8 +341,9 @@
 
 .a11ytb-admin-module-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 18px;
+  align-content: start;
 }
 
 .a11ytb-admin-module-card {
