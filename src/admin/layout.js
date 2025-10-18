@@ -222,7 +222,82 @@ export function createAdminLayout(runtimePanel) {
 
   exportSection.append(exportHeader, exportList, exportEmpty);
 
-  mainColumn.append(introSection, dashboard, syncSection, exportSection);
+  const shareSection = document.createElement('section');
+  shareSection.className = 'a11ytb-admin-section';
+
+  const shareHeader = document.createElement('div');
+  shareHeader.className = 'a11ytb-admin-section-header';
+
+  const shareTitle = document.createElement('h2');
+  shareTitle.className = 'a11ytb-admin-section-title';
+  shareTitle.textContent = 'Partages de profils';
+
+  const shareDescription = document.createElement('p');
+  shareDescription.className = 'a11ytb-admin-section-description';
+  shareDescription.textContent =
+    'Journal des profils diffusés auprès de l’équipe et des retraits de partage.';
+
+  const shareStatus = document.createElement('p');
+  shareStatus.className = 'a11ytb-admin-live';
+  shareStatus.setAttribute('role', 'status');
+  shareStatus.setAttribute('aria-live', 'polite');
+  shareStatus.textContent = 'Aucun partage enregistré.';
+
+  shareHeader.append(shareTitle, shareDescription, shareStatus);
+
+  const shareList = document.createElement('ul');
+  shareList.className = 'a11ytb-admin-share-list';
+  shareList.setAttribute('role', 'list');
+  shareList.hidden = true;
+
+  const shareEmpty = document.createElement('p');
+  shareEmpty.className = 'a11ytb-admin-empty';
+  shareEmpty.textContent = 'Aucun destinataire enregistré pour le moment.';
+
+  shareSection.append(shareHeader, shareList, shareEmpty);
+
+  const automationSection = document.createElement('section');
+  automationSection.className = 'a11ytb-admin-section';
+
+  const automationHeader = document.createElement('div');
+  automationHeader.className = 'a11ytb-admin-section-header';
+
+  const automationTitle = document.createElement('h2');
+  automationTitle.className = 'a11ytb-admin-section-title';
+  automationTitle.textContent = 'Automatisations & raccourcis';
+
+  const automationDescription = document.createElement('p');
+  automationDescription.className = 'a11ytb-admin-section-description';
+  automationDescription.textContent =
+    'Suivi des raccourcis appliqués automatiquement et des presets configurés par profil.';
+
+  const automationStatus = document.createElement('p');
+  automationStatus.className = 'a11ytb-admin-live';
+  automationStatus.setAttribute('role', 'status');
+  automationStatus.setAttribute('aria-live', 'polite');
+  automationStatus.textContent = 'Aucune automatisation enregistrée.';
+
+  automationHeader.append(automationTitle, automationDescription, automationStatus);
+
+  const automationList = document.createElement('ul');
+  automationList.className = 'a11ytb-admin-automation-list';
+  automationList.setAttribute('role', 'list');
+  automationList.hidden = true;
+
+  const automationEmpty = document.createElement('p');
+  automationEmpty.className = 'a11ytb-admin-empty';
+  automationEmpty.textContent = 'Aucun preset de raccourci n’a encore été appliqué.';
+
+  automationSection.append(automationHeader, automationList, automationEmpty);
+
+  mainColumn.append(
+    introSection,
+    dashboard,
+    syncSection,
+    exportSection,
+    shareSection,
+    automationSection
+  );
 
   const availabilityPanel = document.createElement('aside');
   availabilityPanel.className = 'a11ytb-admin-availability';
@@ -325,6 +400,12 @@ export function createAdminLayout(runtimePanel) {
     exportList,
     exportEmpty,
     exportStatus,
+    shareList,
+    shareEmpty,
+    shareStatus,
+    automationList,
+    automationEmpty,
+    automationStatus,
     availability: {
       root: availabilityPanel,
       toolbar: availabilityToolbar,

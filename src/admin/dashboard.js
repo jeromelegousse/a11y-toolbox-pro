@@ -267,6 +267,150 @@ export function initAdminDashboard(mount) {
     }
   }
 
+  function renderProfileShareTimeline(events) {
+    if (!layout.shareList || !layout.shareEmpty) return;
+    const items = Array.isArray(events) ? events.slice(0, 8) : [];
+    layout.shareList.innerHTML = '';
+    if (!items.length) {
+      layout.shareEmpty.hidden = false;
+      layout.shareList.hidden = true;
+      if (layout.shareStatus) {
+        layout.shareStatus.textContent = 'Aucun partage enregistré.';
+      }
+      return;
+    }
+    layout.shareEmpty.hidden = true;
+    layout.shareList.hidden = false;
+    items.forEach((entry) => {
+      const item = document.createElement('li');
+      item.className = 'a11ytb-admin-share-item';
+
+      const head = document.createElement('div');
+      head.className = 'a11ytb-admin-share-head';
+
+      const profile = document.createElement('span');
+      profile.className = 'a11ytb-admin-share-profile';
+      profile.textContent = entry.profileName || entry.profileId;
+
+      const badge = document.createElement('span');
+      badge.className = 'a11ytb-admin-share-badge';
+      badge.dataset.status = entry.action || 'shared';
+      switch (entry.action) {
+        case 'revoked':
+          badge.textContent = 'Arrêté';
+          break;
+        case 'updated':
+          badge.textContent = 'Mis à jour';
+          break;
+        default:
+          badge.textContent = 'Partagé';
+      }
+
+      head.append(profile, badge);
+
+      const meta = document.createElement('p');
+      meta.className = 'a11ytb-admin-share-meta';
+      const count = Number.isFinite(entry.count) ? entry.count : 0;
+      const countLabel =
+        entry.action === 'revoked'
+          ? 'Partage désactivé'
+          : `${count || 0} destinataire${count > 1 ? 's' : ''}`;
+      const timeLabel = formatDateRelative(entry.timestamp);
+      meta.textContent = `${countLabel} • ${timeLabel}`;
+
+      item.append(head, meta);
+
+      const recipients = Array.isArray(entry.recipients) ? entry.recipients : [];
+      if (recipients.length && entry.action !== 'revoked') {
+        const list = document.createElement('ul');
+        list.className = 'a11ytb-admin-share-recipients';
+        list.setAttribute('role', 'list');
+        recipients.slice(0, 6).forEach((recipient) => {
+          const li = document.createElement('li');
+          li.className = 'a11ytb-admin-share-recipient';
+          li.textContent = recipient;
+          list.append(li);
+        });
+        item.append(list);
+      }
+
+      layout.shareList.append(item);
+    });
+
+    if (layout.shareStatus) {
+      layout.shareStatus.textContent = `Dernier partage ${formatDateRelative(items[0].timestamp)}`;
+    }
+  }
+
+  function renderAutomationTimeline(events) {
+    if (!layout.automationList || !layout.automationEmpty) return;
+    const items = Array.isArray(events) ? events.slice(0, 8) : [];
+    layout.automationList.innerHTML = '';
+    if (!items.length) {
+      layout.automationEmpty.hidden = false;
+      layout.automationList.hidden = true;
+      if (layout.automationStatus) {
+        layout.automationStatus.textContent = 'Aucune automatisation enregistrée.';
+      }
+      return;
+    }
+    layout.automationEmpty.hidden = true;
+    layout.automationList.hidden = false;
+    items.forEach((entry) => {
+      const item = document.createElement('li');
+      item.className = 'a11ytb-admin-automation-item';
+
+      const head = document.createElement('div');
+      head.className = 'a11ytb-admin-automation-head';
+
+      const profile = document.createElement('span');
+      profile.className = 'a11ytb-admin-automation-profile';
+      profile.textContent = entry.profileName || entry.profileId;
+
+      const badge = document.createElement('span');
+      badge.className = 'a11ytb-admin-automation-badge';
+      const automationStatus = entry.action || 'automated';
+      badge.dataset.status = automationStatus;
+      switch (automationStatus) {
+        case 'apply-shortcuts':
+          badge.textContent = 'Appliqué';
+          break;
+        case 'update-shortcuts':
+          badge.textContent = 'Configuré';
+          break;
+        default:
+          badge.textContent = 'Automatisé';
+      }
+
+      head.append(profile, badge);
+
+      const meta = document.createElement('p');
+      meta.className = 'a11ytb-admin-automation-meta';
+      const presets = Number.isFinite(entry.presets) ? entry.presets : 0;
+      const invalid = Number.isFinite(entry.invalid) ? entry.invalid : 0;
+      const parts = [];
+      parts.push(
+        presets
+          ? `${presets} raccourci${presets > 1 ? 's' : ''}`
+          : 'Aucun raccourci personnalisé'
+      );
+      if (invalid > 0) {
+        parts.push(`${invalid} ignoré${invalid > 1 ? 's' : ''}`);
+      }
+      parts.push(formatDateRelative(entry.timestamp));
+      meta.textContent = parts.join(' • ');
+
+      item.append(head, meta);
+      layout.automationList.append(item);
+    });
+
+    if (layout.automationStatus) {
+      layout.automationStatus.textContent = `Dernière automatisation ${formatDateRelative(
+        items[0].timestamp
+      )}`;
+    }
+  }
+
   function sync(snapshot) {
     currentSnapshot = snapshot || {};
     const summaries = summarizeStatuses(currentSnapshot);
@@ -279,6 +423,8 @@ export function initAdminDashboard(mount) {
     const collaboration = currentSnapshot.collaboration || {};
     renderSyncTimeline(collaboration.syncs);
     renderExportTimeline(collaboration.exports);
+    renderProfileShareTimeline(collaboration.profileShares);
+    renderAutomationTimeline(collaboration.automations);
   }
 
   const actions = {
