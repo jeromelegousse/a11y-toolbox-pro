@@ -154,9 +154,9 @@ export function buildModuleEntries(snapshot = {}) {
   const collectionsDisabled = new Set(ensureArray(stateUi.collections?.disabled));
   const { moduleToProfiles } = computeProfiles(snapshot);
 
-  return moduleCatalog.map((entry) => {
-    const manifest = entry.manifest || {};
-    const runtimeEntry = runtime[entry.id] || {};
+  return moduleCatalog.map((moduleDefinition) => {
+    const manifest = moduleDefinition.manifest || {};
+    const runtimeEntry = runtime[moduleDefinition.id] || {};
     const blockIds = ensureArray(runtimeEntry.blockIds);
     const status = resolveStatus(runtimeEntry, {
       disabled: disabledSet,
@@ -164,7 +164,7 @@ export function buildModuleEntries(snapshot = {}) {
       disabledCollections: collectionsDisabled,
     });
 
-    const collections = moduleToCollections.get(entry.id);
+    const collections = moduleToCollections.get(moduleDefinition.id);
     const collectionIds = collections ? Array.from(collections) : [];
     const isCollectionDisabled = collectionIds.some((collectionId) =>
       collectionsDisabled.has(collectionId)
@@ -189,11 +189,11 @@ export function buildModuleEntries(snapshot = {}) {
       metrics.lastAttemptAt = runtimeEntry.lastAttemptAt;
     }
 
-    const profiles = moduleToProfiles.get(entry.id) || new Set();
+    const profiles = moduleToProfiles.get(moduleDefinition.id) || new Set();
     const flags = buildFlags(isCollectionDisabled, runtimeEntry, compat);
 
     const entry = {
-      id: entry.id,
+      id: moduleDefinition.id,
       manifest,
       runtime: runtimeEntry,
       blockIds,
@@ -212,7 +212,7 @@ export function buildModuleEntries(snapshot = {}) {
       collections: collectionIds,
       dependencies,
       flags,
-      searchText: buildSearchText({ id: entry.id, manifest }),
+      searchText: buildSearchText({ id: moduleDefinition.id, manifest }),
     };
 
     entry.availability = determineAvailability({
