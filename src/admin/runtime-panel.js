@@ -24,6 +24,9 @@ export function buildRuntimePanel() {
     ['Chargés', 'loaded'],
     ['Tentatives', 'attempts'],
     ['Échecs', 'failures'],
+    ['Requêtes réseau', 'networkRequests'],
+    ['Cache (hits)', 'networkHits'],
+    ['Ressources hors ligne', 'networkOffline'],
   ];
 
   const counterRefs = {};
@@ -97,6 +100,17 @@ export function updateRuntimePanel(panel, entries) {
   const attempts = entries.reduce((acc, entry) => acc + (entry.metrics.attempts || 0), 0);
   const successes = entries.reduce((acc, entry) => acc + (entry.metrics.successes || 0), 0);
   const failures = entries.reduce((acc, entry) => acc + (entry.metrics.failures || 0), 0);
+  const networkRequests = entries.reduce(
+    (acc, entry) => acc + (entry.runtime.network?.requests || 0),
+    0
+  );
+  const networkHits = entries.reduce((acc, entry) => acc + (entry.runtime.network?.hits || 0), 0);
+  const networkOffline = entries.reduce((acc, entry) => {
+    const resources = entry.runtime.network?.resources || [];
+    return (
+      acc + resources.filter((resource) => resource.offline || resource.status === 'offline').length
+    );
+  }, 0);
 
   panel.counters.total.textContent = total.toString();
   panel.counters.active.textContent = active.toString();
@@ -105,6 +119,9 @@ export function updateRuntimePanel(panel, entries) {
   panel.counters.loaded.textContent = loaded.toString();
   panel.counters.attempts.textContent = attempts.toString();
   panel.counters.failures.textContent = failures.toString();
+  panel.counters.networkRequests.textContent = networkRequests.toString();
+  panel.counters.networkHits.textContent = networkHits.toString();
+  panel.counters.networkOffline.textContent = networkOffline.toString();
 
   const totalOutcomes = successes + failures;
   const successRatio = totalOutcomes > 0 ? Math.round((successes / totalOutcomes) * 100) : 0;
@@ -115,7 +132,7 @@ export function updateRuntimePanel(panel, entries) {
     `${successes} chargement(s) réussi(s) sur ${totalOutcomes}`
   );
   panel.status.textContent = total
-    ? `Modules actifs : ${active} sur ${total}. Chargements réussis à ${successRatio} %.`
+    ? `Modules actifs : ${active} sur ${total}. Chargements réussis à ${successRatio} %. Requêtes réseau : ${networkRequests}.`
     : 'En attente de données runtime.';
 
   const combinedTimings = entries

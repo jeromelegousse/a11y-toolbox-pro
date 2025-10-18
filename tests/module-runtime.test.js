@@ -205,3 +205,170 @@ describe('setupModuleRuntime — dépendances', () => {
     );
   });
 });
+
+describe('setupModuleRuntime — ressources réseau', () => {
+  beforeEach(() => {
+    globalThis.window = { a11ytb: {} };
+    window.a11ytb.logActivity = vi.fn();
+    __resetMockModules();
+    __setMockManifests([]);
+    __setMockManifestHistory([]);
+  });
+
+  it('met en cache une ressource réseau et réutilise la mémoire', async () => {
+    const moduleId = `network-${Date.now()}`;
+    __setMockModule(moduleId, { init: vi.fn() });
+
+    const manifest = {
+      id: moduleId,
+      name: 'Module réseau test',
+      version: '1.0.0',
+      runtime: {
+        fetch: {
+          resources: [
+            {
+              id: 'config',
+              url: 'https://example.test/config.json',
+              format: 'json',
+              strategy: 'on-demand',
+              cache: 'memory',
+            },
+          ],
+        },
+      },
+    };
+    __setMockManifests([manifest]);
+
+    const fetchResponse = { ok: true };
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(fetchResponse),
+        text: () => Promise.resolve(JSON.stringify(fetchResponse)),
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      })
+    );
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetchMock;
+
+    try {
+      const state = createStateMock({
+        ui: { disabled: [] },
+        runtime: { modules: {} },
+      });
+
+      const catalog = [
+        {
+          id: moduleId,
+          manifest,
+          loader: () => Promise.resolve(),
+        },
+      ];
+
+      const runtime = setupModuleRuntime({ state, catalog });
+
+      await runtime.fetchResource(moduleId, 'config');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const network = state.get(`runtime.modules.${moduleId}.network`);
+      expect(network.status === 'ready' || network.status === 'idle').toBe(true);
+      const resource = network.resources.find((entry) => entry.id === 'config');
+      expect(resource).toBeDefined();
+      expect(resource.status === 'ready' || resource.status === 'idle').toBe(true);
+
+      fetchMock.mockClear();
+      await runtime.fetchResource(moduleId, 'config');
+      expect(fetchMock).not.toHaveBeenCalled();
+      const networkAfter = state.get(`runtime.modules.${moduleId}.network`);
+      expect(networkAfter.hits).toBeGreaterThanOrEqual(1);
+      const cached = await runtime.getCachedResource(moduleId, 'config');
+      expect(cached).toEqual(fetchResponse);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('sert les données depuis le cache lorsque le navigateur est hors ligne', async () => {
+    const moduleId = `network-offline-${Date.now()}`;
+    __setMockModule(moduleId, { init: vi.fn() });
+
+    const manifest = {
+      id: moduleId,
+      name: 'Module hors ligne',
+      version: '1.0.0',
+      runtime: {
+        fetch: {
+          resources: [
+            {
+              id: 'dataset',
+              url: 'https://example.test/data.json',
+              format: 'json',
+              strategy: 'on-demand',
+              cache: 'memory',
+            },
+          ],
+        },
+      },
+    };
+    __setMockManifests([manifest]);
+
+    const fetchResponse = { offline: false };
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(fetchResponse),
+        text: () => Promise.resolve(JSON.stringify(fetchResponse)),
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      })
+    );
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetchMock;
+
+    const state = createStateMock({
+      ui: { disabled: [] },
+      runtime: { modules: {} },
+    });
+
+    const catalog = [
+      {
+        id: moduleId,
+        manifest,
+        loader: () => Promise.resolve(),
+      },
+    ];
+
+    const originalNavigator = globalThis.navigator;
+
+    try {
+      const runtime = setupModuleRuntime({ state, catalog });
+
+      await runtime.fetchResource(moduleId, 'dataset');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      Object.defineProperty(globalThis, 'navigator', {
+        value: { onLine: false },
+        configurable: true,
+      });
+
+      fetchMock.mockImplementation(() => Promise.reject(new Error('offline')));
+      const cached = await runtime.fetchResource(moduleId, 'dataset');
+      expect(cached).toEqual(fetchResponse);
+      expect(fetchMock).not.toHaveBeenCalledTimes(2);
+
+      const network = state.get(`runtime.modules.${moduleId}.network`);
+      const resource = network.resources.find((entry) => entry.id === 'dataset');
+      expect(resource.offline).toBe(true);
+    } finally {
+      if (originalNavigator) {
+        Object.defineProperty(globalThis, 'navigator', {
+          value: originalNavigator,
+          configurable: true,
+        });
+      } else {
+        delete globalThis.navigator;
+      }
+      globalThis.fetch = originalFetch;
+    }
+  });
+});

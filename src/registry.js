@@ -26,7 +26,20 @@ function serializeManifest(manifest) {
   }
 }
 
+function parseManifestSignature(signature) {
+  if (!signature) {
+    return {};
+  }
+  try {
+    return JSON.parse(signature);
+  } catch (error) {
+    console.warn('a11ytb: impossible de parser le manifest pour diff.', error);
+    return {};
+  }
+}
+
 function createHistoryEntry(manifest, { status, reason }) {
+  const signature = serializeManifest(manifest);
   const entry = {
     version: manifest.version,
     versionInfo: manifest.versionInfo,
@@ -34,6 +47,8 @@ function createHistoryEntry(manifest, { status, reason }) {
     status,
     reason,
     timestamp: Date.now(),
+    signature,
+    snapshot: parseManifestSignature(signature),
   };
   if (manifest.name) {
     entry.name = manifest.name;
@@ -158,6 +173,99 @@ export function listModuleManifestHistory() {
     id,
     history: entries.slice(),
   }));
+}
+
+function flattenManifest(value, prefix = '', target = new Map()) {
+  if (Array.isArray(value)) {
+    if (!value.length && prefix) {
+      target.set(prefix, []);
+      return target;
+    }
+    value.forEach((item, index) => {
+      const nextPrefix = prefix ? `${prefix}[${index}]` : `[${index}]`;
+      flattenManifest(item, nextPrefix, target);
+    });
+    return target;
+  }
+  if (value && typeof value === 'object') {
+    const keys = Object.keys(value);
+    if (!keys.length && prefix) {
+      target.set(prefix, {});
+      return target;
+    }
+    keys.forEach((key) => {
+      const nextPrefix = prefix ? `${prefix}.${key}` : key;
+      flattenManifest(value[key], nextPrefix, target);
+    });
+    return target;
+  }
+  if (prefix) {
+    target.set(prefix, value);
+  }
+  return target;
+}
+
+function normalizeSnapshot(entry) {
+  if (!entry) {
+    return {};
+  }
+  if (entry.snapshot && typeof entry.snapshot === 'object') {
+    return entry.snapshot;
+  }
+  if (typeof entry === 'object') {
+    return entry;
+  }
+  return {};
+}
+
+function serializeValue(value) {
+  if (typeof value === 'undefined') {
+    return 'undefined';
+  }
+  try {
+    return JSON.stringify(value);
+  } catch (error) {
+    return String(value);
+  }
+}
+
+export function diffManifestSnapshots(previousEntry, nextEntry) {
+  const previous = normalizeSnapshot(previousEntry);
+  const next = normalizeSnapshot(nextEntry);
+  const previousFlat = flattenManifest(previous);
+  const nextFlat = flattenManifest(next);
+
+  const diff = {
+    added: [],
+    removed: [],
+    changed: [],
+  };
+
+  nextFlat.forEach((value, path) => {
+    if (!path) return;
+    if (!previousFlat.has(path)) {
+      diff.added.push({ path, value });
+      return;
+    }
+    const previousValue = previousFlat.get(path);
+    if (serializeValue(previousValue) !== serializeValue(value)) {
+      diff.changed.push({ path, previous: previousValue, next: value });
+    }
+  });
+
+  previousFlat.forEach((value, path) => {
+    if (!path) return;
+    if (!nextFlat.has(path)) {
+      diff.removed.push({ path, value });
+    }
+  });
+
+  const sortByPath = (a, b) => a.path.localeCompare(b.path);
+  diff.added.sort(sortByPath);
+  diff.removed.sort(sortByPath);
+  diff.changed.sort(sortByPath);
+
+  return diff;
 }
 
 const _blocks = new Map();

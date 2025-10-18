@@ -114,6 +114,360 @@ function evaluateCompatibility(manifest) {
   return report;
 }
 
+const RESOURCE_DEFAULT_MAX_AGE = 5 * 60 * 1000;
+const RESOURCE_STATUS_PRIORITY = new Map([
+  ['fetching', 5],
+  ['error', 4],
+  ['offline', 3],
+  ['stale', 2],
+  ['ready', 1],
+  ['idle', 0],
+]);
+
+const SUPPORTED_RESOURCE_FORMATS = new Set(['json', 'text', 'arrayBuffer']);
+const SUPPORTED_RESOURCE_CACHES = new Set(['memory', 'persistent', 'both', 'none']);
+const SUPPORTED_RESOURCE_STRATEGIES = new Set(['on-demand', 'lazy', 'preload']);
+const SUPPORTED_BACKGROUND_STRATEGIES = new Set(['idle', 'immediate']);
+
+const RESOURCE_CACHE_STORAGE_KEY = 'a11ytb:module-resources';
+const RESOURCE_CACHE_SW_NAME = 'a11ytb-module-runtime';
+const RESOURCE_CACHE_SW_PREFIX = 'https://a11ytb-runtime-cache/';
+
+function isNavigatorOnline() {
+  if (typeof navigator === 'undefined' || typeof navigator.onLine === 'undefined') {
+    return true;
+  }
+  return navigator.onLine !== false;
+}
+
+function ensureArrayBuffer(value) {
+  if (value instanceof ArrayBuffer) return value;
+  if (ArrayBuffer.isView(value)) {
+    return value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
+  }
+  if (Array.isArray(value)) {
+    const typed = new Uint8Array(value);
+    return typed.buffer;
+  }
+  return null;
+}
+
+function encodeArrayBuffer(value) {
+  const buffer = ensureArrayBuffer(value);
+  if (!buffer) return null;
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i += 1) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return typeof btoa === 'function'
+    ? btoa(binary)
+    : Buffer.from(binary, 'binary').toString('base64');
+}
+
+function decodeArrayBuffer(serialized) {
+  if (!serialized) return null;
+  try {
+    const binary =
+      typeof atob === 'function'
+        ? atob(serialized)
+        : Buffer.from(serialized, 'base64').toString('binary');
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  } catch (error) {
+    console.warn('a11ytb: impossible de décoder une ressource binaire mise en cache.', error);
+    return null;
+  }
+}
+
+function createPersistentResourceCache({
+  cacheName = RESOURCE_CACHE_SW_NAME,
+  storageKey = RESOURCE_CACHE_STORAGE_KEY,
+} = {}) {
+  if (typeof caches === 'object' && typeof caches.open === 'function') {
+    return {
+      ready: Promise.resolve(),
+      async get(key) {
+        try {
+          const cache = await caches.open(cacheName);
+          const request = new Request(`${RESOURCE_CACHE_SW_PREFIX}${encodeURIComponent(key)}`);
+          const response = await cache.match(request);
+          if (!response) return null;
+          let metadata = null;
+          const header = response.headers.get('X-A11YTB-Metadata');
+          if (header) {
+            try {
+              metadata = JSON.parse(header);
+            } catch (error) {
+              metadata = null;
+            }
+          }
+          const format = metadata?.format || 'json';
+          let data;
+          if (format === 'json') {
+            data = await response.clone().json();
+          } else if (format === 'text') {
+            data = await response.clone().text();
+          } else if (format === 'arrayBuffer') {
+            data = await response.clone().arrayBuffer();
+          } else {
+            data = await response.clone().text();
+          }
+          return {
+            data,
+            format,
+            fetchedAt: metadata?.fetchedAt ?? Date.now(),
+            expiresAt: metadata?.expiresAt ?? null,
+            size: metadata?.size ?? null,
+          };
+        } catch (error) {
+          console.warn('a11ytb: lecture du cache service worker impossible.', error);
+          return null;
+        }
+      },
+      async set(key, value) {
+        try {
+          const cache = await caches.open(cacheName);
+          let body;
+          if (value.format === 'json') {
+            body = JSON.stringify(value.data ?? null);
+          } else if (value.format === 'text') {
+            body = String(value.data ?? '');
+          } else if (value.format === 'arrayBuffer') {
+            const buffer = ensureArrayBuffer(value.data);
+            body = buffer ? new Blob([buffer]) : new Blob();
+          } else {
+            body = JSON.stringify(value.data ?? null);
+          }
+          const headers = new Headers();
+          if (value.format === 'json') {
+            headers.set('Content-Type', 'application/json');
+          } else if (value.format === 'text') {
+            headers.set('Content-Type', 'text/plain');
+          }
+          headers.set(
+            'X-A11YTB-Metadata',
+            JSON.stringify({
+              fetchedAt: value.fetchedAt ?? Date.now(),
+              expiresAt: value.expiresAt ?? null,
+              format: value.format,
+              size: value.size ?? null,
+            })
+          );
+          const request = new Request(`${RESOURCE_CACHE_SW_PREFIX}${encodeURIComponent(key)}`);
+          const response = new Response(body, { headers });
+          await cache.put(request, response);
+        } catch (error) {
+          console.warn(
+            'a11ytb: impossible de persister une ressource runtime dans le cache SW.',
+            error
+          );
+        }
+      },
+      async delete(key) {
+        try {
+          const cache = await caches.open(cacheName);
+          await cache.delete(`${RESOURCE_CACHE_SW_PREFIX}${encodeURIComponent(key)}`);
+        } catch (error) {
+          console.warn('a11ytb: suppression cache SW échouée.', error);
+        }
+      },
+      async clear() {
+        try {
+          await caches.delete(cacheName);
+        } catch (error) {
+          console.warn('a11ytb: nettoyage cache SW impossible.', error);
+        }
+      },
+    };
+  }
+
+  let store = new Map();
+  let storageAvailable = false;
+  try {
+    if (typeof localStorage?.getItem === 'function') {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          Object.entries(parsed).forEach(([key, value]) => {
+            store.set(key, value);
+          });
+        }
+      }
+      storageAvailable = true;
+    }
+  } catch (error) {
+    console.warn('a11ytb: stockage local indisponible pour les ressources runtime.', error);
+  }
+
+  function persist() {
+    if (!storageAvailable) return;
+    try {
+      const payload = {};
+      store.forEach((value, key) => {
+        payload[key] = value;
+      });
+      localStorage.setItem(storageKey, JSON.stringify(payload));
+    } catch (error) {
+      console.warn('a11ytb: impossible de persister les ressources runtime.', error);
+    }
+  }
+
+  return {
+    ready: Promise.resolve(),
+    async get(key) {
+      if (!store.has(key)) return null;
+      const entry = store.get(key);
+      if (entry?.format === 'arrayBuffer' && typeof entry.data === 'string') {
+        return { ...entry, data: decodeArrayBuffer(entry.data) };
+      }
+      return entry;
+    },
+    async set(key, value) {
+      let entry = value;
+      if (value.format === 'arrayBuffer') {
+        const encoded = encodeArrayBuffer(value.data);
+        if (!encoded) return;
+        entry = { ...value, data: encoded };
+      }
+      store.set(key, entry);
+      persist();
+    },
+    async delete(key) {
+      if (store.delete(key)) {
+        persist();
+      }
+    },
+    async clear() {
+      store.clear();
+      persist();
+    },
+  };
+}
+
+function computeResourceStatus(resources) {
+  if (!resources.length) return 'idle';
+  let current = 'idle';
+  resources.forEach((resource) => {
+    const status = resource.status || 'idle';
+    const currentPriority = RESOURCE_STATUS_PRIORITY.get(current) ?? 0;
+    const nextPriority = RESOURCE_STATUS_PRIORITY.get(status) ?? 0;
+    if (nextPriority > currentPriority) {
+      current = status;
+    }
+  });
+  return current;
+}
+
+function estimatePayloadSize(data, format) {
+  try {
+    if (format === 'arrayBuffer' && data) {
+      const buffer = ensureArrayBuffer(data);
+      return buffer ? buffer.byteLength : null;
+    }
+    if (format === 'text') {
+      const text = typeof data === 'string' ? data : String(data ?? '');
+      return new Blob([text]).size;
+    }
+    if (format === 'json') {
+      return new Blob([JSON.stringify(data ?? null)]).size;
+    }
+  } catch (error) {
+    console.warn('a11ytb: estimation de taille impossible pour une ressource runtime.', error);
+  }
+  return null;
+}
+
+function normalizeResourceConfig(resource, defaults = {}) {
+  if (!resource || typeof resource !== 'object') return null;
+  const id = typeof resource.id === 'string' && resource.id.trim() ? resource.id.trim() : null;
+  const url = typeof resource.url === 'string' && resource.url.trim() ? resource.url.trim() : null;
+  if (!id || !url) return null;
+  const strategy = SUPPORTED_RESOURCE_STRATEGIES.has(resource.strategy)
+    ? resource.strategy
+    : SUPPORTED_RESOURCE_STRATEGIES.has(defaults.strategy)
+      ? defaults.strategy
+      : 'on-demand';
+  const cacheMode = SUPPORTED_RESOURCE_CACHES.has(resource.cache)
+    ? resource.cache
+    : SUPPORTED_RESOURCE_CACHES.has(defaults.cache)
+      ? defaults.cache
+      : 'memory';
+  const format = SUPPORTED_RESOURCE_FORMATS.has(resource.format)
+    ? resource.format
+    : SUPPORTED_RESOURCE_FORMATS.has(defaults.format)
+      ? defaults.format
+      : 'json';
+  const background = SUPPORTED_BACKGROUND_STRATEGIES.has(resource.background)
+    ? resource.background
+    : SUPPORTED_BACKGROUND_STRATEGIES.has(defaults.background)
+      ? defaults.background
+      : strategy === 'preload'
+        ? 'idle'
+        : 'immediate';
+  const maxAge = Number.isFinite(resource.maxAge)
+    ? Math.max(0, resource.maxAge)
+    : Number.isFinite(defaults.maxAge)
+      ? Math.max(0, defaults.maxAge)
+      : RESOURCE_DEFAULT_MAX_AGE;
+  const staleWhileRevalidate =
+    typeof resource.staleWhileRevalidate === 'boolean'
+      ? resource.staleWhileRevalidate
+      : typeof defaults.staleWhileRevalidate === 'boolean'
+        ? defaults.staleWhileRevalidate
+        : true;
+  const priority = Number.isFinite(resource.priority)
+    ? resource.priority
+    : (defaults.priority ?? 0);
+  const headers =
+    resource.headers && typeof resource.headers === 'object'
+      ? { ...defaults.headers, ...resource.headers }
+      : defaults.headers
+        ? { ...defaults.headers }
+        : undefined;
+  const timeoutMs = Number.isFinite(resource.timeoutMs)
+    ? Math.max(0, resource.timeoutMs)
+    : Number.isFinite(defaults.timeoutMs)
+      ? Math.max(0, defaults.timeoutMs)
+      : null;
+  return {
+    id,
+    url,
+    strategy,
+    cache: cacheMode,
+    format,
+    background,
+    maxAge,
+    staleWhileRevalidate,
+    priority,
+    credentials: resource.credentials || defaults.credentials || 'same-origin',
+    headers,
+    method: resource.method || defaults.method || 'GET',
+    timeoutMs,
+  };
+}
+
+function resolveResourceUrl(resource, baseUrl) {
+  try {
+    if (/^https?:\/\//i.test(resource.url)) {
+      return resource.url;
+    }
+    if (baseUrl) {
+      return new URL(resource.url, baseUrl).toString();
+    }
+    if (typeof document !== 'undefined' && document.baseURI) {
+      return new URL(resource.url, document.baseURI).toString();
+    }
+  } catch (error) {
+    console.warn('a11ytb: résolution URL ressource impossible.', error);
+  }
+  return resource.url;
+}
+
 const METRICS_INCIDENT_LIMIT = 25;
 
 function appendIncident(metrics, incident) {
@@ -223,6 +577,14 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
   const moduleToBlocks = new Map();
   const moduleToCollections = new Map();
   const blockToModule = new Map();
+  const resourcePlans = new Map();
+  const resourceStates = new Map();
+  const resourceRequests = new Map();
+  const resourceMemoryCache = new Map();
+  const resourceTelemetry = new Map();
+  const resourceIdleHandles = new Map();
+  const resourceTriggers = new Map();
+  const persistentResourceCache = createPersistentResourceCache();
 
   collections.forEach((collection) => {
     if (!collection || typeof collection !== 'object') return;
@@ -234,6 +596,39 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
         moduleToCollections.set(moduleId, new Set());
       }
       moduleToCollections.get(moduleId).add(id);
+    });
+  });
+
+  catalog.forEach((entry) => {
+    if (!entry?.id) return;
+    const manifest = entry.manifest || manifests.get(entry.id) || {};
+    const fetchConfig = manifest?.runtime?.fetch;
+    if (!fetchConfig || typeof fetchConfig !== 'object') return;
+    const defaults = {
+      strategy: fetchConfig.strategy,
+      cache: fetchConfig.cache,
+      format: fetchConfig.format,
+      background: fetchConfig.background,
+      maxAge: fetchConfig.maxAge,
+      staleWhileRevalidate: fetchConfig.staleWhileRevalidate,
+      headers: fetchConfig.headers,
+      credentials: fetchConfig.credentials,
+      method: fetchConfig.method,
+      timeoutMs: fetchConfig.timeoutMs,
+    };
+    const baseUrl = typeof fetchConfig.baseUrl === 'string' ? fetchConfig.baseUrl : null;
+    const resources = Array.isArray(fetchConfig.resources)
+      ? fetchConfig.resources
+          .map((resource) => normalizeResourceConfig(resource, defaults))
+          .filter(Boolean)
+          .map((resource) => ({ ...resource, url: resolveResourceUrl(resource, baseUrl) }))
+          .sort((a, b) => b.priority - a.priority)
+      : [];
+    if (!resources.length) return;
+    resourcePlans.set(entry.id, {
+      baseUrl,
+      defaults,
+      resources,
     });
   });
   listBlocks().forEach((block) => {
@@ -260,6 +655,618 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
       }
     }
     return true;
+  }
+
+  function getResourcePlan(moduleId) {
+    return resourcePlans.get(moduleId) || null;
+  }
+
+  function getResourceConfig(moduleId, resourceId) {
+    const plan = getResourcePlan(moduleId);
+    if (!plan) return null;
+    return plan.resources.find((resource) => resource.id === resourceId) || null;
+  }
+
+  function ensureResourceStateMap(moduleId) {
+    if (!resourceStates.has(moduleId)) {
+      resourceStates.set(moduleId, new Map());
+    }
+    return resourceStates.get(moduleId);
+  }
+
+  function ensureTelemetry(moduleId) {
+    if (!resourceTelemetry.has(moduleId)) {
+      resourceTelemetry.set(moduleId, {
+        requests: 0,
+        hits: 0,
+        misses: 0,
+        bytes: 0,
+        lastFetchAt: null,
+        lastError: null,
+        offlineFallback: false,
+      });
+    }
+    return resourceTelemetry.get(moduleId);
+  }
+
+  function ensureResourceState(moduleId, resourceConfigOrId) {
+    const map = ensureResourceStateMap(moduleId);
+    const config =
+      typeof resourceConfigOrId === 'string'
+        ? getResourceConfig(moduleId, resourceConfigOrId)
+        : resourceConfigOrId;
+    if (!config) return null;
+    if (!map.has(config.id)) {
+      map.set(config.id, {
+        id: config.id,
+        url: config.url,
+        format: config.format,
+        cache: config.cache,
+        strategy: config.strategy,
+        background: config.background,
+        maxAge: config.maxAge,
+        staleWhileRevalidate: config.staleWhileRevalidate,
+        priority: config.priority,
+        status: 'idle',
+        lastFetchAt: null,
+        lastUpdatedAt: null,
+        lastError: null,
+        size: null,
+        source: null,
+        expiresAt: null,
+        stale: false,
+        offline: false,
+      });
+    }
+    return map.get(config.id);
+  }
+
+  function snapshotResourceStates(moduleId) {
+    const map = resourceStates.get(moduleId);
+    if (!map) return [];
+    return Array.from(map.values()).map((entry) => ({ ...entry }));
+  }
+
+  function applyNetworkState(moduleId) {
+    const states = snapshotResourceStates(moduleId);
+    if (!states.length) {
+      if (resourceStates.has(moduleId)) {
+        const telemetry = ensureTelemetry(moduleId);
+        updateModuleRuntime(moduleId, {
+          network: {
+            status: computeResourceStatus(states),
+            requests: telemetry.requests,
+            hits: telemetry.hits,
+            misses: telemetry.misses,
+            bytes: telemetry.bytes,
+            lastFetchAt: telemetry.lastFetchAt,
+            lastError: telemetry.lastError,
+            offlineFallback: telemetry.offlineFallback,
+            resources: states,
+          },
+        });
+      }
+      return;
+    }
+    const telemetry = ensureTelemetry(moduleId);
+    const plan = getResourcePlan(moduleId);
+    const status = computeResourceStatus(states);
+    const offlineCount = states.filter((entry) => entry.offline).length;
+    const staleCount = states.filter((entry) => entry.stale).length;
+    const readyCount = states.filter((entry) => entry.status === 'ready').length;
+    updateModuleRuntime(moduleId, {
+      network: {
+        status,
+        requests: telemetry.requests,
+        hits: telemetry.hits,
+        misses: telemetry.misses,
+        bytes: telemetry.bytes,
+        lastFetchAt: telemetry.lastFetchAt,
+        lastError: telemetry.lastError,
+        offlineFallback: telemetry.offlineFallback || offlineCount > 0,
+        ready: readyCount,
+        stale: staleCount,
+        offline: offlineCount,
+        resources: states,
+        plan: plan
+          ? {
+              baseUrl: plan.baseUrl || null,
+              defaultCache: plan.defaults?.cache ?? null,
+              defaultStrategy: plan.defaults?.strategy ?? null,
+            }
+          : null,
+      },
+    });
+  }
+
+  function markResourceTrigger(moduleId, trigger) {
+    if (!resourceTriggers.has(moduleId)) {
+      resourceTriggers.set(moduleId, new Set());
+    }
+    resourceTriggers.get(moduleId).add(trigger);
+  }
+
+  function hasResourceTrigger(moduleId, trigger) {
+    return resourceTriggers.get(moduleId)?.has(trigger) ?? false;
+  }
+
+  function logNetworkEvent(moduleId, message, { tone = 'info', resourceId } = {}) {
+    if (!message) return;
+    const tags = ['modules', 'network'];
+    if (resourceId) {
+      tags.push(`resource:${resourceId}`);
+    }
+    try {
+      window.a11ytb?.logActivity?.(message, { tone, module: moduleId, tags });
+    } catch (error) {
+      console.warn('a11ytb: impossible de journaliser un évènement réseau.', error);
+    }
+  }
+
+  function resourceKey(moduleId, resourceId) {
+    return `${moduleId}::${resourceId}`;
+  }
+
+  function computeExpiresAt(resourceConfig, fetchedAt) {
+    if (!Number.isFinite(resourceConfig?.maxAge) || resourceConfig.maxAge <= 0) {
+      return null;
+    }
+    return (Number.isFinite(fetchedAt) ? fetchedAt : Date.now()) + resourceConfig.maxAge;
+  }
+
+  function isEntryExpired(entry, resourceConfig, reference = Date.now()) {
+    if (!entry) return true;
+    if (!Number.isFinite(resourceConfig?.maxAge) || resourceConfig.maxAge <= 0) {
+      return false;
+    }
+    const expiresAt = Number.isFinite(entry.expiresAt)
+      ? entry.expiresAt
+      : Number.isFinite(entry.fetchedAt)
+        ? entry.fetchedAt + resourceConfig.maxAge
+        : null;
+    if (!Number.isFinite(expiresAt)) return false;
+    return reference > expiresAt;
+  }
+
+  function hydrateResourceCache(moduleId) {
+    const plan = getResourcePlan(moduleId);
+    if (!plan) return;
+    plan.resources.forEach((resource) => {
+      ensureResourceState(moduleId, resource);
+      const key = resourceKey(moduleId, resource.id);
+      persistentResourceCache.ready
+        .then(() => persistentResourceCache.get(key))
+        .then((stored) => {
+          if (!stored) return;
+          const fetchedAt = Number.isFinite(stored.fetchedAt) ? stored.fetchedAt : Date.now();
+          const expiresAt = Number.isFinite(stored.expiresAt)
+            ? stored.expiresAt
+            : computeExpiresAt(resource, fetchedAt);
+          const size = Number.isFinite(stored.size)
+            ? stored.size
+            : estimatePayloadSize(stored.data, resource.format);
+          resourceMemoryCache.set(key, {
+            data: stored.data,
+            format: resource.format,
+            fetchedAt,
+            expiresAt,
+            size,
+            source: stored.source || 'cache',
+          });
+          const stale = isEntryExpired({ expiresAt }, resource);
+          setResourceState(moduleId, resource.id, {
+            lastFetchAt: fetchedAt,
+            lastUpdatedAt: fetchedAt,
+            expiresAt,
+            stale,
+            status: stale ? 'stale' : 'ready',
+            size,
+            source: stored.source || 'cache',
+            lastError: null,
+            offline: false,
+          });
+        })
+        .catch((error) => {
+          console.warn('a11ytb: impossible de réhydrater une ressource runtime.', error);
+        });
+    });
+  }
+
+  function initializeResourceState(moduleId) {
+    const plan = getResourcePlan(moduleId);
+    if (!plan) return;
+    plan.resources.forEach((resource) => ensureResourceState(moduleId, resource));
+    applyNetworkState(moduleId);
+    hydrateResourceCache(moduleId);
+    if (!hasResourceTrigger(moduleId, 'init')) {
+      activateResourceTriggers(moduleId, 'init');
+    }
+  }
+
+  function clearScheduledResourceFetch(moduleId, resourceId) {
+    const key = resourceKey(moduleId, resourceId);
+    const entry = resourceIdleHandles.get(key);
+    if (!entry) return;
+    try {
+      if (typeof entry.cancel === 'function') {
+        entry.cancel();
+      }
+    } catch (error) {
+      console.warn('a11ytb: annulation préchargement ressource impossible.', error);
+    }
+    resourceIdleHandles.delete(key);
+  }
+
+  function queueResourceFetch(moduleId, resourceConfig, { idle = false, delay = 0 } = {}) {
+    const key = resourceKey(moduleId, resourceConfig.id);
+    if (resourceRequests.has(key)) return;
+    if (resourceIdleHandles.has(key)) return;
+
+    const run = () => {
+      resourceIdleHandles.delete(key);
+      fetchModuleResource(moduleId, resourceConfig.id).catch(() => {});
+    };
+
+    if (idle && typeof requestIdleCallback === 'function') {
+      const handle = requestIdleCallback(run, { timeout: resourceConfig.timeoutMs || 4000 });
+      resourceIdleHandles.set(key, {
+        cancel: () => {
+          if (typeof cancelIdleCallback === 'function') {
+            cancelIdleCallback(handle);
+          }
+        },
+      });
+      return;
+    }
+
+    if (delay > 0) {
+      const timeout = setTimeout(run, delay);
+      resourceIdleHandles.set(key, { cancel: () => clearTimeout(timeout) });
+      return;
+    }
+
+    run();
+  }
+
+  function activateResourceTriggers(moduleId, trigger) {
+    const plan = getResourcePlan(moduleId);
+    if (!plan) return;
+    markResourceTrigger(moduleId, trigger);
+    plan.resources.forEach((resource) => {
+      const state = ensureResourceState(moduleId, resource);
+      if (!state) return;
+      const key = resourceKey(moduleId, resource.id);
+      const isFetching = resourceRequests.has(key) || state.status === 'fetching';
+      if (resource.strategy === 'on-demand') return;
+      if (trigger === 'init' && resource.strategy === 'preload') {
+        if (!isFetching && (state.status !== 'ready' || state.stale)) {
+          queueResourceFetch(moduleId, resource, { idle: resource.background === 'idle' });
+        }
+        return;
+      }
+      if (
+        trigger === 'enabled' &&
+        (resource.strategy === 'lazy' || resource.strategy === 'preload')
+      ) {
+        if (!isFetching && (state.status !== 'ready' || state.stale)) {
+          queueResourceFetch(moduleId, resource, {
+            idle: resource.background === 'idle',
+            delay: resource.background === 'idle' ? 0 : 120,
+          });
+        }
+        return;
+      }
+      if (trigger === 'preload' && resource.strategy === 'lazy') {
+        if (!isFetching && (state.status !== 'ready' || state.stale)) {
+          queueResourceFetch(moduleId, resource, { idle: resource.background === 'idle' });
+        }
+      }
+    });
+  }
+
+  function setResourceState(moduleId, resourceId, patch) {
+    const state = ensureResourceState(moduleId, resourceId);
+    if (!state) return null;
+    Object.assign(state, patch);
+    applyNetworkState(moduleId);
+    return state;
+  }
+
+  function snapshotModuleResources(moduleId) {
+    return snapshotResourceStates(moduleId);
+  }
+
+  async function readCachedResource(moduleId, resourceId) {
+    const key = resourceKey(moduleId, resourceId);
+    if (resourceMemoryCache.has(key)) {
+      return resourceMemoryCache.get(key);
+    }
+    try {
+      await persistentResourceCache.ready;
+      const stored = await persistentResourceCache.get(key);
+      if (!stored) return null;
+      const fetchedAt = Number.isFinite(stored.fetchedAt) ? stored.fetchedAt : Date.now();
+      const expiresAt = Number.isFinite(stored.expiresAt)
+        ? stored.expiresAt
+        : computeExpiresAt(getResourceConfig(moduleId, resourceId), fetchedAt);
+      const size = Number.isFinite(stored.size)
+        ? stored.size
+        : estimatePayloadSize(
+            stored.data,
+            getResourceConfig(moduleId, resourceId)?.format || 'json'
+          );
+      const entry = {
+        data: stored.data,
+        format: getResourceConfig(moduleId, resourceId)?.format || 'json',
+        fetchedAt,
+        expiresAt,
+        size,
+        source: stored.source || 'cache',
+      };
+      resourceMemoryCache.set(key, entry);
+      return entry;
+    } catch (error) {
+      console.warn(
+        'a11ytb: lecture cache persistant impossible pour une ressource runtime.',
+        error
+      );
+      return null;
+    }
+  }
+
+  function fetchModuleResource(moduleId, resourceId, { force = false } = {}) {
+    const resource = getResourceConfig(moduleId, resourceId);
+    if (!resource) {
+      return Promise.reject(new Error(`Ressource inconnue ${resourceId} pour ${moduleId}.`));
+    }
+    ensureResourceState(moduleId, resource);
+    const key = resourceKey(moduleId, resourceId);
+    const existing = resourceRequests.get(key);
+    if (existing) {
+      return existing;
+    }
+
+    const nowTs = Date.now();
+    const telemetry = ensureTelemetry(moduleId);
+
+    const cached = resourceMemoryCache.get(key);
+    if (!force && cached && !isEntryExpired(cached, resource, nowTs)) {
+      telemetry.hits += 1;
+      telemetry.lastFetchAt = cached.fetchedAt ?? nowTs;
+      const offline = !isNavigatorOnline();
+      if (offline) {
+        telemetry.offlineFallback = true;
+      }
+      const stale = Boolean(cached.stale) || isEntryExpired(cached, resource, nowTs);
+      const expiresAt = cached.expiresAt ?? computeExpiresAt(resource, cached.fetchedAt ?? nowTs);
+      const size = cached.size ?? estimatePayloadSize(cached.data, resource.format);
+      setResourceState(moduleId, resourceId, {
+        status: stale ? 'stale' : 'ready',
+        lastFetchAt: cached.fetchedAt ?? nowTs,
+        lastUpdatedAt: cached.fetchedAt ?? nowTs,
+        size,
+        expiresAt,
+        stale,
+        source: cached.source || 'memory',
+        lastError: null,
+        offline,
+      });
+      if (offline) {
+        logNetworkEvent(moduleId, `Ressource ${resourceId} servie depuis le cache (hors ligne).`, {
+          tone: 'warning',
+          resourceId,
+        });
+      }
+      return Promise.resolve(cached.data);
+    }
+
+    const pending = persistentResourceCache.ready
+      .then(() => readCachedResource(moduleId, resourceId))
+      .then((stored) => {
+        if (stored && !force) {
+          const stale = isEntryExpired(stored, resource, nowTs);
+          if (!stale) {
+            telemetry.hits += 1;
+            telemetry.lastFetchAt = stored.fetchedAt ?? nowTs;
+            const offline = !isNavigatorOnline();
+            if (offline) {
+              telemetry.offlineFallback = true;
+            }
+            const expiresAt =
+              stored.expiresAt ?? computeExpiresAt(resource, stored.fetchedAt ?? nowTs);
+            const size = stored.size ?? estimatePayloadSize(stored.data, resource.format);
+            setResourceState(moduleId, resourceId, {
+              status: 'ready',
+              lastFetchAt: stored.fetchedAt ?? nowTs,
+              lastUpdatedAt: stored.fetchedAt ?? nowTs,
+              expiresAt,
+              stale: false,
+              size,
+              source: stored.source || 'cache',
+              lastError: null,
+              offline,
+            });
+            if (offline) {
+              logNetworkEvent(
+                moduleId,
+                `Ressource ${resourceId} servie depuis le cache (hors ligne).`,
+                {
+                  tone: 'warning',
+                  resourceId,
+                }
+              );
+            }
+            return stored.data;
+          }
+          if (!isNavigatorOnline()) {
+            telemetry.hits += 1;
+            telemetry.lastFetchAt = stored.fetchedAt ?? nowTs;
+            telemetry.offlineFallback = true;
+            setResourceState(moduleId, resourceId, {
+              status: 'stale',
+              lastFetchAt: stored.fetchedAt ?? nowTs,
+              lastUpdatedAt: stored.fetchedAt ?? nowTs,
+              expiresAt: stored.expiresAt ?? computeExpiresAt(resource, stored.fetchedAt ?? nowTs),
+              stale: true,
+              size: stored.size ?? estimatePayloadSize(stored.data, resource.format),
+              source: stored.source || 'cache',
+              lastError: null,
+              offline: true,
+            });
+            logNetworkEvent(moduleId, `Ressource ${resourceId} servie hors ligne (cache).`, {
+              tone: 'warning',
+              resourceId,
+            });
+            return stored.data;
+          }
+        }
+
+        if (!isNavigatorOnline()) {
+          telemetry.offlineFallback = true;
+          setResourceState(moduleId, resourceId, {
+            status: 'offline',
+            lastError: 'Réseau hors ligne',
+            offline: true,
+          });
+          logNetworkEvent(moduleId, `Ressource ${resourceId} inaccessible (hors ligne).`, {
+            tone: 'alert',
+            resourceId,
+          });
+          throw new Error('Réseau hors ligne');
+        }
+
+        telemetry.requests += 1;
+        telemetry.misses += 1;
+        telemetry.lastFetchAt = Date.now();
+        telemetry.offlineFallback = false;
+        setResourceState(moduleId, resourceId, {
+          status: 'fetching',
+          lastError: null,
+          offline: false,
+          source: 'network',
+        });
+
+        const controller = typeof AbortController === 'function' ? new AbortController() : null;
+        let timeoutHandle = null;
+        if (controller && Number.isFinite(resource.timeoutMs) && resource.timeoutMs > 0) {
+          timeoutHandle = setTimeout(() => {
+            try {
+              controller.abort();
+            } catch (error) {
+              console.warn('a11ytb: impossible d’annuler une requête ressource.', error);
+            }
+          }, resource.timeoutMs);
+        }
+
+        const requestInit = {
+          method: resource.method || 'GET',
+          credentials: resource.credentials || 'same-origin',
+          headers: resource.headers,
+          signal: controller?.signal,
+        };
+
+        const fetchPromise = Promise.resolve()
+          .then(() => fetch(resource.url, requestInit))
+          .then((response) => {
+            if (!response.ok) {
+              const error = new Error(`Échec (${response.status}) pour ${resourceId}.`);
+              error.status = response.status;
+              throw error;
+            }
+            if (resource.format === 'json') return response.json();
+            if (resource.format === 'text') return response.text();
+            if (resource.format === 'arrayBuffer') return response.arrayBuffer();
+            return response.text();
+          })
+          .then((data) => {
+            const fetchedAt = Date.now();
+            const expiresAt = computeExpiresAt(resource, fetchedAt);
+            const size = estimatePayloadSize(data, resource.format);
+            if (resource.cache !== 'none') {
+              resourceMemoryCache.set(key, {
+                data,
+                format: resource.format,
+                fetchedAt,
+                expiresAt,
+                size,
+                source: 'network',
+              });
+            } else {
+              resourceMemoryCache.delete(key);
+            }
+            if (resource.cache === 'persistent' || resource.cache === 'both') {
+              persistentResourceCache.ready
+                .then(() =>
+                  persistentResourceCache.set(key, {
+                    data,
+                    format: resource.format,
+                    fetchedAt,
+                    expiresAt,
+                    size,
+                    source: 'cache',
+                  })
+                )
+                .catch((error) => {
+                  console.warn('a11ytb: impossible de persister une ressource runtime.', error);
+                });
+            }
+            telemetry.bytes += Number.isFinite(size) ? size : 0;
+            telemetry.lastError = null;
+            setResourceState(moduleId, resourceId, {
+              status: 'ready',
+              lastFetchAt: fetchedAt,
+              lastUpdatedAt: fetchedAt,
+              expiresAt,
+              stale: false,
+              size,
+              source: 'network',
+              lastError: null,
+              offline: false,
+            });
+            logNetworkEvent(
+              moduleId,
+              `Ressource ${resourceId} synchronisée (${size ? `${Math.round(size / 1024)} Ko` : 'taille inconnue'}).`,
+              {
+                tone: 'info',
+                resourceId,
+              }
+            );
+            return data;
+          })
+          .catch((error) => {
+            telemetry.lastError = error?.message || 'Erreur réseau';
+            setResourceState(moduleId, resourceId, {
+              status: 'error',
+              lastError: telemetry.lastError,
+              offline: !isNavigatorOnline(),
+            });
+            logNetworkEvent(
+              moduleId,
+              `Échec chargement ressource ${resourceId} : ${telemetry.lastError}`,
+              {
+                tone: 'alert',
+                resourceId,
+              }
+            );
+            throw error;
+          })
+          .finally(() => {
+            if (timeoutHandle) {
+              clearTimeout(timeoutHandle);
+            }
+            resourceRequests.delete(key);
+            clearScheduledResourceFetch(moduleId, resourceId);
+          });
+
+        resourceRequests.set(key, fetchPromise);
+        return fetchPromise;
+      });
+
+    return pending;
+  }
+
+  function getCachedResource(moduleId, resourceId) {
+    return readCachedResource(moduleId, resourceId).then((entry) => entry?.data ?? null);
   }
 
   const initialized = new Set();
@@ -296,7 +1303,12 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
     const entry = getLifecycleEntry(moduleId);
     if (entry.mounted) return;
     const teardowns = [];
-    const context = { state };
+    const runtimeHelpers = {
+      fetchResource: (resourceId, options) => fetchModuleResource(moduleId, resourceId, options),
+      getResource: (resourceId) => getCachedResource(moduleId, resourceId),
+      getResources: () => snapshotModuleResources(moduleId),
+    };
+    const context = { state, runtime: runtimeHelpers };
     if (typeof mod.mount === 'function') {
       try {
         const result = mod.mount(context);
@@ -328,7 +1340,12 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
     const entry = getLifecycleEntry(moduleId);
     if (!entry.mounted) return;
     runTeardowns(entry, moduleId);
-    const context = { state };
+    const runtimeHelpers = {
+      fetchResource: (resourceId, options) => fetchModuleResource(moduleId, resourceId, options),
+      getResource: (resourceId) => getCachedResource(moduleId, resourceId),
+      getResources: () => snapshotModuleResources(moduleId),
+    };
+    const context = { state, runtime: runtimeHelpers };
     if (typeof mod.unmount === 'function') {
       try {
         mod.unmount(context);
@@ -387,7 +1404,11 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
     }
     cancelScheduledPreload(moduleId);
     preloadedModules.add(moduleId);
-    loadModule(moduleId).catch(() => {});
+    loadModule(moduleId)
+      .then(() => {
+        activateResourceTriggers(moduleId, 'preload');
+      })
+      .catch(() => {});
   }
 
   function scheduleIdlePreload(moduleId) {
@@ -487,6 +1508,7 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
     return loadModule(moduleId)
       .then(() => {
         mountModule(moduleId);
+        activateResourceTriggers(moduleId, 'enabled');
       })
       .catch(() => {});
   }
@@ -757,7 +1779,13 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
           if (typeof mod.init === 'function') {
             const initStartedAt = now();
             try {
-              mod.init({ state });
+              const runtimeHelpers = {
+                fetchResource: (resourceId, options) =>
+                  fetchModuleResource(moduleId, resourceId, options),
+                getResource: (resourceId) => getCachedResource(moduleId, resourceId),
+                getResources: () => snapshotModuleResources(moduleId),
+              };
+              mod.init({ state, runtime: runtimeHelpers });
             } catch (error) {
               console.error(`a11ytb: échec de l’initialisation du module ${moduleId}.`, error);
               metrics.failures += 1;
@@ -848,6 +1876,7 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
       collections: getCollectionsForModule(moduleId),
       enabled,
     });
+    initializeResourceState(moduleId);
     if (enabled) {
       ensureModuleMounted(moduleId);
     } else {
@@ -867,6 +1896,7 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
       collections: getCollectionsForModule(moduleId),
       enabled,
     });
+    initializeResourceState(moduleId);
     if (enabled) {
       ensureModuleMounted(moduleId);
     } else {
@@ -912,6 +1942,11 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
   if (!window.a11ytb.runtime) window.a11ytb.runtime = {};
   window.a11ytb.runtime.loadModule = loadModule;
   window.a11ytb.runtime.refreshManifestGovernance = refreshManifestGovernance;
+  window.a11ytb.runtime.fetchResource = (moduleId, resourceId, options) =>
+    fetchModuleResource(moduleId, resourceId, options);
+  window.a11ytb.runtime.getResource = (moduleId, resourceId) =>
+    getCachedResource(moduleId, resourceId);
+  window.a11ytb.runtime.getResourceSnapshot = (moduleId) => snapshotModuleResources(moduleId);
   window.a11ytb.runtime.registerBlockElement = (blockId, element) => {
     if (!blockId || !element) return;
     const moduleId = blockToModule.get(blockId);
@@ -939,5 +1974,9 @@ export function setupModuleRuntime({ state, catalog, collections = [], onMetrics
   return {
     loadModule,
     isModuleLoaded: (id) => initialized.has(id),
+    fetchResource: (moduleId, resourceId, options) =>
+      fetchModuleResource(moduleId, resourceId, options),
+    getCachedResource,
+    getResourceSnapshot: snapshotModuleResources,
   };
 }

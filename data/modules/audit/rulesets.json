@@ -1,0 +1,34 @@
+{
+  "version": "2024.06",
+  "generatedAt": "2024-06-20T10:30:00.000Z",
+  "rules": [
+    {
+      "id": "wcag-color-contrast",
+      "level": "AA",
+      "category": "perception",
+      "description": "Vérifie les ratios de contraste texte/fond pour les éléments interactifs et statiques.",
+      "updatedAt": "2024-05-18T12:00:00.000Z"
+    },
+    {
+      "id": "wcag-focus-visible",
+      "level": "AA",
+      "category": "interaction",
+      "description": "Contrôle la présence d’indicateurs de focus visibles pour tous les éléments focusables.",
+      "updatedAt": "2024-04-29T08:15:00.000Z"
+    },
+    {
+      "id": "wcag-landmark-navigation",
+      "level": "A",
+      "category": "structure",
+      "description": "Valide la déclaration des rôles landmarks et la cohérence des titres de section.",
+      "updatedAt": "2024-03-12T09:45:00.000Z"
+    },
+    {
+      "id": "wcag-form-labels",
+      "level": "AA",
+      "category": "interaction",
+      "description": "Inspecte les libellés et instructions des contrôles de formulaire.",
+      "updatedAt": "2024-02-06T07:20:00.000Z"
+    }
+  ]
+}

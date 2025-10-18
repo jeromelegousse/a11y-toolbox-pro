@@ -115,6 +115,29 @@ export const manifest = {
   ],
   runtime: {
     preload: 'pointer',
+    fetch: {
+      baseUrl: '/data/modules/audit/',
+      cache: 'persistent',
+      resources: [
+        {
+          id: 'rulesets',
+          url: 'rulesets.json',
+          format: 'json',
+          strategy: 'lazy',
+          cache: 'persistent',
+          background: 'idle',
+          maxAge: 1000 * 60 * 60 * 24,
+        },
+        {
+          id: 'presets',
+          url: 'presets.json',
+          format: 'json',
+          strategy: 'on-demand',
+          cache: 'memory',
+          maxAge: 1000 * 60 * 60 * 6,
+        },
+      ],
+    },
   },
   permissions: ['dom-inspection', 'activity-log'],
   defaults: {
