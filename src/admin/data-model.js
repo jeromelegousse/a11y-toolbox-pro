@@ -150,7 +150,7 @@ export function buildModuleEntries(snapshot = {}) {
     const profiles = moduleToProfiles.get(entry.id) || new Set();
     const flags = buildFlags(isCollectionDisabled, runtimeEntry, compat);
 
-    const entry = {
+    const moduleEntry = {
       id: entry.id,
       manifest,
       runtime: runtimeEntry,
@@ -173,16 +173,16 @@ export function buildModuleEntries(snapshot = {}) {
       searchText: buildSearchText({ id: entry.id, manifest }),
     };
 
-    entry.availability = determineAvailability({
-      enabled: entry.enabled,
-      statusTone: entry.statusTone,
+    moduleEntry.availability = determineAvailability({
+      enabled: moduleEntry.enabled,
+      statusTone: moduleEntry.statusTone,
       compatStatus,
       collectionDisabled: isCollectionDisabled,
-      dependencies: entry.dependencies,
-      flags: entry.flags,
+      dependencies: moduleEntry.dependencies,
+      flags: moduleEntry.flags,
     });
 
-    return entry;
+    return moduleEntry;
   });
 }
 
