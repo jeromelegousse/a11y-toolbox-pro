@@ -1146,6 +1146,18 @@ function a11ytb_get_preferences_integration_config(): array
 }
 
 /**
+ * @deprecated 1.19.0  Utilisez a11ytb_get_preferences_integration_config().
+ */
+function a11ytb_get_preferences_sync_config(): array
+{
+    if (function_exists('_deprecated_function')) {
+        _deprecated_function(__FUNCTION__, '1.19.0', 'a11ytb_get_preferences_integration_config');
+    }
+
+    return a11ytb_get_preferences_integration_config();
+}
+
+/**
  * Retourne les définitions des déclencheurs inline à partir du manifeste JSON.
  *
  * @return array<string, array<string, mixed>>
