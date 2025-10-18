@@ -151,18 +151,38 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
 
   function cloneProfileDefinition(profile) {
     if (!profile || typeof profile !== 'object') return {};
+    let clone = null;
     if (typeof structuredClone === 'function') {
       try {
-        return structuredClone(profile);
+        clone = structuredClone(profile);
       } catch (error) {
-        // ignore and fallback to JSON strategy
+        clone = null;
       }
     }
-    try {
-      return JSON.parse(JSON.stringify(profile));
-    } catch (error) {
-      return { ...profile };
+    if (!clone) {
+      try {
+        clone = JSON.parse(JSON.stringify(profile));
+      } catch (error) {
+        clone = { ...profile };
+      }
     }
+    if (!clone || typeof clone !== 'object') {
+      return {};
+    }
+    const normalizedShortcuts = normalizeShortcutPresetMap(clone.shortcuts);
+    if (Object.keys(normalizedShortcuts).length) {
+      clone.shortcuts = normalizedShortcuts;
+    } else {
+      delete clone.shortcuts;
+    }
+    const recipients = normalizeShareRecipients(clone.sharedWith);
+    if (recipients.length) {
+      clone.sharedWith = recipients;
+    } else {
+      delete clone.sharedWith;
+      delete clone.lastSharedAt;
+    }
+    return clone;
   }
 
   function canonicalizeKey(token) {
@@ -220,6 +240,57 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     });
     if (!combo.key) return null;
     return combo;
+  }
+
+  function normalizeShortcutPresetMap(input) {
+    if (!input || typeof input !== 'object') return {};
+    const normalized = {};
+    Object.entries(input).forEach(([actionId, rawCombo]) => {
+      if (!CUSTOM_SHORTCUT_LOOKUP.has(actionId)) return;
+      let parsed = null;
+      if (typeof rawCombo === 'string') {
+        parsed = parseShortcutCombo(rawCombo);
+      } else if (rawCombo && typeof rawCombo === 'object') {
+        const normalizedCombo = {
+          alt: Boolean(rawCombo.alt),
+          shift: Boolean(rawCombo.shift),
+          ctrl: Boolean(rawCombo.ctrl),
+          meta: Boolean(rawCombo.meta),
+          key: canonicalizeKey(rawCombo.key || rawCombo.code || rawCombo.keyCode),
+        };
+        if (normalizedCombo.key) {
+          parsed = normalizedCombo;
+        }
+      }
+      if (parsed && parsed.key) {
+        normalized[actionId] = serializeShortcutCombo(parsed);
+      }
+    });
+    return normalized;
+  }
+
+  function normalizeShareRecipients(value) {
+    if (!value) return [];
+    const tokens = Array.isArray(value)
+      ? value
+      : String(value)
+          .split(/[,;\n]/)
+          .map((token) => token.trim());
+    const seen = new Set();
+    const recipients = [];
+    tokens.forEach((token) => {
+      const trimmed = token.trim();
+      if (!trimmed) return;
+      const normalized = trimmed.slice(0, 120);
+      if (seen.has(normalized.toLowerCase())) return;
+      seen.add(normalized.toLowerCase());
+      recipients.push(normalized);
+    });
+    return recipients.slice(0, 16);
+  }
+
+  function hasShortcutPresets(map) {
+    return map && Object.keys(map).length > 0;
   }
 
   function serializeShortcutCombo(combo) {
@@ -843,6 +914,8 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     clone.preset = false;
     clone.createdAt = Date.now();
     clone.source = profileId;
+    delete clone.lastSharedAt;
+    delete clone.sharedWith;
     const baseId = slugifyProfileId(trimmedName) || `profil-${Date.now()}`;
     const newId = ensureUniqueProfileId(baseId, profiles);
     const next = { ...profiles, [newId]: clone };
@@ -857,7 +930,16 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     const profiles = getProfilesState();
     const profile = profiles?.[profileId];
     if (!profile) return;
-    const payload = JSON.stringify({ id: profileId, ...profile }, null, 2);
+    const payload = JSON.stringify(
+      {
+        id: profileId,
+        ...profile,
+        shortcuts: hasShortcutPresets(profile.shortcuts) ? profile.shortcuts : undefined,
+        sharedWith: Array.isArray(profile.sharedWith) ? profile.sharedWith : undefined,
+      },
+      null,
+      2
+    );
     const copied = await copyToClipboard(payload);
     if (copied) {
       logActivity(`Profil copié : ${profile.name || profileId}`, {
@@ -920,6 +1002,8 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   function normalizeImportedProfile(raw) {
     if (!raw || typeof raw !== 'object') return null;
     const settings = raw.settings && typeof raw.settings === 'object' ? { ...raw.settings } : {};
+    const shortcuts = normalizeShortcutPresetMap(raw.shortcuts);
+    const sharedWith = normalizeShareRecipients(raw.sharedWith);
     const normalized = {
       name: typeof raw.name === 'string' ? raw.name.trim() : undefined,
       summary: typeof raw.summary === 'string' ? raw.summary : undefined,
@@ -931,8 +1015,219 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       preset: false,
       source: raw.source || null,
       createdAt: Date.now(),
+      shortcuts: Object.keys(shortcuts).length ? shortcuts : undefined,
+      sharedWith: sharedWith.length ? sharedWith : undefined,
+      lastSharedAt:
+        sharedWith.length && Number.isFinite(raw.lastSharedAt) ? Number(raw.lastSharedAt) : undefined,
     };
     return normalized;
+  }
+
+  function parseShortcutPresetInput(raw) {
+    const presets = {};
+    const invalid = [];
+    if (typeof raw !== 'string') {
+      return { presets, invalid };
+    }
+    raw
+      .split(/\r?\n|[,;]/)
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .forEach((entry) => {
+        const [idPart, comboPart] = entry.split(/[:=]/);
+        if (!idPart || !comboPart) {
+          invalid.push(entry);
+          return;
+        }
+        const actionId = idPart.trim();
+        const comboValue = comboPart.trim();
+        if (!CUSTOM_SHORTCUT_LOOKUP.has(actionId)) {
+          invalid.push(entry);
+          return;
+        }
+        const parsed = parseShortcutCombo(comboValue);
+        if (!parsed || !parsed.key) {
+          invalid.push(entry);
+          return;
+        }
+        presets[actionId] = serializeShortcutCombo(parsed);
+      });
+    return { presets, invalid };
+  }
+
+  function formatShortcutPresetLines(shortcuts) {
+    const normalized = normalizeShortcutPresetMap(shortcuts);
+    if (!Object.keys(normalized).length) return '';
+    return Object.entries(normalized)
+      .map(([actionId, combo]) => `${actionId}=${combo}`)
+      .join('\n');
+  }
+
+  async function configureProfileShortcuts(profileId) {
+    const profiles = getProfilesState();
+    const profile = profiles?.[profileId];
+    if (!profile) return;
+    const defaultValue = formatShortcutPresetLines(profile.shortcuts);
+    const response = await openModalDialog({
+      mode: 'prompt',
+      title: 'Configurer les raccourcis',
+      description:
+        "Indiquez une ligne par raccourci (action = combinaison). Exemple : view-modules=Alt+Shift+M.",
+      inputLabel: 'Raccourcis personnalisés',
+      defaultValue,
+      confirmLabel: 'Enregistrer',
+      cancelLabel: 'Annuler',
+      multiline: true,
+      rows: Math.max(6, CUSTOM_SHORTCUT_DEFINITIONS.length + 2),
+      requireValue: false,
+      trimValue: false,
+      placeholder: 'view-modules=Alt+Shift+M',
+    });
+    if (response === null) return;
+    const { presets, invalid } = parseShortcutPresetInput(response);
+    const nextProfiles = { ...profiles, [profileId]: { ...profile } };
+    if (Object.keys(presets).length) {
+      nextProfiles[profileId].shortcuts = presets;
+    } else {
+      delete nextProfiles[profileId].shortcuts;
+    }
+    saveProfilesState(nextProfiles);
+    recordAutomationEvent({
+      profileId,
+      profileName: profile.name || profileId,
+      action: 'update-shortcuts',
+      presets: Object.keys(presets).length,
+      invalid: invalid.length,
+    });
+    logActivity(`Raccourcis enregistrés pour ${profile.name || profileId}`, {
+      tone: 'confirm',
+      tags: ['raccourcis', 'profils'],
+      payload: Object.keys(presets).length ? presets : undefined,
+    });
+    if (invalid.length) {
+      logActivity('Certaines entrées de raccourcis ont été ignorées.', {
+        tone: 'warning',
+        tags: ['raccourcis', 'profils'],
+        payload: { invalid },
+      });
+    }
+  }
+
+  function applyProfileShortcuts(profileId, profile) {
+    const presets = normalizeShortcutPresetMap(profile?.shortcuts);
+    const entries = Object.entries(presets);
+    if (!entries.length) return;
+    const overrides = { ...getShortcutOverrides() };
+    let applied = 0;
+    entries.forEach(([actionId, combo]) => {
+      if (!combo) return;
+      overrides[actionId] = combo;
+      applied += 1;
+    });
+    state.set('ui.shortcuts.overrides', overrides);
+    state.set('ui.shortcuts.lastRecorded', {
+      id: null,
+      combo: null,
+      source: `profile:${profileId}`,
+      timestamp: Date.now(),
+    });
+    recordAutomationEvent({
+      profileId,
+      profileName: profile?.name || profileId,
+      action: 'apply-shortcuts',
+      presets: applied,
+    });
+    logActivity(`Raccourcis appliqués depuis ${profile?.name || profileId}`, {
+      tone: 'confirm',
+      tags: ['raccourcis', 'profils'],
+      payload: presets,
+    });
+  }
+
+  async function shareProfile(profileId) {
+    const profiles = getProfilesState();
+    const profile = profiles?.[profileId];
+    if (!profile) return;
+    const defaultValue = Array.isArray(profile.sharedWith)
+      ? profile.sharedWith.join(', ')
+      : '';
+    const input = await openModalDialog({
+      mode: 'prompt',
+      title: 'Partager le profil',
+      description:
+        'Saisissez les destinataires (e-mails ou identifiants), séparés par des virgules ou retours à la ligne.',
+      inputLabel: 'Destinataires',
+      defaultValue,
+      confirmLabel: defaultValue ? 'Mettre à jour le partage' : 'Partager',
+      cancelLabel: 'Annuler',
+      placeholder: 'marie@example.org, luc@example.org',
+      multiline: true,
+      rows: 4,
+      trimValue: false,
+      requireValue: false,
+    });
+    if (input === null) return;
+    const recipients = normalizeShareRecipients(input);
+    const nextProfiles = { ...profiles, [profileId]: { ...profile } };
+    const profileName = profile.name || profileId;
+    if (recipients.length) {
+      nextProfiles[profileId].sharedWith = recipients;
+      nextProfiles[profileId].lastSharedAt = Date.now();
+      logActivity(`Profil partagé : ${profileName}`, {
+        tone: 'confirm',
+        tags: ['profils', 'partage'],
+        payload: { recipients },
+      });
+      recordProfileShareEvent({
+        profileId,
+        profileName,
+        recipients,
+        action: defaultValue ? 'updated' : 'shared',
+      });
+    } else {
+      delete nextProfiles[profileId].sharedWith;
+      delete nextProfiles[profileId].lastSharedAt;
+      logActivity(`Partage désactivé : ${profileName}`, {
+        tone: 'warning',
+        tags: ['profils', 'partage'],
+      });
+      recordProfileShareEvent({
+        profileId,
+        profileName,
+        recipients: [],
+        action: 'revoked',
+      });
+    }
+    saveProfilesState(nextProfiles);
+  }
+
+  async function stopSharingProfile(profileId) {
+    const profiles = getProfilesState();
+    const profile = profiles?.[profileId];
+    if (!profile || !Array.isArray(profile.sharedWith) || !profile.sharedWith.length) return;
+    const profileName = profile.name || profileId;
+    const confirmed = await openModalDialog({
+      mode: 'confirm',
+      title: 'Arrêter le partage',
+      description: `Retirer l’accès partagé au profil « ${profileName} » ?`,
+      confirmLabel: 'Arrêter le partage',
+      cancelLabel: 'Annuler',
+    });
+    if (!confirmed) return;
+    const nextProfiles = { ...profiles, [profileId]: { ...profile } };
+    delete nextProfiles[profileId].sharedWith;
+    delete nextProfiles[profileId].lastSharedAt;
+    saveProfilesState(nextProfiles);
+    recordProfileShareEvent({
+      profileId,
+      profileName,
+      recipients: [],
+      action: 'revoked',
+    });
+    logActivity(`Partage désactivé : ${profileName}`, {
+      tone: 'info',
+      tags: ['profils', 'partage'],
+    });
   }
 
   async function importProfileFromPrompt() {
@@ -7805,6 +8100,71 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
         card.append(origin);
       }
 
+      const sharedRecipients = Array.isArray(profile.sharedWith) ? profile.sharedWith : [];
+      if (sharedRecipients.length) {
+        const shareBlock = document.createElement('div');
+        shareBlock.className = 'a11ytb-profile-share';
+        const shareTitle = document.createElement('p');
+        shareTitle.className = 'a11ytb-profile-share-title';
+        shareTitle.textContent = 'Partagé avec';
+        shareBlock.append(shareTitle);
+
+        const shareList = document.createElement('ul');
+        shareList.className = 'a11ytb-profile-share-list';
+        shareList.setAttribute('role', 'list');
+        sharedRecipients.forEach((recipient) => {
+          const item = document.createElement('li');
+          item.className = 'a11ytb-profile-share-recipient';
+          item.textContent = recipient;
+          shareList.append(item);
+        });
+        shareBlock.append(shareList);
+
+        if (Number.isFinite(profile.lastSharedAt)) {
+          const sharedAt = new Date(profile.lastSharedAt);
+          if (!Number.isNaN(sharedAt.getTime())) {
+            const shareMeta = document.createElement('p');
+            shareMeta.className = 'a11ytb-profile-share-meta';
+            const dateLabel = sharedAt.toLocaleDateString('fr-FR');
+            const timeLabel = formatTime(sharedAt.getTime());
+            shareMeta.textContent = `Mis à jour le ${dateLabel} à ${timeLabel}`;
+            shareBlock.append(shareMeta);
+          }
+        }
+
+        card.append(shareBlock);
+      }
+
+      const shortcutPresets = normalizeShortcutPresetMap(profile.shortcuts);
+      const shortcutEntries = Object.entries(shortcutPresets);
+      if (shortcutEntries.length) {
+        const shortcutsBlock = document.createElement('div');
+        shortcutsBlock.className = 'a11ytb-profile-shortcuts';
+        const shortcutsTitle = document.createElement('p');
+        shortcutsTitle.className = 'a11ytb-profile-shortcuts-title';
+        shortcutsTitle.textContent = 'Raccourcis du profil';
+        shortcutsBlock.append(shortcutsTitle);
+
+        const shortcutsList = document.createElement('ul');
+        shortcutsList.className = 'a11ytb-profile-shortcuts-list';
+        shortcutsList.setAttribute('role', 'list');
+        shortcutEntries.forEach(([actionId, combo]) => {
+          const definition = CUSTOM_SHORTCUT_LOOKUP.get(actionId);
+          const item = document.createElement('li');
+          item.className = 'a11ytb-profile-shortcut';
+          const label = document.createElement('span');
+          label.className = 'a11ytb-profile-shortcut-label';
+          label.textContent = definition?.label || actionId;
+          const comboEl = document.createElement('span');
+          comboEl.className = 'a11ytb-profile-shortcut-combo';
+          comboEl.textContent = combo;
+          item.append(label, comboEl);
+          shortcutsList.append(item);
+        });
+        shortcutsBlock.append(shortcutsList);
+        card.append(shortcutsBlock);
+      }
+
       const actions = document.createElement('div');
       actions.className = 'a11ytb-profile-actions';
 
@@ -7815,6 +8175,32 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       applyBtn.dataset.profileId = id;
       applyBtn.textContent = id === lastProfile ? 'Réappliquer' : 'Appliquer';
       actions.append(applyBtn);
+
+      const shareBtn = document.createElement('button');
+      shareBtn.type = 'button';
+      shareBtn.className = 'a11ytb-button a11ytb-button--ghost';
+      shareBtn.dataset.profileAction = 'share';
+      shareBtn.dataset.profileId = id;
+      shareBtn.textContent = sharedRecipients.length ? 'Mettre à jour le partage' : 'Partager';
+      actions.append(shareBtn);
+
+      if (sharedRecipients.length) {
+        const revokeBtn = document.createElement('button');
+        revokeBtn.type = 'button';
+        revokeBtn.className = 'a11ytb-button a11ytb-button--ghost';
+        revokeBtn.dataset.profileAction = 'unshare';
+        revokeBtn.dataset.profileId = id;
+        revokeBtn.textContent = 'Arrêter le partage';
+        actions.append(revokeBtn);
+      }
+
+      const shortcutsBtn = document.createElement('button');
+      shortcutsBtn.type = 'button';
+      shortcutsBtn.className = 'a11ytb-button a11ytb-button--ghost';
+      shortcutsBtn.dataset.profileAction = 'shortcuts';
+      shortcutsBtn.dataset.profileId = id;
+      shortcutsBtn.textContent = shortcutEntries.length ? 'Modifier les raccourcis' : 'Configurer les raccourcis';
+      actions.append(shortcutsBtn);
 
       const duplicateBtn = document.createElement('button');
       duplicateBtn.type = 'button';
@@ -7867,6 +8253,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     const tone = profile.tone || 'confirm';
     const message = profile.activity || `Profil appliqué : ${profile.name || profileId}`;
     state.set('ui.lastProfile', profileId);
+    applyProfileShortcuts(profileId, profile);
     logActivity(message, { tone });
   }
 
@@ -8051,6 +8438,32 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       ...event,
       timestamp: Date.now(),
     });
+  }
+
+  function recordProfileShareEvent(event) {
+    if (!event) return;
+    const count = Array.isArray(event.recipients) ? event.recipients.length : 0;
+    pushCollaborationItem(
+      'collaboration.profileShares',
+      {
+        ...event,
+        count,
+        timestamp: Date.now(),
+      },
+      30
+    );
+  }
+
+  function recordAutomationEvent(event) {
+    if (!event) return;
+    pushCollaborationItem(
+      'collaboration.automations',
+      {
+        ...event,
+        timestamp: Date.now(),
+      },
+      30
+    );
   }
 
   function appendIntegrationFeedback(message, options = {}) {
@@ -8601,6 +9014,12 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     if (!profileId) return;
     if (action === 'apply') {
       applyProfile(profileId);
+    } else if (action === 'share') {
+      await shareProfile(profileId);
+    } else if (action === 'unshare') {
+      await stopSharingProfile(profileId);
+    } else if (action === 'shortcuts') {
+      await configureProfileShortcuts(profileId);
     } else if (action === 'duplicate') {
       await duplicateProfile(profileId);
     } else if (action === 'export') {

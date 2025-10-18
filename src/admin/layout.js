@@ -79,6 +79,10 @@ export function createAdminLayout(runtimePanel) {
   const statusGrid = document.createElement('div');
   statusGrid.className = 'a11ytb-admin-status-grid';
 
+  const manifestDiff = document.createElement('section');
+  manifestDiff.className = 'a11ytb-admin-manifest-diff';
+  manifestDiff.hidden = true;
+
   const filterBar = document.createElement('div');
   filterBar.className = 'a11ytb-admin-filters';
 
@@ -148,7 +152,7 @@ export function createAdminLayout(runtimePanel) {
   emptyState.textContent = 'Aucun module ne correspond aux filtres sélectionnés.';
   emptyState.hidden = true;
 
-  dashboard.append(dashboardHeader, statusGrid, filterBar, moduleGrid, emptyState);
+  dashboard.append(dashboardHeader, statusGrid, manifestDiff, filterBar, moduleGrid, emptyState);
 
   const syncSection = document.createElement('section');
   syncSection.className = 'a11ytb-admin-section';
@@ -218,14 +222,174 @@ export function createAdminLayout(runtimePanel) {
 
   exportSection.append(exportHeader, exportList, exportEmpty);
 
-  mainColumn.append(introSection, dashboard, syncSection, exportSection);
-  layout.append(mainColumn, runtimePanel.element);
+  const shareSection = document.createElement('section');
+  shareSection.className = 'a11ytb-admin-section';
+
+  const shareHeader = document.createElement('div');
+  shareHeader.className = 'a11ytb-admin-section-header';
+
+  const shareTitle = document.createElement('h2');
+  shareTitle.className = 'a11ytb-admin-section-title';
+  shareTitle.textContent = 'Partages de profils';
+
+  const shareDescription = document.createElement('p');
+  shareDescription.className = 'a11ytb-admin-section-description';
+  shareDescription.textContent =
+    'Journal des profils diffusés auprès de l’équipe et des retraits de partage.';
+
+  const shareStatus = document.createElement('p');
+  shareStatus.className = 'a11ytb-admin-live';
+  shareStatus.setAttribute('role', 'status');
+  shareStatus.setAttribute('aria-live', 'polite');
+  shareStatus.textContent = 'Aucun partage enregistré.';
+
+  shareHeader.append(shareTitle, shareDescription, shareStatus);
+
+  const shareList = document.createElement('ul');
+  shareList.className = 'a11ytb-admin-share-list';
+  shareList.setAttribute('role', 'list');
+  shareList.hidden = true;
+
+  const shareEmpty = document.createElement('p');
+  shareEmpty.className = 'a11ytb-admin-empty';
+  shareEmpty.textContent = 'Aucun destinataire enregistré pour le moment.';
+
+  shareSection.append(shareHeader, shareList, shareEmpty);
+
+  const automationSection = document.createElement('section');
+  automationSection.className = 'a11ytb-admin-section';
+
+  const automationHeader = document.createElement('div');
+  automationHeader.className = 'a11ytb-admin-section-header';
+
+  const automationTitle = document.createElement('h2');
+  automationTitle.className = 'a11ytb-admin-section-title';
+  automationTitle.textContent = 'Automatisations & raccourcis';
+
+  const automationDescription = document.createElement('p');
+  automationDescription.className = 'a11ytb-admin-section-description';
+  automationDescription.textContent =
+    'Suivi des raccourcis appliqués automatiquement et des presets configurés par profil.';
+
+  const automationStatus = document.createElement('p');
+  automationStatus.className = 'a11ytb-admin-live';
+  automationStatus.setAttribute('role', 'status');
+  automationStatus.setAttribute('aria-live', 'polite');
+  automationStatus.textContent = 'Aucune automatisation enregistrée.';
+
+  automationHeader.append(automationTitle, automationDescription, automationStatus);
+
+  const automationList = document.createElement('ul');
+  automationList.className = 'a11ytb-admin-automation-list';
+  automationList.setAttribute('role', 'list');
+  automationList.hidden = true;
+
+  const automationEmpty = document.createElement('p');
+  automationEmpty.className = 'a11ytb-admin-empty';
+  automationEmpty.textContent = 'Aucun preset de raccourci n’a encore été appliqué.';
+
+  automationSection.append(automationHeader, automationList, automationEmpty);
+
+  mainColumn.append(
+    introSection,
+    dashboard,
+    syncSection,
+    exportSection,
+    shareSection,
+    automationSection
+  );
+
+  const availabilityPanel = document.createElement('aside');
+  availabilityPanel.className = 'a11ytb-admin-availability';
+
+  const availabilityHeader = document.createElement('header');
+  availabilityHeader.className = 'a11ytb-admin-availability-header';
+
+  const availabilityTitle = document.createElement('h2');
+  availabilityTitle.className = 'a11ytb-admin-availability-title';
+  availabilityTitle.textContent = 'Modules disponibles';
+
+  const availabilityDescription = document.createElement('p');
+  availabilityDescription.className = 'a11ytb-admin-availability-description';
+  availabilityDescription.textContent =
+    'Repérez les modules prêts à l’usage, identifiez les blocages et appliquez des filtres croisés.';
+
+  const availabilityCounts = document.createElement('dl');
+  availabilityCounts.className = 'a11ytb-admin-availability-counts';
+
+  const makeCount = (label, id) => {
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    dd.className = 'a11ytb-admin-availability-count';
+    dd.id = `a11ytb-availability-${id}`;
+    dd.textContent = '0';
+    availabilityCounts.append(dt, dd);
+    return dd;
+  };
+
+  const totalCount = makeCount('Modules suivis', 'total');
+  const activeCount = makeCount('Actifs', 'active');
+  const pinnedCount = makeCount('Épinglés', 'pinned');
+
+  availabilityHeader.append(
+    availabilityTitle,
+    availabilityDescription,
+    availabilityCounts
+  );
+
+  const availabilityToolbar = document.createElement('div');
+  availabilityToolbar.className = 'a11ytb-admin-availability-toolbar';
+
+  const availabilityBucketList = document.createElement('div');
+  availabilityBucketList.className = 'a11ytb-admin-availability-buckets';
+
+  const availabilityEmpty = document.createElement('p');
+  availabilityEmpty.className = 'a11ytb-admin-availability-empty';
+  availabilityEmpty.textContent = 'Aucun module à afficher pour cette catégorie.';
+  availabilityEmpty.hidden = true;
+
+  const taxonomy = document.createElement('div');
+  taxonomy.className = 'a11ytb-admin-availability-taxonomy';
+
+  const buildTaxonomySection = (titleText, listClass) => {
+    const section = document.createElement('section');
+    section.className = 'a11ytb-admin-availability-taxonomy-section';
+    const title = document.createElement('h3');
+    title.className = 'a11ytb-admin-availability-taxonomy-title';
+    title.textContent = titleText;
+    const list = document.createElement('ul');
+    list.className = listClass;
+    list.setAttribute('role', 'list');
+    const empty = document.createElement('p');
+    empty.className = 'a11ytb-admin-availability-taxonomy-empty';
+    empty.textContent = 'Aucune donnée disponible.';
+    empty.hidden = true;
+    section.append(title, list, empty);
+    return { section, list, empty };
+  };
+
+  const profileSection = buildTaxonomySection('Profils concernés', 'a11ytb-admin-availability-profiles');
+  const collectionSection = buildTaxonomySection('Collections associées', 'a11ytb-admin-availability-collections');
+
+  taxonomy.append(profileSection.section, collectionSection.section);
+
+  availabilityPanel.append(
+    availabilityHeader,
+    availabilityToolbar,
+    availabilityBucketList,
+    availabilityEmpty,
+    taxonomy
+  );
+
+  layout.append(mainColumn, availabilityPanel, runtimePanel.element);
 
   return {
     root: layout,
     introSection,
     dashboard,
     statusGrid,
+    manifestDiff,
     moduleGrid,
     emptyState,
     connectionStatus,
@@ -236,6 +400,27 @@ export function createAdminLayout(runtimePanel) {
     exportList,
     exportEmpty,
     exportStatus,
+    shareList,
+    shareEmpty,
+    shareStatus,
+    automationList,
+    automationEmpty,
+    automationStatus,
+    availability: {
+      root: availabilityPanel,
+      toolbar: availabilityToolbar,
+      bucketList: availabilityBucketList,
+      empty: availabilityEmpty,
+      counts: {
+        total: totalCount,
+        active: activeCount,
+        pinned: pinnedCount,
+      },
+      profiles: profileSection.list,
+      profilesEmpty: profileSection.empty,
+      collections: collectionSection.list,
+      collectionsEmpty: collectionSection.empty,
+    },
     filters: {
       profile: profileFilter.control,
       collection: collectionFilter.control,

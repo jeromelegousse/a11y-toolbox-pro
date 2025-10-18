@@ -204,6 +204,8 @@ const baseInitial = {
     },
     syncs: [],
     exports: [],
+    profileShares: [],
+    automations: [],
   },
 };
 
