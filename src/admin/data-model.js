@@ -20,6 +20,10 @@ flattenedModuleCollections.forEach((collection) => {
   });
 });
 
+const collectionMetadata = new Map(
+  flattenedModuleCollections.map((collection) => [collection.id, collection])
+);
+
 function resolveStatus(runtimeEntry, { disabled, hidden, disabledCollections }) {
   const isErrored = runtimeEntry.state === 'error';
   if (isErrored) {
@@ -89,6 +93,18 @@ function buildFlags(isCollectionDisabled, runtimeEntry, compat) {
   if (compat?.status === 'partial') {
     flags.push({ tone: 'alert', label: 'Compatibilité partielle' });
   }
+  const network = runtimeEntry.network || {};
+  if (network.status === 'error') {
+    flags.push({ tone: 'alert', label: 'Ressources distantes en erreur' });
+  }
+  if (network.status === 'offline') {
+    flags.push({ tone: 'warning', label: 'Ressources servies hors ligne' });
+  }
+  if (Number.isFinite(network.stale) && network.stale > 0) {
+    const label =
+      network.stale > 1 ? `${network.stale} ressources à rafraîchir` : '1 ressource à rafraîchir';
+    flags.push({ tone: 'warning', label });
+  }
   return flags;
 }
 
@@ -134,6 +150,8 @@ export function buildModuleEntries(snapshot = {}) {
     const compatStatus = compat.status || 'none';
 
     const dependencies = ensureArray(runtimeEntry.dependencies);
+    const network = runtimeEntry.network || {};
+    const networkResources = ensureArray(network.resources);
 
     const metrics = runtimeEntry.metrics
       ? { ...runtimeEntry.metrics }
@@ -150,7 +168,7 @@ export function buildModuleEntries(snapshot = {}) {
     const profiles = moduleToProfiles.get(entry.id) || new Set();
     const flags = buildFlags(isCollectionDisabled, runtimeEntry, compat);
 
-    const entry = {
+    const moduleEntry = {
       id: entry.id,
       manifest,
       runtime: runtimeEntry,
@@ -169,26 +187,35 @@ export function buildModuleEntries(snapshot = {}) {
       profiles: Array.from(profiles),
       collections: collectionIds,
       dependencies,
+      network,
+      networkStatus: network.status || 'idle',
+      networkResources,
+      networkRequests: Number.isFinite(network.requests) ? network.requests : 0,
+      networkHits: Number.isFinite(network.hits) ? network.hits : 0,
       flags,
       searchText: buildSearchText({ id: entry.id, manifest }),
     };
 
-    entry.availability = determineAvailability({
-      enabled: entry.enabled,
-      statusTone: entry.statusTone,
+    moduleEntry.availability = determineAvailability({
+      enabled: moduleEntry.enabled,
+      statusTone: moduleEntry.statusTone,
       compatStatus,
       collectionDisabled: isCollectionDisabled,
-      dependencies: entry.dependencies,
-      flags: entry.flags,
+      dependencies: moduleEntry.dependencies,
+      flags: moduleEntry.flags,
     });
 
-    return entry;
+    return moduleEntry;
   });
 }
 
 export function filterModules(entries, filters) {
   return entries.filter((entry) => {
-    if (filters.availability && filters.availability !== 'all' && entry.availability !== filters.availability) {
+    if (
+      filters.availability &&
+      filters.availability !== 'all' &&
+      entry.availability !== filters.availability
+    ) {
       return false;
     }
     if (filters.profile !== 'all' && !entry.profiles.includes(filters.profile)) {
@@ -291,7 +318,9 @@ export function computeAvailabilityBuckets(entries = []) {
     },
   ];
 
-  const bucketMap = new Map(initialBuckets.map((bucket) => [bucket.id, { ...bucket, modules: [] }]));
+  const bucketMap = new Map(
+    initialBuckets.map((bucket) => [bucket.id, { ...bucket, modules: [] }])
+  );
   const profileCounts = new Map();
   const collectionCounts = new Map();
 
@@ -304,9 +333,13 @@ export function computeAvailabilityBuckets(entries = []) {
     }
 
     ensureArray(entry.profiles).forEach((profileId) => incrementCount(profileCounts, profileId));
-    ensureArray(entry.collections).forEach((collectionId) => incrementCount(collectionCounts, collectionId));
+    ensureArray(entry.collections).forEach((collectionId) =>
+      incrementCount(collectionCounts, collectionId)
+    );
 
-    const bucketId = bucketMap.has(entry.availability) ? entry.availability : determineAvailability(entry);
+    const bucketId = bucketMap.has(entry.availability)
+      ? entry.availability
+      : determineAvailability(entry);
     const bucket = bucketMap.get(bucketId) || bucketMap.get('attention');
     bucket.modules.push(entry);
   });
@@ -356,6 +389,293 @@ function normalizeFlags(entry) {
   return result;
 }
 
+function computeRate(part, total) {
+  if (!Number.isFinite(part) || !Number.isFinite(total) || total <= 0) {
+    return null;
+  }
+  const ratio = (part / total) * 100;
+  return Number.isFinite(ratio) ? ratio : null;
+}
+
+function countOfflineResources(resources) {
+  return ensureArray(resources).filter(
+    (resource) => resource?.offline || resource?.status === 'offline'
+  ).length;
+}
+
+function getCollectionLabel(collectionId) {
+  const metadata = collectionMetadata.get(collectionId);
+  if (!metadata) {
+    return { label: collectionId, pathLabel: collectionId };
+  }
+  return {
+    label: metadata.label || collectionId,
+    pathLabel: metadata.pathLabel || metadata.label || collectionId,
+  };
+}
+
+export function computeMetricsOverview(entries = [], snapshot = {}) {
+  const totals = {
+    attempts: 0,
+    successes: 0,
+    failures: 0,
+    incidentCount: 0,
+    incidentWarnings: 0,
+    incidentErrors: 0,
+    latency: {
+      load: { total: 0, samples: 0 },
+      init: { total: 0, samples: 0 },
+    },
+    lastTimestamp: 0,
+    network: { requests: 0, hits: 0, offline: 0 },
+  };
+
+  const moduleSummaries = [];
+  const moduleIndex = new Map();
+  const collectionAggregates = new Map();
+
+  entries.forEach((entry) => {
+    const attempts = Number(entry.metrics?.attempts) || 0;
+    const successes = Number(entry.metrics?.successes) || 0;
+    const failures = Number(entry.metrics?.failures) || 0;
+    totals.attempts += attempts;
+    totals.successes += successes;
+    totals.failures += failures;
+
+    const timings = entry.metrics?.timings || {};
+    const loadTiming = timings.load || {};
+    const initTiming = timings.init || {};
+    const loadSamples = Number(loadTiming.samples) || 0;
+    const initSamples = Number(initTiming.samples) || 0;
+    const loadTotal = Number(loadTiming.total) || 0;
+    const initTotal = Number(initTiming.total) || 0;
+    if (loadSamples > 0 && loadTotal > 0) {
+      totals.latency.load.total += loadTotal;
+      totals.latency.load.samples += loadSamples;
+    }
+    if (initSamples > 0 && initTotal > 0) {
+      totals.latency.init.total += initTotal;
+      totals.latency.init.samples += initSamples;
+    }
+
+    const manifestName = entry.manifest?.name || entry.id;
+    const moduleIncidents = ensureArray(entry.metrics?.incidents);
+    let lastIncidentAt = Number(entry.metrics?.lastIncidentAt) || 0;
+    let warningCount = 0;
+    let errorCount = 0;
+    moduleIncidents.forEach((incident) => {
+      const severity = incident?.severity || (incident?.type === 'warning' ? 'warning' : 'error');
+      if (severity === 'warning') {
+        warningCount += 1;
+        totals.incidentWarnings += 1;
+      } else {
+        errorCount += 1;
+        totals.incidentErrors += 1;
+      }
+      if (Number.isFinite(incident?.at) && incident.at > lastIncidentAt) {
+        lastIncidentAt = incident.at;
+      }
+    });
+    totals.incidentCount += moduleIncidents.length;
+
+    const offlineResources = countOfflineResources(entry.networkResources);
+    if (Number.isFinite(entry.networkRequests)) {
+      totals.network.requests += entry.networkRequests;
+    }
+    if (Number.isFinite(entry.networkHits)) {
+      totals.network.hits += entry.networkHits;
+    }
+    totals.network.offline += offlineResources;
+
+    const lastAttemptAt = Number(entry.metrics?.lastAttemptAt) || Number(entry.runtime?.lastAttemptAt) || 0;
+    const lastSuccessAt = Number(entry.metrics?.lastSuccessAt) || 0;
+    const lastFailureAt = Number(entry.metrics?.lastFailureAt) || Number(entry.runtime?.lastFailureAt) || 0;
+    const moduleLastTimestamp = Math.max(lastAttemptAt, lastSuccessAt, lastFailureAt, lastIncidentAt);
+    if (moduleLastTimestamp > totals.lastTimestamp) {
+      totals.lastTimestamp = moduleLastTimestamp;
+    }
+
+    const summary = {
+      id: entry.id,
+      label: manifestName,
+      attempts,
+      successes,
+      failures,
+      successRate: computeRate(successes, attempts),
+      failureRate: computeRate(failures, attempts) ?? 0,
+      latency: {
+        combinedAverage: Number.isFinite(timings.combinedAverage) ? timings.combinedAverage : null,
+        loadAverage: Number.isFinite(loadTiming.average) ? loadTiming.average : null,
+        initAverage: Number.isFinite(initTiming.average) ? initTiming.average : null,
+      },
+      incidents: {
+        total: moduleIncidents.length,
+        warnings: warningCount,
+        errors: errorCount,
+        lastAt: lastIncidentAt,
+      },
+      collections: ensureArray(entry.collections),
+      profiles: ensureArray(entry.profiles),
+      network: {
+        requests: Number(entry.networkRequests) || 0,
+        hits: Number(entry.networkHits) || 0,
+        offline: offlineResources,
+      },
+      lastUpdatedAt: moduleLastTimestamp,
+    };
+
+    moduleSummaries.push(summary);
+    moduleIndex.set(entry.id, summary);
+
+    summary.collections.forEach((collectionId) => {
+      if (!collectionId) return;
+      if (!collectionAggregates.has(collectionId)) {
+        const { label, pathLabel } = getCollectionLabel(collectionId);
+        collectionAggregates.set(collectionId, {
+          id: collectionId,
+          label,
+          pathLabel,
+          modules: new Set(),
+          attempts: 0,
+          successes: 0,
+          failures: 0,
+          incidents: 0,
+        });
+      }
+      const aggregate = collectionAggregates.get(collectionId);
+      aggregate.modules.add(entry.id);
+      aggregate.attempts += attempts;
+      aggregate.successes += successes;
+      aggregate.failures += failures;
+      aggregate.incidents += moduleIncidents.length;
+    });
+  });
+
+  const metricsSyncState = snapshot?.runtime?.metricsSync || {};
+  const activeWindows = ensureArray(metricsSyncState.activeWindows);
+  const pendingQueue = ensureArray(metricsSyncState.pendingQueue);
+  const recentIncidents = [];
+
+  activeWindows.forEach((windowData) => {
+    const moduleId = windowData?.moduleId;
+    const incidents = ensureArray(windowData?.incidents);
+    if (!moduleId || !incidents.length) {
+      return;
+    }
+    const moduleSummary = moduleIndex.get(moduleId);
+    const moduleLabel =
+      moduleSummary?.label || windowData.moduleLabel || windowData.moduleId || moduleId;
+    incidents.forEach((incident) => {
+      const severity = incident?.severity || (incident?.type === 'warning' ? 'warning' : 'error');
+      const at = Number.isFinite(incident?.at) ? incident.at : Number(windowData.lastTimestamp) || 0;
+      recentIncidents.push({
+        moduleId,
+        moduleLabel,
+        severity,
+        message: incident?.message || '',
+        at,
+      });
+    });
+  });
+
+  recentIncidents.sort((a, b) => (b.at || 0) - (a.at || 0));
+
+  const loadAverage =
+    totals.latency.load.samples > 0
+      ? totals.latency.load.total / totals.latency.load.samples
+      : null;
+  const initAverage =
+    totals.latency.init.samples > 0
+      ? totals.latency.init.total / totals.latency.init.samples
+      : null;
+  const combinedAverage =
+    (Number.isFinite(loadAverage) ? loadAverage : 0) +
+    (Number.isFinite(initAverage) ? initAverage : 0);
+
+  const successRate = computeRate(totals.successes, totals.attempts);
+
+  const modulesWithAttempts = moduleSummaries.filter((module) => module.attempts > 0);
+  const topFailures = modulesWithAttempts
+    .slice()
+    .sort((a, b) => {
+      if ((b.failureRate || 0) !== (a.failureRate || 0)) {
+        return (b.failureRate || 0) - (a.failureRate || 0);
+      }
+      if (b.failures !== a.failures) {
+        return b.failures - a.failures;
+      }
+      return (b.attempts || 0) - (a.attempts || 0);
+    })
+    .slice(0, 8);
+
+  const topLatency = moduleSummaries
+    .filter((module) => Number.isFinite(module.latency.combinedAverage))
+    .slice()
+    .sort((a, b) => b.latency.combinedAverage - a.latency.combinedAverage)
+    .slice(0, 6);
+
+  const collections = Array.from(collectionAggregates.values())
+    .map((aggregate) => ({
+      id: aggregate.id,
+      label: aggregate.label,
+      pathLabel: aggregate.pathLabel,
+      modules: aggregate.modules.size,
+      attempts: aggregate.attempts,
+      successes: aggregate.successes,
+      failures: aggregate.failures,
+      successRate: computeRate(aggregate.successes, aggregate.attempts),
+      incidentCount: aggregate.incidents,
+    }))
+    .sort((a, b) => {
+      if ((b.failures || 0) !== (a.failures || 0)) {
+        return (b.failures || 0) - (a.failures || 0);
+      }
+      if ((a.successRate ?? 0) !== (b.successRate ?? 0)) {
+        return (a.successRate ?? 0) - (b.successRate ?? 0);
+      }
+      return (a.label || a.id).localeCompare(b.label || b.id, 'fr');
+    })
+    .slice(0, 6);
+
+  const updatedAt = Math.max(
+    totals.lastTimestamp,
+    Number(metricsSyncState.lastUpdatedAt) || 0,
+    recentIncidents.length ? recentIncidents[0].at || 0 : 0
+  );
+
+  return {
+    totals: {
+      modules: entries.length,
+      attempts: totals.attempts,
+      successes: totals.successes,
+      failures: totals.failures,
+      successRate,
+      latency: {
+        loadAverage: Number.isFinite(loadAverage) ? loadAverage : null,
+        initAverage: Number.isFinite(initAverage) ? initAverage : null,
+        combinedAverage:
+          Number.isFinite(combinedAverage) && combinedAverage > 0 ? combinedAverage : null,
+      },
+      network: totals.network,
+    },
+    modules: moduleSummaries,
+    topFailures,
+    topLatency,
+    collections,
+    incidents: {
+      total: totals.incidentCount,
+      warnings: totals.incidentWarnings,
+      errors: totals.incidentErrors,
+      recent: recentIncidents.slice(0, 8),
+    },
+    sync: {
+      activeWindows: activeWindows.length,
+      pendingQueue: pendingQueue.length,
+    },
+    updatedAt,
+  };
+}
+
 function buildChildHighlights(collection, moduleSet, entryById) {
   return flattenedModuleCollections
     .filter((child) => child.parentId === collection.id)
@@ -366,7 +686,7 @@ function buildChildHighlights(collection, moduleSet, entryById) {
       }
       const matched = directModules.filter((moduleId) => moduleSet.has(moduleId));
       const missing = directModules.filter((moduleId) => !moduleSet.has(moduleId));
-      const hasIssues = matched.length > 0 && (missing.length > 0);
+      const hasIssues = matched.length > 0 && missing.length > 0;
       if (!hasIssues) {
         return null;
       }
@@ -390,7 +710,9 @@ export function computeProfileCollectionSuggestions(entries = [], snapshot = {})
   const disabledCollections = new Set(ensureArray(snapshot?.ui?.collections?.disabled));
   const result = [];
 
-  const topLevelCollections = flattenedModuleCollections.filter((collection) => collection.depth === 0);
+  const topLevelCollections = flattenedModuleCollections.filter(
+    (collection) => collection.depth === 0
+  );
 
   profiles.forEach((profile) => {
     const moduleSet = new Set(ensureArray(profile.modules));
@@ -417,8 +739,12 @@ export function computeProfileCollectionSuggestions(entries = [], snapshot = {})
       }
 
       const missing = moduleDetails.filter((detail) => !detail.inProfile);
-      const blockedCount = matched.filter((detail) => detail.entry?.availability === 'blocked').length;
-      const attentionCount = matched.filter((detail) => detail.entry?.availability === 'attention').length;
+      const blockedCount = matched.filter(
+        (detail) => detail.entry?.availability === 'blocked'
+      ).length;
+      const attentionCount = matched.filter(
+        (detail) => detail.entry?.availability === 'attention'
+      ).length;
       const readyCount = matched.filter((detail) => detail.entry?.availability === 'ready').length;
       const compatStatus = moduleDetails.reduce(
         (worst, detail) => pickWorstCompatStatus(worst, detail.entry?.compatStatus || 'full'),
@@ -458,27 +784,29 @@ export function computeProfileCollectionSuggestions(entries = [], snapshot = {})
         tone = 'confirm';
       }
 
-      const requires = ensureArray(collection.requires).map((requirement) => {
-        if (!requirement || typeof requirement !== 'object') {
-          return null;
-        }
-        if (requirement.type === 'module') {
-          const moduleEntry = entryById.get(requirement.id);
+      const requires = ensureArray(collection.requires)
+        .map((requirement) => {
+          if (!requirement || typeof requirement !== 'object') {
+            return null;
+          }
+          if (requirement.type === 'module') {
+            const moduleEntry = entryById.get(requirement.id);
+            return {
+              id: requirement.id,
+              type: 'module',
+              label: moduleEntry?.manifest?.name || requirement.label || requirement.id,
+              reason: requirement.reason || '',
+            };
+          }
+          const target = collectionLookup.get(requirement.id);
           return {
             id: requirement.id,
-            type: 'module',
-            label: moduleEntry?.manifest?.name || requirement.label || requirement.id,
+            type: 'collection',
+            label: requirement.label || target?.label || requirement.id,
             reason: requirement.reason || '',
           };
-        }
-        const target = collectionLookup.get(requirement.id);
-        return {
-          id: requirement.id,
-          type: 'collection',
-          label: requirement.label || target?.label || requirement.id,
-          reason: requirement.reason || '',
-        };
-      }).filter(Boolean);
+        })
+        .filter(Boolean);
 
       profileSuggestions.push({
         id: collection.id,
@@ -512,11 +840,7 @@ export function computeProfileCollectionSuggestions(entries = [], snapshot = {})
         requires,
         isCollectionDisabled,
         children: childHighlights,
-        score:
-          blockedCount * 100 +
-          attentionCount * 50 +
-          (missing.length > 0 ? 25 : 0) +
-          coverage,
+        score: blockedCount * 100 + attentionCount * 50 + (missing.length > 0 ? 25 : 0) + coverage,
       });
     });
 

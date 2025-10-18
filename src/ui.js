@@ -1019,7 +1019,9 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       shortcuts: Object.keys(shortcuts).length ? shortcuts : undefined,
       sharedWith: sharedWith.length ? sharedWith : undefined,
       lastSharedAt:
-        sharedWith.length && Number.isFinite(raw.lastSharedAt) ? Number(raw.lastSharedAt) : undefined,
+        sharedWith.length && Number.isFinite(raw.lastSharedAt)
+          ? Number(raw.lastSharedAt)
+          : undefined,
     };
     return normalized;
   }
@@ -1073,7 +1075,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       mode: 'prompt',
       title: 'Configurer les raccourcis',
       description:
-        "Indiquez une ligne par raccourci (action = combinaison). Exemple : view-modules=Alt+Shift+M.",
+        'Indiquez une ligne par raccourci (action = combinaison). Exemple : view-modules=Alt+Shift+M.',
       inputLabel: 'Raccourcis personnalisés',
       defaultValue,
       confirmLabel: 'Enregistrer',
@@ -1149,9 +1151,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     const profiles = getProfilesState();
     const profile = profiles?.[profileId];
     if (!profile) return;
-    const defaultValue = Array.isArray(profile.sharedWith)
-      ? profile.sharedWith.join(', ')
-      : '';
+    const defaultValue = Array.isArray(profile.sharedWith) ? profile.sharedWith.join(', ') : '';
     const input = await openModalDialog({
       mode: 'prompt',
       title: 'Partager le profil',
@@ -1641,7 +1641,8 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
           valueNode.textContent = '';
           return;
         }
-        valueNode.textContent = typeof valueFormatter === 'function' ? valueFormatter(numeric) : `${numeric}`;
+        valueNode.textContent =
+          typeof valueFormatter === 'function' ? valueFormatter(numeric) : `${numeric}`;
       };
       input.addEventListener('input', (event) => {
         updateLabel(event.target.value);
@@ -1686,7 +1687,18 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     progress.input.addEventListener('blur', stopScrub);
     progress.input.addEventListener('change', stopScrub);
     progress.input.addEventListener('keydown', (event) => {
-      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
+      if (
+        [
+          'ArrowLeft',
+          'ArrowRight',
+          'ArrowUp',
+          'ArrowDown',
+          'Home',
+          'End',
+          'PageUp',
+          'PageDown',
+        ].includes(event.key)
+      ) {
         ttsOverlayState.progressInteracting = true;
       }
     });
@@ -2058,7 +2070,9 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       const start = Math.max(0, Number(word?.start) || 0);
       const end = Math.max(start, Number(word?.end) || 0);
       if (start > index) {
-        fragment.append((ownerDocument || document).createTextNode(normalizedText.slice(index, start)));
+        fragment.append(
+          (ownerDocument || document).createTextNode(normalizedText.slice(index, start))
+        );
       }
       const span = (ownerDocument || document).createElement('span');
       span.className = 'a11ytb-tts-word';
@@ -2188,7 +2202,10 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       }
       overlayContext.progressInput.setAttribute('aria-valuemin', '0');
       overlayContext.progressInput.setAttribute('aria-valuemax', '100');
-      overlayContext.progressInput.setAttribute('aria-valuenow', String(Math.min(Math.max(percent, 0), 100)));
+      overlayContext.progressInput.setAttribute(
+        'aria-valuenow',
+        String(Math.min(Math.max(percent, 0), 100))
+      );
       overlayContext.progressInput.setAttribute('aria-valuetext', `${percent}%`);
     }
 
@@ -5054,6 +5071,23 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     unknown: 'Compatibilité non vérifiée automatiquement.',
   };
 
+  const NETWORK_STATUS_LABELS = {
+    idle: 'En attente',
+    fetching: 'Chargement',
+    ready: 'En cache',
+    stale: 'À rafraîchir',
+    error: 'Erreur',
+    offline: 'Hors ligne',
+  };
+
+  const NETWORK_STATUS_TONE = {
+    fetching: 'info',
+    ready: 'confirm',
+    stale: 'warning',
+    error: 'alert',
+    offline: 'warning',
+  };
+
   function ensureSelectValue(select, value) {
     if (!select) return;
     const allowed = Array.from(select.options).some((option) => option.value === value);
@@ -5118,6 +5152,15 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
         dependencies,
         profileIds,
         collectionIds,
+        network: runtimeEntry.network || {},
+        networkStatus: runtimeEntry.network?.status || 'idle',
+        networkResources: Array.isArray(runtimeEntry.network?.resources)
+          ? runtimeEntry.network.resources
+          : [],
+        networkRequests: Number.isFinite(runtimeEntry.network?.requests)
+          ? runtimeEntry.network.requests
+          : 0,
+        networkHits: Number.isFinite(runtimeEntry.network?.hits) ? runtimeEntry.network.hits : 0,
       });
     });
 
@@ -5204,6 +5247,18 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       );
       meta.append(compatBadge);
 
+      if (entry.networkStatus && entry.networkStatus !== 'idle') {
+        const networkLabel = NETWORK_STATUS_LABELS[entry.networkStatus] || entry.networkStatus;
+        const networkBadge = createBadge(
+          `Réseau : ${networkLabel}`,
+          `network-${entry.networkStatus}`,
+          {
+            title: 'État de synchronisation des ressources distantes.',
+          }
+        );
+        meta.append(networkBadge);
+      }
+
       if (entry.runtime.enabled) {
         meta.append(
           createBadge('Actif', 'active', { title: 'Module chargé dans la configuration actuelle.' })
@@ -5269,6 +5324,88 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
           depList.append(item);
         });
         card.append(depList);
+      }
+
+      if (entry.networkResources.length) {
+        const networkSection = document.createElement('div');
+        networkSection.className = 'a11ytb-available-network';
+
+        const networkTitle = document.createElement('p');
+        networkTitle.className = 'a11ytb-available-subtitle';
+        networkTitle.textContent = 'Ressources distantes';
+        networkSection.append(networkTitle);
+
+        if (entry.networkRequests || entry.networkHits) {
+          const summary = document.createElement('p');
+          summary.className = 'a11ytb-available-network-summary';
+          summary.textContent = `Requêtes : ${entry.networkRequests} · Hits cache : ${entry.networkHits}`;
+          networkSection.append(summary);
+        }
+
+        const networkList = document.createElement('ul');
+        networkList.className = 'a11ytb-available-network-list';
+
+        entry.networkResources.forEach((resource) => {
+          const item = document.createElement('li');
+          item.className = 'a11ytb-available-network-item';
+          const status = resource.status || 'idle';
+          item.dataset.status = status;
+          if (resource.stale) {
+            item.dataset.stale = 'true';
+          }
+          if (resource.offline) {
+            item.dataset.offline = 'true';
+          }
+
+          const header = document.createElement('div');
+          header.className = 'a11ytb-available-network-header';
+
+          const label = document.createElement('span');
+          label.className = 'a11ytb-available-network-label';
+          label.textContent = resource.label || resource.id;
+
+          const statusLabel = NETWORK_STATUS_LABELS[status] || status;
+          const statusBadge = createBadge(`Statut : ${statusLabel}`, `network-${status}`, {
+            title: resource.lastError || `Stratégie ${resource.strategy || 'on-demand'}.`,
+          });
+          header.append(label, statusBadge);
+          item.append(header);
+
+          const detailParts = [];
+          if (resource.strategy) {
+            detailParts.push(`Mode : ${resource.strategy}`);
+          }
+          if (resource.cache) {
+            detailParts.push(`Cache : ${resource.cache}`);
+          }
+          if (Number.isFinite(resource.size) && resource.size >= 0) {
+            const sizeKb = Math.max(1, Math.round(resource.size / 1024));
+            detailParts.push(`Taille : ${sizeKb} Ko`);
+          }
+          if (Number.isFinite(resource.lastFetchAt)) {
+            const fetchedDate = new Date(resource.lastFetchAt);
+            detailParts.push(`Maj : ${fetchedDate.toLocaleString('fr-FR')}`);
+          }
+          if (Number.isFinite(resource.expiresAt) && resource.expiresAt > 0) {
+            const expiresDate = new Date(resource.expiresAt);
+            detailParts.push(`Expire : ${expiresDate.toLocaleString('fr-FR')}`);
+          }
+          if (resource.lastError) {
+            detailParts.push(resource.lastError);
+          }
+
+          if (detailParts.length) {
+            const detail = document.createElement('p');
+            detail.className = 'a11ytb-available-network-detail';
+            detail.textContent = detailParts.join(' · ');
+            item.append(detail);
+          }
+
+          networkList.append(item);
+        });
+
+        networkSection.append(networkList);
+        card.append(networkSection);
       }
 
       const compatMessages = [];
@@ -8039,11 +8176,12 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     const lastProfile = snapshot?.ui?.lastProfile ?? state.get('ui.lastProfile');
     const entries = Object.entries(data);
     const moduleEntries = buildModuleEntries(sourceSnapshot || {});
-    const suggestionModel = computeProfileCollectionSuggestions(moduleEntries, sourceSnapshot || {});
+    const suggestionModel = computeProfileCollectionSuggestions(
+      moduleEntries,
+      sourceSnapshot || {}
+    );
     const suggestionMap = new Map(
-      Array.isArray(suggestionModel)
-        ? suggestionModel.map((entry) => [entry.profileId, entry])
-        : []
+      Array.isArray(suggestionModel) ? suggestionModel.map((entry) => [entry.profileId, entry]) : []
     );
     profilesList.innerHTML = '';
     if (!entries.length) {
@@ -8306,7 +8444,9 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       shortcutsBtn.className = 'a11ytb-button a11ytb-button--ghost';
       shortcutsBtn.dataset.profileAction = 'shortcuts';
       shortcutsBtn.dataset.profileId = id;
-      shortcutsBtn.textContent = shortcutEntries.length ? 'Modifier les raccourcis' : 'Configurer les raccourcis';
+      shortcutsBtn.textContent = shortcutEntries.length
+        ? 'Modifier les raccourcis'
+        : 'Configurer les raccourcis';
       actions.append(shortcutsBtn);
 
       const duplicateBtn = document.createElement('button');

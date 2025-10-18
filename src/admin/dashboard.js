@@ -3,6 +3,7 @@ import { summarizeStatuses } from '../status-center.js';
 import { COMPATIBILITY_LABELS, COMPATIBILITY_TONES } from './constants.js';
 import {
   buildModuleEntries,
+  computeMetricsOverview,
   computeProfiles,
   computeProfileCollectionSuggestions,
   filterModules,
@@ -14,6 +15,7 @@ import { createModuleCard } from './render/module-card.js';
 import { createModuleAvailabilityPanel } from './render/module-availability-panel.js';
 import { renderManifestDiff } from './render/manifest-diff.js';
 import { renderStatusCards } from './render/status-cards.js';
+import { createMetricsDashboard } from './render/metrics-dashboard.js';
 import {
   createBadge,
   ensureArray,
@@ -45,6 +47,7 @@ export function initAdminDashboard(mount) {
 
   const runtimePanel = buildRuntimePanel();
   const layout = createAdminLayout(runtimePanel);
+  const metricsView = createMetricsDashboard(layout.metrics);
 
   mount.innerHTML = '';
   mount.append(layout.root);
@@ -628,6 +631,7 @@ export function initAdminDashboard(mount) {
     renderStatusCards(layout.statusGrid, summaries);
     updateManifestDiffView(summaries);
     currentEntries = buildModuleEntries(currentSnapshot);
+    metricsView.update(computeMetricsOverview(currentEntries, currentSnapshot));
     updateRuntimePanel(runtimePanel, currentEntries);
     updateFiltersFromSnapshot(currentSnapshot);
     renderModules(currentEntries);

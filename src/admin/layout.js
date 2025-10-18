@@ -154,6 +154,131 @@ export function createAdminLayout(runtimePanel) {
 
   dashboard.append(dashboardHeader, statusGrid, manifestDiff, filterBar, moduleGrid, emptyState);
 
+  const metricsSection = document.createElement('section');
+  metricsSection.className = 'a11ytb-admin-section';
+
+  const metricsHeader = document.createElement('div');
+  metricsHeader.className = 'a11ytb-admin-section-header';
+
+  const metricsTitle = document.createElement('h2');
+  metricsTitle.className = 'a11ytb-admin-section-title';
+  metricsTitle.textContent = 'Métriques consolidées';
+
+  const metricsDescription = document.createElement('p');
+  metricsDescription.className = 'a11ytb-admin-section-description';
+  metricsDescription.textContent =
+    'Analysez les performances globales, les incidents récents et les collections à surveiller.';
+
+  const metricsStatus = document.createElement('p');
+  metricsStatus.className = 'a11ytb-admin-live';
+  metricsStatus.setAttribute('role', 'status');
+  metricsStatus.setAttribute('aria-live', 'polite');
+  metricsStatus.textContent = 'En attente de données métriques.';
+
+  metricsHeader.append(metricsTitle, metricsDescription, metricsStatus);
+
+  const metricsSummary = document.createElement('div');
+  metricsSummary.className = 'a11ytb-admin-metrics-summary';
+
+  const metricsEmpty = document.createElement('p');
+  metricsEmpty.className = 'a11ytb-admin-empty';
+  metricsEmpty.textContent = 'Aucune donnée métrique disponible pour le moment.';
+
+  const metricsDetail = document.createElement('div');
+  metricsDetail.className = 'a11ytb-admin-metrics-detail';
+
+  const metricsTableWrapper = document.createElement('div');
+  metricsTableWrapper.className = 'a11ytb-admin-metrics-table-wrapper';
+
+  const metricsTable = document.createElement('table');
+  metricsTable.className = 'a11ytb-admin-metrics-table';
+  metricsTable.setAttribute('aria-describedby', 'a11ytb-metrics-caption');
+
+  const metricsCaption = document.createElement('caption');
+  metricsCaption.id = 'a11ytb-metrics-caption';
+  metricsCaption.textContent = 'Modules présentant le plus de difficultés récentes.';
+
+  const metricsHead = document.createElement('thead');
+  const metricsHeadRow = document.createElement('tr');
+  ['Module', 'Tentatives', 'Échecs', 'Taux', 'Latence', 'Incidents'].forEach((label) => {
+    const th = document.createElement('th');
+    th.scope = 'col';
+    th.textContent = label;
+    metricsHeadRow.append(th);
+  });
+  metricsHead.append(metricsHeadRow);
+
+  const metricsBody = document.createElement('tbody');
+
+  metricsTable.append(metricsCaption, metricsHead, metricsBody);
+
+  const metricsTableEmpty = document.createElement('p');
+  metricsTableEmpty.className = 'a11ytb-admin-metrics-subempty';
+  metricsTableEmpty.textContent = 'Aucun échec enregistré.';
+
+  metricsTableWrapper.append(metricsTable, metricsTableEmpty);
+
+  const metricsSide = document.createElement('div');
+  metricsSide.className = 'a11ytb-admin-metrics-side';
+
+  const buildMetricsGroup = (titleText, emptyText) => {
+    const group = document.createElement('section');
+    group.className = 'a11ytb-admin-metrics-group';
+    const title = document.createElement('h3');
+    title.className = 'a11ytb-admin-metrics-subtitle';
+    title.textContent = titleText;
+    const list = document.createElement('ul');
+    list.className = 'a11ytb-admin-metrics-list';
+    list.setAttribute('role', 'list');
+    const empty = document.createElement('p');
+    empty.className = 'a11ytb-admin-metrics-subempty';
+    empty.textContent = emptyText;
+    group.append(title, list, empty);
+    return { group, list, empty };
+  };
+
+  const latencyGroup = buildMetricsGroup(
+    'Temps de réponse les plus élevés',
+    'Aucune mesure de latence disponible.'
+  );
+  const incidentGroup = buildMetricsGroup(
+    'Incidents récents',
+    'Aucun incident enregistré.'
+  );
+  const collectionGroup = buildMetricsGroup(
+    'Collections sous surveillance',
+    'Aucune collection en alerte.'
+  );
+
+  metricsSide.append(latencyGroup.group, incidentGroup.group, collectionGroup.group);
+
+  metricsDetail.append(metricsTableWrapper, metricsSide);
+
+  const metricsExport = document.createElement('div');
+  metricsExport.className = 'a11ytb-admin-metrics-export';
+
+  const exportJsonButton = document.createElement('button');
+  exportJsonButton.type = 'button';
+  exportJsonButton.className = 'a11ytb-admin-metrics-export-button';
+  exportJsonButton.textContent = 'Exporter JSON';
+  exportJsonButton.disabled = true;
+
+  const exportCsvButton = document.createElement('button');
+  exportCsvButton.type = 'button';
+  exportCsvButton.className = 'a11ytb-admin-metrics-export-button';
+  exportCsvButton.textContent = 'Exporter CSV';
+  exportCsvButton.disabled = true;
+
+  metricsExport.append(exportJsonButton, exportCsvButton);
+
+  metricsSection.append(
+    metricsHeader,
+    metricsSummary,
+    metricsEmpty,
+    metricsDetail,
+    metricsExport
+  );
+
   const syncSection = document.createElement('section');
   syncSection.className = 'a11ytb-admin-section';
 
@@ -327,6 +452,7 @@ export function createAdminLayout(runtimePanel) {
   mainColumn.append(
     introSection,
     dashboard,
+    metricsSection,
     syncSection,
     exportSection,
     shareSection,
@@ -432,6 +558,25 @@ export function createAdminLayout(runtimePanel) {
     syncList,
     syncEmpty,
     syncStatus,
+    metrics: {
+      section: metricsSection,
+      status: metricsStatus,
+      summary: metricsSummary,
+      empty: metricsEmpty,
+      table: metricsTable,
+      tableBody: metricsBody,
+      tableEmpty: metricsTableEmpty,
+      latencyList: latencyGroup.list,
+      latencyEmpty: latencyGroup.empty,
+      incidentsList: incidentGroup.list,
+      incidentsEmpty: incidentGroup.empty,
+      collectionsList: collectionGroup.list,
+      collectionsEmpty: collectionGroup.empty,
+      exports: {
+        json: exportJsonButton,
+        csv: exportCsvButton,
+      },
+    },
     exportList,
     exportEmpty,
     exportStatus,

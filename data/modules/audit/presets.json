@@ -1,0 +1,28 @@
+{
+  "version": "2024.05",
+  "presets": [
+    {
+      "id": "fastpass-default",
+      "label": "Audit rapide",
+      "description": "Exécute le noyau axe-core et les contrôles de contraste critiques.",
+      "rules": ["wcag-color-contrast", "wcag-focus-visible"]
+    },
+    {
+      "id": "full-regression",
+      "label": "Audit complet",
+      "description": "Active l’ensemble des règles WCAG et les validations landmarks.",
+      "rules": [
+        "wcag-color-contrast",
+        "wcag-focus-visible",
+        "wcag-landmark-navigation",
+        "wcag-form-labels"
+      ]
+    },
+    {
+      "id": "forms-intensive",
+      "label": "Formulaires détaillés",
+      "description": "Concentre l’audit sur les champs de formulaire et la navigation clavier.",
+      "rules": ["wcag-form-labels", "wcag-focus-visible"]
+    }
+  ]
+}
