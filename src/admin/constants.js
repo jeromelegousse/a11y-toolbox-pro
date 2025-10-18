@@ -12,12 +12,4 @@ export const COMPATIBILITY_TONES = {
   none: 'muted',
 };
 
-export const NAMESPACE_TO_MODULE = new Map([
-  ['contrast', 'contrast'],
-  ['spacing', 'spacing'],
-  ['tts', 'tts'],
-  ['stt', 'stt'],
-  ['braille', 'braille'],
-  ['audio', 'audio-feedback'],
-  ['audit', 'audit'],
-]);
+export { NAMESPACE_TO_MODULE } from '../profile-utils.js';

@@ -1,4 +1,5 @@
 import { formatTimestamp, summarizeReport } from './modules/audit-report.js';
+import { diffManifestSnapshots } from './registry.js';
 
 const STATUS_TONE_DEFAULT = 'info';
 const STATUS_TONE_ACTIVE = 'active';
@@ -749,13 +750,35 @@ function buildManifestHistorySummary(snapshot = {}) {
   );
   const totalFallback = declaredTotal ?? metrics.totalModules ?? metrics.trackedModules;
 
+  function pickLatestDiffCandidate(buckets) {
+    let candidate = null;
+    buckets.forEach((bucket) => {
+      const history = Array.isArray(bucket.history) ? bucket.history : [];
+      if (history.length < 2) return;
+      const sorted = history.slice().sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+      const latest = sorted[sorted.length - 1];
+      const previous = sorted[sorted.length - 2];
+      const timestamp = Number.isFinite(latest.timestamp) ? latest.timestamp : 0;
+      if (!candidate || timestamp > candidate.timestamp) {
+        candidate = {
+          moduleId: bucket.id,
+          moduleLabel: latest.name || bucket.id,
+          latest,
+          previous,
+          timestamp,
+        };
+      }
+    });
+    return candidate;
+  }
+
   if (metrics.trackedModules === 0) {
     const targetTotal = declaredTotal ?? metrics.totalModules ?? metrics.trackedModules;
     const moduleCountLabel =
       targetTotal && targetTotal > 0
         ? `${targetTotal} manifeste${targetTotal > 1 ? 's' : ''}`
         : 'vos manifestes';
-    return {
+    const summary = {
       id: 'manifest-history',
       label: 'Historique manifestes',
       badge: 'Versionnement requis',
@@ -784,6 +807,7 @@ function buildManifestHistorySummary(snapshot = {}) {
         coverageRate: 0,
       },
     };
+    return summary;
   }
 
   const detailParts = [];
@@ -814,7 +838,7 @@ function buildManifestHistorySummary(snapshot = {}) {
 
   const trackedLabel = `${metrics.trackedModules}/${totalFallback}`;
 
-  return {
+  const summary = {
     id: 'manifest-history',
     label: 'Historique manifestes',
     badge: 'Versionnement',
@@ -846,6 +870,20 @@ function buildManifestHistorySummary(snapshot = {}) {
       coverageRate: metrics.coverageRate,
     },
   };
+
+  const diffCandidate = pickLatestDiffCandidate(historyBuckets);
+  if (diffCandidate) {
+    summary.insights.manifestDiff = {
+      moduleId: diffCandidate.moduleId,
+      moduleLabel: diffCandidate.moduleLabel,
+      latest: diffCandidate.latest,
+      previous: diffCandidate.previous,
+      timestamp: diffCandidate.timestamp,
+      diff: diffManifestSnapshots(diffCandidate.previous, diffCandidate.latest),
+    };
+  }
+
+  return summary;
 }
 
 function isEmpty(value) {
