@@ -132,7 +132,9 @@ export function renderManifestDiff(container, summary, moduleEntry, handlers = {
   const timestamp = Number.isFinite(latest.timestamp) ? latest.timestamp : null;
   const subtitle = document.createElement('p');
   subtitle.className = 'a11ytb-admin-manifest-diff-subtitle';
-  subtitle.textContent = timestamp ? `Mise à jour ${formatDateRelative(timestamp)}` : 'Date de mise à jour inconnue';
+  subtitle.textContent = timestamp
+    ? `Mise à jour ${formatDateRelative(timestamp)}`
+    : 'Date de mise à jour inconnue';
 
   header.append(title, version, subtitle);
 

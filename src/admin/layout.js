@@ -241,10 +241,7 @@ export function createAdminLayout(runtimePanel) {
     'Temps de réponse les plus élevés',
     'Aucune mesure de latence disponible.'
   );
-  const incidentGroup = buildMetricsGroup(
-    'Incidents récents',
-    'Aucun incident enregistré.'
-  );
+  const incidentGroup = buildMetricsGroup('Incidents récents', 'Aucun incident enregistré.');
   const collectionGroup = buildMetricsGroup(
     'Collections sous surveillance',
     'Aucune collection en alerte.'
@@ -271,13 +268,7 @@ export function createAdminLayout(runtimePanel) {
 
   metricsExport.append(exportJsonButton, exportCsvButton);
 
-  metricsSection.append(
-    metricsHeader,
-    metricsSummary,
-    metricsEmpty,
-    metricsDetail,
-    metricsExport
-  );
+  metricsSection.append(metricsHeader, metricsSummary, metricsEmpty, metricsDetail, metricsExport);
 
   const syncSection = document.createElement('section');
   syncSection.className = 'a11ytb-admin-section';
@@ -493,11 +484,7 @@ export function createAdminLayout(runtimePanel) {
   const activeCount = makeCount('Actifs', 'active');
   const pinnedCount = makeCount('Épinglés', 'pinned');
 
-  availabilityHeader.append(
-    availabilityTitle,
-    availabilityDescription,
-    availabilityCounts
-  );
+  availabilityHeader.append(availabilityTitle, availabilityDescription, availabilityCounts);
 
   const availabilityToolbar = document.createElement('div');
   availabilityToolbar.className = 'a11ytb-admin-availability-toolbar';
@@ -530,8 +517,14 @@ export function createAdminLayout(runtimePanel) {
     return { section, list, empty };
   };
 
-  const profileSection = buildTaxonomySection('Profils concernés', 'a11ytb-admin-availability-profiles');
-  const collectionSection = buildTaxonomySection('Collections associées', 'a11ytb-admin-availability-collections');
+  const profileSection = buildTaxonomySection(
+    'Profils concernés',
+    'a11ytb-admin-availability-profiles'
+  );
+  const collectionSection = buildTaxonomySection(
+    'Collections associées',
+    'a11ytb-admin-availability-collections'
+  );
 
   taxonomy.append(profileSection.section, collectionSection.section);
 

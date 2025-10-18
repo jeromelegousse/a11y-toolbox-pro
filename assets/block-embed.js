@@ -129,9 +129,7 @@
         toggleBtn.setAttribute('aria-pressed', String(enabled));
       }
       if (statusEl) {
-        statusEl.textContent = enabled
-          ? 'Contraste élevé activé'
-          : 'Contraste élevé désactivé';
+        statusEl.textContent = enabled ? 'Contraste élevé activé' : 'Contraste élevé désactivé';
       }
     };
 

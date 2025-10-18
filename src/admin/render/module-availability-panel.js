@@ -192,10 +192,12 @@ export function createModuleAvailabilityPanel(layout, handlers = {}) {
         list.className = 'a11ytb-admin-availability-list';
         list.setAttribute('role', 'list');
         bucket.modules.slice(0, 6).forEach((entry) => {
-          list.append(renderModuleItem(entry, handlers.actions, {
-            onFocusModule: handlers.onFocusModule,
-            onRefresh: handlers.onRefresh,
-          }));
+          list.append(
+            renderModuleItem(entry, handlers.actions, {
+              onFocusModule: handlers.onFocusModule,
+              onRefresh: handlers.onRefresh,
+            })
+          );
         });
         section.append(list);
         layout.bucketList.append(section);

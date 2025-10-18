@@ -418,9 +418,7 @@ export function initAdminDashboard(mount) {
       const invalid = Number.isFinite(entry.invalid) ? entry.invalid : 0;
       const parts = [];
       parts.push(
-        presets
-          ? `${presets} raccourci${presets > 1 ? 's' : ''}`
-          : 'Aucun raccourci personnalisé'
+        presets ? `${presets} raccourci${presets > 1 ? 's' : ''}` : 'Aucun raccourci personnalisé'
       );
       if (invalid > 0) {
         parts.push(`${invalid} ignoré${invalid > 1 ? 's' : ''}`);
@@ -518,8 +516,8 @@ export function initAdminDashboard(mount) {
           suggestion.tone === 'alert'
             ? 'Blocage'
             : suggestion.tone === 'warning'
-            ? 'À compléter'
-            : 'À vérifier',
+              ? 'À compléter'
+              : 'À vérifier',
           suggestion.tone || 'info'
         );
         toneBadge.classList.add('a11ytb-admin-suggestion-badge');

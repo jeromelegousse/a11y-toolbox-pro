@@ -97,7 +97,9 @@ describe('computeMetricsOverview', () => {
     expect(overview.topFailures[0].id).toBe('module-two');
     expect(overview.topLatency[0].id).toBe('module-one');
 
-    const alphaCollection = overview.collections.find((collection) => collection.id === 'set-alpha');
+    const alphaCollection = overview.collections.find(
+      (collection) => collection.id === 'set-alpha'
+    );
     expect(alphaCollection?.modules).toBe(2);
     expect(alphaCollection?.attempts).toBe(8);
 

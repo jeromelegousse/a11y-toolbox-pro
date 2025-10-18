@@ -103,10 +103,7 @@ export function createMetricsDashboard(elements = {}) {
     const cards = [
       buildSummaryCard('Modules observés', String(overview.totals.modules || 0)),
       buildSummaryCard('Taux de succès', formatPercent(overview.totals.successRate)),
-      buildSummaryCard(
-        'Latence moyenne',
-        formatDuration(overview.totals.latency?.combinedAverage)
-      ),
+      buildSummaryCard('Latence moyenne', formatDuration(overview.totals.latency?.combinedAverage)),
       buildSummaryCard('Incidents cumulés', formatIncidentSummary(overview.incidents)),
     ];
     cards.forEach((card) => summary.append(card));
@@ -185,9 +182,7 @@ export function createMetricsDashboard(elements = {}) {
   function renderIncidentList(overview) {
     if (!incidentsList || !incidentsEmpty) return;
     incidentsList.innerHTML = '';
-    const recent = Array.isArray(overview.incidents?.recent)
-      ? overview.incidents.recent
-      : [];
+    const recent = Array.isArray(overview.incidents?.recent) ? overview.incidents.recent : [];
     if (!recent.length) {
       incidentsEmpty.hidden = false;
       return;
@@ -292,7 +287,11 @@ export function createMetricsDashboard(elements = {}) {
       modules: currentOverview.modules,
       collections: currentOverview.collections,
     };
-    triggerDownload('a11ytb-metrics.json', `${JSON.stringify(payload, null, 2)}\n`, 'application/json');
+    triggerDownload(
+      'a11ytb-metrics.json',
+      `${JSON.stringify(payload, null, 2)}\n`,
+      'application/json'
+    );
   }
 
   function exportCsv() {
@@ -323,7 +322,9 @@ export function createMetricsDashboard(elements = {}) {
       module.failures,
       Number.isFinite(module.successRate) ? module.successRate.toFixed(2) : '',
       Number.isFinite(module.failureRate) ? module.failureRate.toFixed(2) : '',
-      Number.isFinite(module.latency?.combinedAverage) ? module.latency.combinedAverage.toFixed(2) : '',
+      Number.isFinite(module.latency?.combinedAverage)
+        ? module.latency.combinedAverage.toFixed(2)
+        : '',
       Number.isFinite(module.latency?.loadAverage) ? module.latency.loadAverage.toFixed(2) : '',
       Number.isFinite(module.latency?.initAverage) ? module.latency.initAverage.toFixed(2) : '',
       module.incidents?.total ?? 0,
