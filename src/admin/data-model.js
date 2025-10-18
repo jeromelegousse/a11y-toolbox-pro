@@ -87,6 +87,28 @@ function resolveStatus(runtimeEntry, { disabled, hidden, disabledCollections }) 
   return { label: 'Actif', tone: 'confirm', enabled: true };
 }
 
+function determineAvailability({
+  enabled,
+  statusTone,
+  compatStatus,
+  collectionDisabled,
+  dependencies,
+  flags,
+}) {
+  const dependencyList = ensureArray(dependencies);
+  const hasBlockingDependency = dependencyList.some(
+    (dependency) => dependency.status && dependency.status !== 'ok'
+  );
+  const hasAlertFlag = ensureArray(flags).some((flag) => flag.tone === 'alert');
+  if (statusTone === 'alert' || hasBlockingDependency || hasAlertFlag) {
+    return 'blocked';
+  }
+  if (!enabled || collectionDisabled || compatStatus === 'partial' || compatStatus === 'unknown') {
+    return 'attention';
+  }
+  return 'ready';
+}
+
 function buildFlags(isCollectionDisabled, runtimeEntry, compat) {
   const flags = [];
   if (isCollectionDisabled) {
@@ -170,7 +192,7 @@ export function buildModuleEntries(snapshot = {}) {
     const profiles = moduleToProfiles.get(entry.id) || new Set();
     const flags = buildFlags(isCollectionDisabled, runtimeEntry, compat);
 
-    return {
+    const entry = {
       id: entry.id,
       manifest,
       runtime: runtimeEntry,
@@ -192,11 +214,25 @@ export function buildModuleEntries(snapshot = {}) {
       flags,
       searchText: buildSearchText({ id: entry.id, manifest }),
     };
+
+    entry.availability = determineAvailability({
+      enabled: entry.enabled,
+      statusTone: entry.statusTone,
+      compatStatus,
+      collectionDisabled: isCollectionDisabled,
+      dependencies: entry.dependencies,
+      flags: entry.flags,
+    });
+
+    return entry;
   });
 }
 
 export function filterModules(entries, filters) {
   return entries.filter((entry) => {
+    if (filters.availability && filters.availability !== 'all' && entry.availability !== filters.availability) {
+      return false;
+    }
     if (filters.profile !== 'all' && !entry.profiles.includes(filters.profile)) {
       return false;
     }
@@ -238,4 +274,97 @@ export function sortModules(entries, sortKey) {
         (a.manifest.name || a.id).localeCompare(b.manifest.name || b.id, 'fr')
       );
   }
+}
+
+function incrementCount(map, key) {
+  if (!key) {
+    return;
+  }
+  const current = map.get(key) || 0;
+  map.set(key, current + 1);
+}
+
+function sortByCountAndLabel(a, b) {
+  if (b.count !== a.count) {
+    return b.count - a.count;
+  }
+  return (a.label || a.id).localeCompare(b.label || b.id, 'fr');
+}
+
+function formatCounts(map, lookup) {
+  return Array.from(map.entries())
+    .map(([id, count]) => {
+      const metadata = lookup?.get(id);
+      const label = metadata?.label || id;
+      const pathLabel = metadata?.pathLabel || label;
+      return { id, count, label, pathLabel };
+    })
+    .sort(sortByCountAndLabel);
+}
+
+export function computeAvailabilityBuckets(entries = []) {
+  const stats = {
+    total: entries.length,
+    enabled: 0,
+    pinned: 0,
+  };
+
+  const initialBuckets = [
+    {
+      id: 'ready',
+      label: 'Prêts à l’usage',
+      description: 'Modules actifs ou activables immédiatement.',
+      tone: 'confirm',
+      modules: [],
+    },
+    {
+      id: 'attention',
+      label: 'À surveiller',
+      description: 'Compatibilité partielle, collections désactivées ou modules en pause.',
+      tone: 'warning',
+      modules: [],
+    },
+    {
+      id: 'blocked',
+      label: 'Bloqués',
+      description: 'Dépendances manquantes, erreurs de chargement ou alertes critiques.',
+      tone: 'alert',
+      modules: [],
+    },
+  ];
+
+  const bucketMap = new Map(initialBuckets.map((bucket) => [bucket.id, { ...bucket, modules: [] }]));
+  const profileCounts = new Map();
+  const collectionCounts = new Map();
+
+  entries.forEach((entry) => {
+    if (entry.enabled) {
+      stats.enabled += 1;
+    }
+    if (entry.isPinned) {
+      stats.pinned += 1;
+    }
+
+    ensureArray(entry.profiles).forEach((profileId) => incrementCount(profileCounts, profileId));
+    ensureArray(entry.collections).forEach((collectionId) => incrementCount(collectionCounts, collectionId));
+
+    const bucketId = bucketMap.has(entry.availability) ? entry.availability : determineAvailability(entry);
+    const bucket = bucketMap.get(bucketId) || bucketMap.get('attention');
+    bucket.modules.push(entry);
+  });
+
+  const buckets = Array.from(bucketMap.values()).map((bucket) => ({
+    ...bucket,
+    modules: bucket.modules
+      .slice()
+      .sort((a, b) => (a.manifest.name || a.id).localeCompare(b.manifest.name || b.id, 'fr')),
+    count: bucket.modules.length,
+  }));
+
+  return {
+    stats,
+    buckets,
+    profiles: formatCounts(profileCounts),
+    collections: formatCounts(collectionCounts, collectionLookup),
+  };
 }
