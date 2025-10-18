@@ -1,7 +1,9 @@
 import { moduleCatalog } from '../module-catalog.js';
 import { flattenedModuleCollections } from '../module-collections.js';
-import { NAMESPACE_TO_MODULE } from './constants.js';
+import { computeProfiles } from '../profile-utils.js';
 import { ensureArray } from './utils.js';
+
+export { computeProfiles } from '../profile-utils.js';
 
 export const collectionLookup = new Map(
   flattenedModuleCollections.map((collection) => [collection.id, collection])
@@ -17,50 +19,6 @@ flattenedModuleCollections.forEach((collection) => {
     moduleToCollections.get(moduleId).add(collection.id);
   });
 });
-
-function resolveModuleFromNamespace(namespace) {
-  if (typeof namespace !== 'string') {
-    return null;
-  }
-  const key = namespace.split('.')[0];
-  return NAMESPACE_TO_MODULE.get(key) || null;
-}
-
-export function computeProfiles(snapshot = {}) {
-  const profiles = snapshot?.profiles || {};
-  const entries = Object.entries(profiles)
-    .map(([id, profile]) => {
-      const settings = profile?.settings || {};
-      const modules = new Set();
-      Object.keys(settings).forEach((path) => {
-        const moduleId = resolveModuleFromNamespace(path);
-        if (moduleId) {
-          modules.add(moduleId);
-        }
-      });
-      return {
-        id,
-        label: profile?.name || id,
-        modules: Array.from(modules),
-      };
-    })
-    .filter((entry) => entry.modules.length > 0);
-
-  const moduleToProfiles = new Map();
-  entries.forEach((profile) => {
-    profile.modules.forEach((moduleId) => {
-      if (!moduleToProfiles.has(moduleId)) {
-        moduleToProfiles.set(moduleId, new Set());
-      }
-      moduleToProfiles.get(moduleId).add(profile.id);
-    });
-  });
-
-  return {
-    list: entries,
-    moduleToProfiles,
-  };
-}
 
 function resolveStatus(runtimeEntry, { disabled, hidden, disabledCollections }) {
   const isErrored = runtimeEntry.state === 'error';
@@ -367,4 +325,218 @@ export function computeAvailabilityBuckets(entries = []) {
     profiles: formatCounts(profileCounts),
     collections: formatCounts(collectionCounts, collectionLookup),
   };
+}
+
+const COMPATIBILITY_SEVERITY = new Map([
+  ['full', 0],
+  ['unknown', 1],
+  ['partial', 2],
+  ['none', 3],
+]);
+
+function pickWorstCompatStatus(current, candidate) {
+  const currentWeight = COMPATIBILITY_SEVERITY.get(current) ?? 0;
+  const candidateWeight = COMPATIBILITY_SEVERITY.get(candidate) ?? 0;
+  return candidateWeight > currentWeight ? candidate : current;
+}
+
+function normalizeFlags(entry) {
+  const seen = new Set();
+  const result = [];
+  ensureArray(entry?.flags).forEach((flag) => {
+    if (!flag || typeof flag.label !== 'string') {
+      return;
+    }
+    const key = `${flag.tone || 'info'}::${flag.label}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push({ tone: flag.tone || 'info', label: flag.label });
+    }
+  });
+  return result;
+}
+
+function buildChildHighlights(collection, moduleSet, entryById) {
+  return flattenedModuleCollections
+    .filter((child) => child.parentId === collection.id)
+    .map((child) => {
+      const directModules = ensureArray(child.directModules).filter(Boolean);
+      if (!directModules.length) {
+        return null;
+      }
+      const matched = directModules.filter((moduleId) => moduleSet.has(moduleId));
+      const missing = directModules.filter((moduleId) => !moduleSet.has(moduleId));
+      const hasIssues = matched.length > 0 && (missing.length > 0);
+      if (!hasIssues) {
+        return null;
+      }
+      return {
+        id: child.id,
+        label: child.label || child.id,
+        matched: matched.length,
+        total: directModules.length,
+        missingModules: missing.map((moduleId) => ({
+          id: moduleId,
+          label: entryById.get(moduleId)?.manifest?.name || moduleId,
+        })),
+      };
+    })
+    .filter(Boolean);
+}
+
+export function computeProfileCollectionSuggestions(entries = [], snapshot = {}) {
+  const entryById = new Map(entries.map((entry) => [entry.id, entry]));
+  const { list: profiles } = computeProfiles(snapshot);
+  const disabledCollections = new Set(ensureArray(snapshot?.ui?.collections?.disabled));
+  const result = [];
+
+  const topLevelCollections = flattenedModuleCollections.filter((collection) => collection.depth === 0);
+
+  profiles.forEach((profile) => {
+    const moduleSet = new Set(ensureArray(profile.modules));
+    const profileSuggestions = [];
+
+    topLevelCollections.forEach((collection) => {
+      const directModules = ensureArray(collection.directModules).filter(Boolean);
+      if (!directModules.length) {
+        return;
+      }
+
+      const moduleDetails = directModules.map((moduleId) => {
+        const entry = entryById.get(moduleId) || null;
+        return {
+          id: moduleId,
+          entry,
+          inProfile: moduleSet.has(moduleId),
+        };
+      });
+
+      const matched = moduleDetails.filter((detail) => detail.inProfile);
+      if (!matched.length) {
+        return;
+      }
+
+      const missing = moduleDetails.filter((detail) => !detail.inProfile);
+      const blockedCount = matched.filter((detail) => detail.entry?.availability === 'blocked').length;
+      const attentionCount = matched.filter((detail) => detail.entry?.availability === 'attention').length;
+      const readyCount = matched.filter((detail) => detail.entry?.availability === 'ready').length;
+      const compatStatus = moduleDetails.reduce(
+        (worst, detail) => pickWorstCompatStatus(worst, detail.entry?.compatStatus || 'full'),
+        'full'
+      );
+
+      const aggregatedFlags = [];
+      const seenFlags = new Set();
+      moduleDetails.forEach((detail) => {
+        normalizeFlags(detail.entry).forEach((flag) => {
+          const key = `${flag.tone}::${flag.label}`;
+          if (!seenFlags.has(key)) {
+            seenFlags.add(key);
+            aggregatedFlags.push(flag);
+          }
+        });
+      });
+
+      const isCollectionDisabled = disabledCollections.has(collection.id);
+
+      const shouldInclude =
+        missing.length > 0 || blockedCount > 0 || attentionCount > 0 || isCollectionDisabled;
+      if (!shouldInclude) {
+        return;
+      }
+
+      const childHighlights = buildChildHighlights(collection, moduleSet, entryById);
+
+      const coverage = directModules.length ? matched.length / directModules.length : 0;
+
+      let tone = 'info';
+      if (blockedCount > 0) {
+        tone = 'alert';
+      } else if (attentionCount > 0 || missing.length > 0 || isCollectionDisabled) {
+        tone = 'warning';
+      } else if (readyCount === matched.length && matched.length > 0) {
+        tone = 'confirm';
+      }
+
+      const requires = ensureArray(collection.requires).map((requirement) => {
+        if (!requirement || typeof requirement !== 'object') {
+          return null;
+        }
+        if (requirement.type === 'module') {
+          const moduleEntry = entryById.get(requirement.id);
+          return {
+            id: requirement.id,
+            type: 'module',
+            label: moduleEntry?.manifest?.name || requirement.label || requirement.id,
+            reason: requirement.reason || '',
+          };
+        }
+        const target = collectionLookup.get(requirement.id);
+        return {
+          id: requirement.id,
+          type: 'collection',
+          label: requirement.label || target?.label || requirement.id,
+          reason: requirement.reason || '',
+        };
+      }).filter(Boolean);
+
+      profileSuggestions.push({
+        id: collection.id,
+        label: collection.label || collection.id,
+        description: collection.description || '',
+        coverage: {
+          matched: matched.length,
+          total: directModules.length,
+          percent: coverage,
+        },
+        missingModules: missing.map((detail) => ({
+          id: detail.id,
+          label: detail.entry?.manifest?.name || detail.id,
+          compatStatus: detail.entry?.compatStatus || 'none',
+        })),
+        modules: moduleDetails.map((detail) => ({
+          id: detail.id,
+          label: detail.entry?.manifest?.name || detail.id,
+          availability: detail.entry?.availability || 'attention',
+          status: detail.entry?.status || '',
+          tone: detail.entry?.statusTone || 'info',
+          compatStatus: detail.entry?.compatStatus || 'none',
+          inProfile: detail.inProfile,
+        })),
+        flags: aggregatedFlags,
+        blockedCount,
+        attentionCount,
+        readyCount,
+        compatStatus,
+        tone,
+        requires,
+        isCollectionDisabled,
+        children: childHighlights,
+        score:
+          blockedCount * 100 +
+          attentionCount * 50 +
+          (missing.length > 0 ? 25 : 0) +
+          coverage,
+      });
+    });
+
+    if (profileSuggestions.length) {
+      profileSuggestions.sort((a, b) => {
+        if (b.score !== a.score) {
+          return b.score - a.score;
+        }
+        if (b.coverage.percent !== a.coverage.percent) {
+          return b.coverage.percent - a.coverage.percent;
+        }
+        return (a.label || a.id).localeCompare(b.label || b.id, 'fr');
+      });
+      result.push({
+        profileId: profile.id,
+        profileLabel: profile.label,
+        suggestions: profileSuggestions,
+      });
+    }
+  });
+
+  return result;
 }

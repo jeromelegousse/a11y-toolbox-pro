@@ -5,6 +5,7 @@ import { summarizeStatuses } from './status-center.js';
 import { buildGuidedChecklists, toggleManualChecklistStep } from './guided-checklists.js';
 import { normalizeAudioEvents } from './audio-config.js';
 import { flattenedModuleCollections, moduleCollectionsById } from './module-collections.js';
+import { buildModuleEntries, computeProfileCollectionSuggestions } from './admin/data-model.js';
 import { updateDependencyDisplay } from './utils/dependency-display.js';
 import { createActivityIntegration } from './integrations/activity.js';
 import { collectFocusable } from './utils/focus.js';
@@ -8033,9 +8034,17 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
 
   function renderProfiles(snapshot) {
     if (!profilesList) return;
-    const data = snapshot?.profiles ?? state.get('profiles') ?? {};
+    const sourceSnapshot = snapshot || state.get();
+    const data = sourceSnapshot?.profiles ?? state.get('profiles') ?? {};
     const lastProfile = snapshot?.ui?.lastProfile ?? state.get('ui.lastProfile');
     const entries = Object.entries(data);
+    const moduleEntries = buildModuleEntries(sourceSnapshot || {});
+    const suggestionModel = computeProfileCollectionSuggestions(moduleEntries, sourceSnapshot || {});
+    const suggestionMap = new Map(
+      Array.isArray(suggestionModel)
+        ? suggestionModel.map((entry) => [entry.profileId, entry])
+        : []
+    );
     profilesList.innerHTML = '';
     if (!entries.length) {
       const empty = document.createElement('p');
@@ -8133,6 +8142,104 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
         }
 
         card.append(shareBlock);
+      }
+
+      const profileSuggestion = suggestionMap.get(id);
+      const suggestionEntries = profileSuggestion?.suggestions || [];
+      if (suggestionEntries.length) {
+        const suggestionBlock = document.createElement('div');
+        suggestionBlock.className = 'a11ytb-profile-suggestions';
+
+        const suggestionTitle = document.createElement('p');
+        suggestionTitle.className = 'a11ytb-profile-suggestions-title';
+        suggestionTitle.textContent = 'Collections recommandées';
+        suggestionBlock.append(suggestionTitle);
+
+        const suggestionList = document.createElement('ul');
+        suggestionList.className = 'a11ytb-profile-suggestions-list';
+        suggestionList.setAttribute('role', 'list');
+
+        suggestionEntries.slice(0, 3).forEach((suggestion) => {
+          const item = document.createElement('li');
+          item.className = 'a11ytb-profile-suggestion';
+          item.dataset.tone = suggestion.tone || 'info';
+
+          const name = document.createElement('span');
+          name.className = 'a11ytb-profile-suggestion-name';
+          name.textContent = suggestion.label;
+
+          const coverage = document.createElement('span');
+          coverage.className = 'a11ytb-profile-suggestion-coverage';
+          coverage.textContent = `${suggestion.coverage.matched}/${suggestion.coverage.total}`;
+
+          const headerRow = document.createElement('div');
+          headerRow.className = 'a11ytb-profile-suggestion-head';
+          headerRow.append(name, coverage);
+
+          item.append(headerRow);
+
+          const missingModules = Array.isArray(suggestion.missingModules)
+            ? suggestion.missingModules
+            : [];
+          const flagLabels = Array.isArray(suggestion.flags) ? suggestion.flags : [];
+
+          if (missingModules.length || flagLabels.length) {
+            const detail = document.createElement('p');
+            detail.className = 'a11ytb-profile-suggestion-detail';
+            if (missingModules.length) {
+              const names = missingModules
+                .slice(0, 2)
+                .map((module) => module.label)
+                .join(', ');
+              const extra = missingModules.length > 2 ? '…' : '';
+              detail.textContent = `À ajouter : ${names}${extra}`;
+            } else {
+              detail.textContent = 'Vérifier les modules signalés.';
+            }
+            item.append(detail);
+          }
+
+          if (suggestion.requires.length) {
+            const requires = document.createElement('ul');
+            requires.className = 'a11ytb-profile-suggestion-requires';
+            requires.setAttribute('role', 'list');
+            suggestion.requires.slice(0, 2).forEach((requirement) => {
+              const entry = document.createElement('li');
+              entry.className = 'a11ytb-profile-suggestion-require';
+              entry.textContent = requirement.label;
+              requires.append(entry);
+            });
+            item.append(requires);
+          }
+
+          if (flagLabels.length) {
+            const flagGroup = document.createElement('div');
+            flagGroup.className = 'a11ytb-profile-suggestion-flags';
+            flagLabels.slice(0, 3).forEach((flag) => {
+              const badge = document.createElement('span');
+              badge.className = `a11ytb-profile-suggestion-flag a11ytb-profile-suggestion-flag--${
+                flag.tone || 'info'
+              }`;
+              badge.textContent = flag.label;
+              flagGroup.append(badge);
+            });
+            item.append(flagGroup);
+          }
+
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'a11ytb-profile-suggestion-button';
+          button.dataset.profileAction = 'suggestion';
+          button.dataset.profileId = id;
+          button.dataset.collectionId = suggestion.id;
+          button.textContent = 'Voir les modules';
+          item.append(button);
+
+          suggestionList.append(item);
+        });
+
+        suggestionBlock.append(suggestionList);
+        card.append(suggestionBlock);
       }
 
       const shortcutPresets = normalizeShortcutPresetMap(profile.shortcuts);
@@ -8240,6 +8347,19 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
 
       profilesList.append(card);
     });
+  }
+
+  function openSuggestedCollection(profileId, collectionId) {
+    if (panel.dataset.open !== 'true') {
+      toggle(true);
+    }
+    state.set('ui.view', 'modules');
+    if (profileId) {
+      state.set('ui.availableModules.profile', profileId);
+    }
+    if (collectionId) {
+      state.set('ui.availableModules.collection', collectionId);
+    }
   }
 
   function applyProfile(profileId) {
@@ -9028,6 +9148,9 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       await renameProfile(profileId);
     } else if (action === 'delete') {
       await deleteProfile(profileId);
+    } else if (action === 'suggestion') {
+      const collectionId = button.dataset.collectionId || null;
+      openSuggestedCollection(profileId, collectionId);
     }
   });
 

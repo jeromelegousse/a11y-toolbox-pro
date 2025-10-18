@@ -290,13 +290,48 @@ export function createAdminLayout(runtimePanel) {
 
   automationSection.append(automationHeader, automationList, automationEmpty);
 
+  const suggestionSection = document.createElement('section');
+  suggestionSection.className = 'a11ytb-admin-section';
+
+  const suggestionHeader = document.createElement('div');
+  suggestionHeader.className = 'a11ytb-admin-section-header';
+
+  const suggestionTitle = document.createElement('h2');
+  suggestionTitle.className = 'a11ytb-admin-section-title';
+  suggestionTitle.textContent = 'Collections suggérées';
+
+  const suggestionDescription = document.createElement('p');
+  suggestionDescription.className = 'a11ytb-admin-section-description';
+  suggestionDescription.textContent =
+    'Identifiez les packs à compléter en fonction des modules activés dans vos profils.';
+
+  const suggestionStatus = document.createElement('p');
+  suggestionStatus.className = 'a11ytb-admin-live';
+  suggestionStatus.setAttribute('role', 'status');
+  suggestionStatus.setAttribute('aria-live', 'polite');
+  suggestionStatus.textContent = 'Aucune recommandation disponible.';
+
+  suggestionHeader.append(suggestionTitle, suggestionDescription, suggestionStatus);
+
+  const suggestionList = document.createElement('div');
+  suggestionList.className = 'a11ytb-admin-suggestions';
+  suggestionList.setAttribute('role', 'list');
+  suggestionList.hidden = true;
+
+  const suggestionEmpty = document.createElement('p');
+  suggestionEmpty.className = 'a11ytb-admin-empty';
+  suggestionEmpty.textContent = 'Aucune recommandation pour le moment.';
+
+  suggestionSection.append(suggestionHeader, suggestionList, suggestionEmpty);
+
   mainColumn.append(
     introSection,
     dashboard,
     syncSection,
     exportSection,
     shareSection,
-    automationSection
+    automationSection,
+    suggestionSection
   );
 
   const availabilityPanel = document.createElement('aside');
@@ -406,6 +441,9 @@ export function createAdminLayout(runtimePanel) {
     automationList,
     automationEmpty,
     automationStatus,
+    suggestionsList: suggestionList,
+    suggestionsEmpty: suggestionEmpty,
+    suggestionsStatus: suggestionStatus,
     availability: {
       root: availabilityPanel,
       toolbar: availabilityToolbar,

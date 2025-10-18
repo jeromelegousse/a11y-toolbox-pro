@@ -1,13 +1,26 @@
 import { flattenedModuleCollections } from '../module-collections.js';
 import { summarizeStatuses } from '../status-center.js';
-import { buildModuleEntries, computeProfiles, filterModules, sortModules } from './data-model.js';
+import { COMPATIBILITY_LABELS, COMPATIBILITY_TONES } from './constants.js';
+import {
+  buildModuleEntries,
+  computeProfiles,
+  computeProfileCollectionSuggestions,
+  filterModules,
+  sortModules,
+} from './data-model.js';
 import { createAdminLayout } from './layout.js';
 import { buildRuntimePanel, updateRuntimePanel } from './runtime-panel.js';
 import { createModuleCard } from './render/module-card.js';
 import { createModuleAvailabilityPanel } from './render/module-availability-panel.js';
 import { renderManifestDiff } from './render/manifest-diff.js';
 import { renderStatusCards } from './render/status-cards.js';
-import { ensureArray, formatDateRelative, getGeminiConfig, updateFilterOptions } from './utils.js';
+import {
+  createBadge,
+  ensureArray,
+  formatDateRelative,
+  getGeminiConfig,
+  updateFilterOptions,
+} from './utils.js';
 
 const DEFAULT_FILTERS = {
   availability: 'all',
@@ -82,6 +95,18 @@ export function initAdminDashboard(mount) {
     if (options.some((option) => option.value === value)) {
       select.value = value;
     }
+  }
+
+  function applySuggestionFilters(profileId, collectionId) {
+    if (profileId && layout.filters.profile) {
+      filters.profile = profileId;
+      setSelectValue(layout.filters.profile, profileId);
+    }
+    if (collectionId && layout.filters.collection) {
+      filters.collection = collectionId;
+      setSelectValue(layout.filters.collection, collectionId);
+    }
+    renderModules(currentEntries);
   }
 
   function updateAvailabilityPanel() {
@@ -411,6 +436,192 @@ export function initAdminDashboard(mount) {
     }
   }
 
+  function renderProfileSuggestions(entries, snapshot) {
+    if (!layout.suggestionsList || !layout.suggestionsEmpty) return;
+    const suggestions = computeProfileCollectionSuggestions(entries, snapshot);
+    layout.suggestionsList.innerHTML = '';
+    if (!Array.isArray(suggestions) || !suggestions.length) {
+      layout.suggestionsEmpty.hidden = false;
+      layout.suggestionsList.hidden = true;
+      if (layout.suggestionsStatus) {
+        layout.suggestionsStatus.textContent = 'Aucune recommandation disponible.';
+      }
+      return;
+    }
+
+    layout.suggestionsEmpty.hidden = true;
+    layout.suggestionsList.hidden = false;
+
+    const totalRecommendations = suggestions.reduce(
+      (count, entry) => count + ensureArray(entry.suggestions).length,
+      0
+    );
+    if (layout.suggestionsStatus) {
+      layout.suggestionsStatus.textContent = `${totalRecommendations} recommandation${
+        totalRecommendations > 1 ? 's' : ''
+      } pour ${suggestions.length} profil${suggestions.length > 1 ? 's' : ''}.`;
+    }
+
+    suggestions.forEach((profileEntry) => {
+      const profileCard = document.createElement('article');
+      profileCard.className = 'a11ytb-admin-suggestion-profile';
+      profileCard.setAttribute('role', 'listitem');
+      profileCard.dataset.profileId = profileEntry.profileId;
+
+      const head = document.createElement('header');
+      head.className = 'a11ytb-admin-suggestion-head';
+
+      const title = document.createElement('h3');
+      title.className = 'a11ytb-admin-suggestion-title';
+      title.textContent = profileEntry.profileLabel || profileEntry.profileId;
+
+      const countBadge = createBadge(
+        `${profileEntry.suggestions.length} recommandation${
+          profileEntry.suggestions.length > 1 ? 's' : ''
+        }`,
+        'info'
+      );
+      countBadge.classList.add('a11ytb-admin-suggestion-count');
+
+      head.append(title, countBadge);
+
+      const missingTotal = profileEntry.suggestions.reduce(
+        (sum, suggestion) => sum + ensureArray(suggestion.missingModules).length,
+        0
+      );
+      const profileMeta = document.createElement('p');
+      profileMeta.className = 'a11ytb-admin-suggestion-meta';
+      profileMeta.textContent = missingTotal
+        ? `${missingTotal} module${missingTotal > 1 ? 's' : ''} à compléter.`
+        : 'Modules à surveiller.';
+
+      const suggestionList = document.createElement('ul');
+      suggestionList.className = 'a11ytb-admin-suggestion-items';
+      suggestionList.setAttribute('role', 'list');
+
+      profileEntry.suggestions.slice(0, 4).forEach((suggestion) => {
+        const item = document.createElement('li');
+        item.className = 'a11ytb-admin-suggestion-item';
+        item.dataset.tone = suggestion.tone || 'info';
+
+        const itemHead = document.createElement('div');
+        itemHead.className = 'a11ytb-admin-suggestion-item-head';
+
+        const name = document.createElement('h4');
+        name.className = 'a11ytb-admin-suggestion-name';
+        name.textContent = suggestion.label;
+
+        const toneBadge = createBadge(
+          suggestion.tone === 'alert'
+            ? 'Blocage'
+            : suggestion.tone === 'warning'
+            ? 'À compléter'
+            : 'À vérifier',
+          suggestion.tone || 'info'
+        );
+        toneBadge.classList.add('a11ytb-admin-suggestion-badge');
+
+        const compatBadge = createBadge(
+          COMPATIBILITY_LABELS[suggestion.compatStatus] || COMPATIBILITY_LABELS.none,
+          COMPATIBILITY_TONES[suggestion.compatStatus] || COMPATIBILITY_TONES.none
+        );
+        compatBadge.classList.add('a11ytb-admin-suggestion-compat');
+
+        itemHead.append(name, toneBadge, compatBadge);
+
+        const coverage = document.createElement('p');
+        coverage.className = 'a11ytb-admin-suggestion-coverage';
+        coverage.textContent = `${suggestion.coverage.matched}/${suggestion.coverage.total} modules alignés`;
+
+        item.append(itemHead, coverage);
+
+        if (suggestion.missingModules.length) {
+          const missing = document.createElement('p');
+          missing.className = 'a11ytb-admin-suggestion-missing';
+          const missingNames = suggestion.missingModules
+            .slice(0, 3)
+            .map((module) => module.label)
+            .join(', ');
+          const extra = suggestion.missingModules.length > 3 ? '…' : '';
+          missing.textContent = `À ajouter : ${missingNames}${extra}`;
+          item.append(missing);
+        }
+
+        if (suggestion.flags.length) {
+          const flagGroup = document.createElement('div');
+          flagGroup.className = 'a11ytb-admin-suggestion-flags';
+          suggestion.flags.slice(0, 3).forEach((flag) => {
+            const flagBadge = createBadge(flag.label, flag.tone || 'info');
+            flagBadge.classList.add('a11ytb-admin-suggestion-flag');
+            flagGroup.append(flagBadge);
+          });
+          item.append(flagGroup);
+        }
+
+        if (suggestion.requires.length) {
+          const requiresList = document.createElement('ul');
+          requiresList.className = 'a11ytb-admin-suggestion-requires';
+          requiresList.setAttribute('role', 'list');
+          suggestion.requires.slice(0, 3).forEach((requirement) => {
+            const requireItem = document.createElement('li');
+            requireItem.className = 'a11ytb-admin-suggestion-require';
+            requireItem.textContent = requirement.label;
+            if (requirement.reason) {
+              const detail = document.createElement('span');
+              detail.className = 'a11ytb-admin-suggestion-require-detail';
+              detail.textContent = requirement.reason;
+              requireItem.append(detail);
+            }
+            requiresList.append(requireItem);
+          });
+          item.append(requiresList);
+        }
+
+        if (suggestion.children.length) {
+          const childList = document.createElement('ul');
+          childList.className = 'a11ytb-admin-suggestion-children';
+          childList.setAttribute('role', 'list');
+          suggestion.children.slice(0, 2).forEach((child) => {
+            const childItem = document.createElement('li');
+            childItem.className = 'a11ytb-admin-suggestion-child';
+            childItem.textContent = `${child.label} (${child.matched}/${child.total})`;
+            if (child.missingModules.length) {
+              const detail = document.createElement('span');
+              detail.className = 'a11ytb-admin-suggestion-child-missing';
+              const childNames = child.missingModules
+                .slice(0, 2)
+                .map((module) => module.label)
+                .join(', ');
+              detail.textContent = `Manque : ${childNames}${
+                child.missingModules.length > 2 ? '…' : ''
+              }`;
+              childItem.append(detail);
+            }
+            childList.append(childItem);
+          });
+          item.append(childList);
+        }
+
+        const actions = document.createElement('div');
+        actions.className = 'a11ytb-admin-suggestion-actions';
+        const openButton = document.createElement('button');
+        openButton.type = 'button';
+        openButton.className = 'a11ytb-admin-suggestion-button';
+        openButton.textContent = 'Afficher ces modules';
+        openButton.addEventListener('click', () => {
+          applySuggestionFilters(profileEntry.profileId, suggestion.id);
+        });
+        actions.append(openButton);
+        item.append(actions);
+
+        suggestionList.append(item);
+      });
+
+      profileCard.append(head, profileMeta, suggestionList);
+      layout.suggestionsList.append(profileCard);
+    });
+  }
+
   function sync(snapshot) {
     currentSnapshot = snapshot || {};
     const summaries = summarizeStatuses(currentSnapshot);
@@ -425,6 +636,7 @@ export function initAdminDashboard(mount) {
     renderExportTimeline(collaboration.exports);
     renderProfileShareTimeline(collaboration.profileShares);
     renderAutomationTimeline(collaboration.automations);
+    renderProfileSuggestions(currentEntries, currentSnapshot);
   }
 
   const actions = {
