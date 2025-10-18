@@ -3416,6 +3416,31 @@ function a11ytb_force_admin_app_module_type(string $tag, string $handle, string 
 }
 
 /**
+ * Affiche les champs cachés nécessaires pour soumettre un groupe de réglages.
+ */
+function a11ytb_render_settings_hidden_fields(string $option_group, string $context): void
+{
+    if (function_exists('settings_fields')) {
+        settings_fields($option_group);
+    }
+
+    /**
+     * Permet d’ajouter des champs cachés supplémentaires aux formulaires de réglages.
+     *
+     * @param string $option_group Groupe de réglages courant.
+     * @param string $context      Contexte logique du formulaire (ex: onglet).
+     */
+    do_action('a11ytb/render_settings_hidden_fields', $option_group, $context);
+
+    if ($context !== '') {
+        printf(
+            '<input type="hidden" name="a11ytb_settings_context" value="%s" />',
+            esc_attr($context)
+        );
+    }
+}
+
+/**
  * Affiche la page d'administration principale du plugin.
  */
 function a11ytb_render_admin_page(): void
