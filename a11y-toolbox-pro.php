@@ -1406,6 +1406,92 @@ function a11ytb_register_inline_shortcodes(): void
 add_action('init', 'a11ytb_register_inline_shortcodes');
 
 /**
+ * Retourne le contexte utilisateur exposé au frontal.
+ */
+function a11ytb_get_current_user_context(): array
+{
+    $context = [
+        'authenticated' => false,
+        'id' => 0,
+        'displayName' => '',
+        'email' => '',
+        'avatar' => '',
+        'roles' => [],
+        'permissions' => [],
+    ];
+
+    if (!function_exists('is_user_logged_in') || !is_user_logged_in()) {
+        /**
+         * Permet de filtrer le contexte utilisateur exposé au frontal.
+         *
+         * @param array       $context Contexte par défaut.
+         * @param object|null $user    Utilisateur courant.
+         */
+        return apply_filters('a11ytb/current_user_context', $context, null);
+    }
+
+    $user_id = function_exists('get_current_user_id') ? (int) get_current_user_id() : 0;
+    if ($user_id <= 0) {
+        return apply_filters('a11ytb/current_user_context', $context, null);
+    }
+
+    $context['authenticated'] = true;
+    $context['id'] = $user_id;
+
+    $user = null;
+    if (function_exists('wp_get_current_user')) {
+        $user = wp_get_current_user();
+    } elseif (function_exists('get_userdata')) {
+        $user = get_userdata($user_id);
+    }
+
+    if (is_object($user)) {
+        $display_name = isset($user->display_name) && is_string($user->display_name)
+            ? $user->display_name
+            : '';
+        if ($display_name !== '' && function_exists('wp_strip_all_tags')) {
+            $display_name = wp_strip_all_tags($display_name);
+        }
+        $context['displayName'] = $display_name;
+
+        $email = isset($user->user_email) && is_string($user->user_email) ? $user->user_email : '';
+        if ($email !== '' && function_exists('sanitize_email')) {
+            $email = sanitize_email($email);
+        }
+        $context['email'] = $email;
+
+        if (function_exists('get_avatar_url')) {
+            $avatar = get_avatar_url($user_id);
+            if (is_string($avatar)) {
+                $context['avatar'] = $avatar;
+            }
+        }
+
+        $roles = [];
+        if (isset($user->roles) && is_array($user->roles)) {
+            foreach ($user->roles as $role) {
+                if (!is_string($role) || $role === '') {
+                    continue;
+                }
+                $roles[] = function_exists('sanitize_key') ? sanitize_key($role) : strtolower($role);
+            }
+        }
+        if ($roles) {
+            $context['roles'] = array_values(array_unique($roles));
+        }
+    }
+
+    if (function_exists('current_user_can')) {
+        $context['permissions'] = [
+            'manageOptions' => current_user_can('manage_options'),
+            'editPosts' => current_user_can('edit_posts'),
+        ];
+    }
+
+    return apply_filters('a11ytb/current_user_context', $context, $user);
+}
+
+/**
  * Construit la configuration transmise au frontal.
  */
 function a11ytb_get_frontend_config(): array
