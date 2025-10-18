@@ -42,7 +42,8 @@
       },
       edit: (props) => {
         const { attributes, setAttributes, className } = props;
-        const label = attributes.label || definition.defaultLabel || definition.title || definition.id;
+        const label =
+          attributes.label || definition.defaultLabel || definition.title || definition.id;
         const description = attributes.description || '';
         const helper = definition.description || '';
 
@@ -77,8 +78,7 @@
               { className: 'a11ytb-block-editor-description' },
               description || definition.defaultDescription
             ),
-          helper &&
-            el('p', { className: 'a11ytb-block-editor-helper' }, helper)
+          helper && el('p', { className: 'a11ytb-block-editor-helper' }, helper)
         );
 
         return el(Fragment, null, controlsPanel, preview);

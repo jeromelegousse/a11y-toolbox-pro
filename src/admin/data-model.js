@@ -487,10 +487,17 @@ export function computeMetricsOverview(entries = [], snapshot = {}) {
     }
     totals.network.offline += offlineResources;
 
-    const lastAttemptAt = Number(entry.metrics?.lastAttemptAt) || Number(entry.runtime?.lastAttemptAt) || 0;
+    const lastAttemptAt =
+      Number(entry.metrics?.lastAttemptAt) || Number(entry.runtime?.lastAttemptAt) || 0;
     const lastSuccessAt = Number(entry.metrics?.lastSuccessAt) || 0;
-    const lastFailureAt = Number(entry.metrics?.lastFailureAt) || Number(entry.runtime?.lastFailureAt) || 0;
-    const moduleLastTimestamp = Math.max(lastAttemptAt, lastSuccessAt, lastFailureAt, lastIncidentAt);
+    const lastFailureAt =
+      Number(entry.metrics?.lastFailureAt) || Number(entry.runtime?.lastFailureAt) || 0;
+    const moduleLastTimestamp = Math.max(
+      lastAttemptAt,
+      lastSuccessAt,
+      lastFailureAt,
+      lastIncidentAt
+    );
     if (moduleLastTimestamp > totals.lastTimestamp) {
       totals.lastTimestamp = moduleLastTimestamp;
     }
@@ -567,7 +574,9 @@ export function computeMetricsOverview(entries = [], snapshot = {}) {
       moduleSummary?.label || windowData.moduleLabel || windowData.moduleId || moduleId;
     incidents.forEach((incident) => {
       const severity = incident?.severity || (incident?.type === 'warning' ? 'warning' : 'error');
-      const at = Number.isFinite(incident?.at) ? incident.at : Number(windowData.lastTimestamp) || 0;
+      const at = Number.isFinite(incident?.at)
+        ? incident.at
+        : Number(windowData.lastTimestamp) || 0;
       recentIncidents.push({
         moduleId,
         moduleLabel,

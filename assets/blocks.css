@@ -61,7 +61,9 @@
   color: #fff;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .a11ytb-inline-trigger__button:hover,
@@ -75,6 +77,7 @@
   outline-offset: 2px;
 }
 
-.a11ytb-inline-trigger[data-a11ytb-action='toggle'] .a11ytb-inline-trigger__button[aria-pressed='true'] {
+.a11ytb-inline-trigger[data-a11ytb-action='toggle']
+  .a11ytb-inline-trigger__button[aria-pressed='true'] {
   background: var(--wp--preset--color--contrast-2, #374151);
 }

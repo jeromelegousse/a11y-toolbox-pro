@@ -143,10 +143,13 @@ export function createPreferenceSync({
     if (timer) {
       clearTimeout(timer);
     }
-    timer = setTimeout(() => {
-      timer = null;
-      flush().catch(() => {});
-    }, Math.max(500, Number(throttleMs) || 0));
+    timer = setTimeout(
+      () => {
+        timer = null;
+        flush().catch(() => {});
+      },
+      Math.max(500, Number(throttleMs) || 0)
+    );
   }
 
   async function load() {
