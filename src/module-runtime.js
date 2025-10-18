@@ -160,18 +160,30 @@ function encodeArrayBuffer(value) {
   for (let i = 0; i < bytes.byteLength; i += 1) {
     binary += String.fromCharCode(bytes[i]);
   }
-  return typeof btoa === 'function'
-    ? btoa(binary)
-    : Buffer.from(binary, 'binary').toString('base64');
+  if (typeof btoa === 'function') {
+    return btoa(binary);
+  }
+  if (typeof globalThis !== 'undefined' && typeof globalThis.Buffer === 'function') {
+    return globalThis.Buffer.from(binary, 'binary').toString('base64');
+  }
+  console.warn('a11ytb: aucun encodeur base64 disponible pour sérialiser une ressource binaire.');
+  return null;
 }
 
 function decodeArrayBuffer(serialized) {
   if (!serialized) return null;
   try {
-    const binary =
-      typeof atob === 'function'
-        ? atob(serialized)
-        : Buffer.from(serialized, 'base64').toString('binary');
+    let binary;
+    if (typeof atob === 'function') {
+      binary = atob(serialized);
+    } else if (typeof globalThis !== 'undefined' && typeof globalThis.Buffer === 'function') {
+      binary = globalThis.Buffer.from(serialized, 'base64').toString('binary');
+    } else {
+      console.warn(
+        'a11ytb: aucun décodeur base64 disponible pour une ressource binaire mise en cache.'
+      );
+      return null;
+    }
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i += 1) {
       bytes[i] = binary.charCodeAt(i);

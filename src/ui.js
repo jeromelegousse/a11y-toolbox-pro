@@ -5080,14 +5080,6 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     offline: 'Hors ligne',
   };
 
-  const NETWORK_STATUS_TONE = {
-    fetching: 'info',
-    ready: 'confirm',
-    stale: 'warning',
-    error: 'alert',
-    offline: 'warning',
-  };
-
   function ensureSelectValue(select, value) {
     if (!select) return;
     const allowed = Array.from(select.options).some((option) => option.value === value);
@@ -5380,7 +5372,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
           }
           if (Number.isFinite(resource.size) && resource.size >= 0) {
             const sizeKb = Math.max(1, Math.round(resource.size / 1024));
-            detailParts.push(`Taille : ${sizeKb} Ko`);
+            detailParts.push(`Taille : ${sizeKb} Ko`);
           }
           if (Number.isFinite(resource.lastFetchAt)) {
             const fetchedDate = new Date(resource.lastFetchAt);

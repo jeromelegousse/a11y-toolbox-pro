@@ -5,9 +5,9 @@ function formatPercent(value) {
     return '—';
   }
   if (value >= 99 || value === 0) {
-    return `${Math.round(value)} %`;
+    return `${Math.round(value)} %`;
   }
-  return `${value.toFixed(1)} %`;
+  return `${value.toFixed(1)} %`;
 }
 
 function formatIncidentSummary(incidents = {}) {
@@ -17,10 +17,10 @@ function formatIncidentSummary(incidents = {}) {
   }
   const parts = [];
   if (incidents.errors) {
-    parts.push(`${incidents.errors} crit.`);
+    parts.push(`${incidents.errors} crit.`);
   }
   if (incidents.warnings) {
-    parts.push(`${incidents.warnings} avert.`);
+    parts.push(`${incidents.warnings} avert.`);
   }
   return parts.length ? `${total} (${parts.join(' · ')})` : `${total}`;
 }
@@ -244,12 +244,12 @@ export function createMetricsDashboard(elements = {}) {
 
       const meta = document.createElement('span');
       meta.className = 'a11ytb-admin-metrics-item-meta';
-      const parts = [`${formatPercent(collection.successRate)} succès`];
+      const parts = [`${formatPercent(collection.successRate)} succès`];
       if (collection.failures) {
-        parts.push(`${collection.failures} échec(s)`);
+        parts.push(`${collection.failures} échec(s)`);
       }
       if (collection.incidentCount) {
-        parts.push(`${collection.incidentCount} incident(s)`);
+        parts.push(`${collection.incidentCount} incident(s)`);
       }
       meta.textContent = parts.join(' · ');
 
