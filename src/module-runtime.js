@@ -464,19 +464,55 @@ function normalizeResourceConfig(resource, defaults = {}) {
 }
 
 function resolveResourceUrl(resource, baseUrl) {
+  const absoluteUrlPattern = /^https?:\/\//i;
+  const resolveWithBase = (targetUrl, candidateBase) => {
+    if (!candidateBase) return null;
+    try {
+      return new URL(targetUrl, candidateBase).toString();
+    } catch (_) {
+      return null;
+    }
+  };
+
   try {
-    if (/^https?:\/\//i.test(resource.url)) {
+    if (absoluteUrlPattern.test(resource.url)) {
       return resource.url;
     }
+
+    const candidateBases = [];
     if (baseUrl) {
-      return new URL(resource.url, baseUrl).toString();
+      if (absoluteUrlPattern.test(baseUrl)) {
+        candidateBases.push(baseUrl);
+      } else {
+        const documentBase =
+          typeof document !== 'undefined'
+            ? document.baseURI || (typeof window !== 'undefined' ? window.location?.href : null)
+            : null;
+        if (documentBase) {
+          const resolvedBase = resolveWithBase(baseUrl, documentBase);
+          if (resolvedBase) {
+            candidateBases.push(resolvedBase);
+          }
+        }
+      }
     }
-    if (typeof document !== 'undefined' && document.baseURI) {
-      return new URL(resource.url, document.baseURI).toString();
+
+    if (typeof document !== 'undefined') {
+      if (document.baseURI) {
+        candidateBases.push(document.baseURI);
+      } else if (typeof window !== 'undefined' && window.location?.href) {
+        candidateBases.push(window.location.href);
+      }
+    }
+
+    for (const candidate of candidateBases) {
+      const resolved = resolveWithBase(resource.url, candidate);
+      if (resolved) return resolved;
     }
   } catch (error) {
     console.warn('a11ytb: résolution URL ressource impossible.', error);
   }
+
   return resource.url;
 }
 
