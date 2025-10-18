@@ -4,10 +4,13 @@ import { buildModuleEntries, computeProfiles, filterModules, sortModules } from 
 import { createAdminLayout } from './layout.js';
 import { buildRuntimePanel, updateRuntimePanel } from './runtime-panel.js';
 import { createModuleCard } from './render/module-card.js';
+import { createModuleAvailabilityPanel } from './render/module-availability-panel.js';
+import { renderManifestDiff } from './render/manifest-diff.js';
 import { renderStatusCards } from './render/status-cards.js';
 import { ensureArray, formatDateRelative, getGeminiConfig, updateFilterOptions } from './utils.js';
 
 const DEFAULT_FILTERS = {
+  availability: 'all',
   profile: 'all',
   collection: 'all',
   compatibility: 'all',
@@ -17,6 +20,7 @@ const DEFAULT_FILTERS = {
 };
 
 let previewState = null;
+let availabilityController = null;
 
 export function initAdminDashboard(mount) {
   if (!mount) {
@@ -70,6 +74,45 @@ export function initAdminDashboard(mount) {
 
   let currentSnapshot = {};
   let currentEntries = [];
+  let currentSummaries = [];
+
+  function setSelectValue(select, value) {
+    if (!select) return;
+    const options = Array.from(select.options || []);
+    if (options.some((option) => option.value === value)) {
+      select.value = value;
+    }
+  }
+
+  function updateAvailabilityPanel() {
+    if (availabilityController) {
+      availabilityController.update(currentEntries, { filters });
+    }
+  }
+
+  function focusModule(entry) {
+    if (!entry) return;
+    filters.search = entry.id;
+    layout.filters.search.value = entry.id;
+    renderModules(currentEntries);
+  }
+
+  function updateManifestDiffView(summaries) {
+    const source = Array.isArray(summaries) ? summaries : currentSummaries;
+    if (Array.isArray(summaries)) {
+      currentSummaries = summaries;
+    }
+    const manifestSummary = Array.isArray(source)
+      ? source.find((entry) => entry.id === 'manifest-history')
+      : null;
+    const moduleId = manifestSummary?.insights?.manifestDiff?.moduleId;
+    const moduleEntry = moduleId ? currentEntries.find((entry) => entry.id === moduleId) : null;
+    renderManifestDiff(layout.manifestDiff, manifestSummary, moduleEntry, {
+      onFocusModule(entry) {
+        focusModule(entry);
+      },
+    });
+  }
 
   function updateFiltersFromSnapshot(snapshot) {
     const { list } = computeProfiles(snapshot);
@@ -102,6 +145,8 @@ export function initAdminDashboard(mount) {
     if (!sorted.length) {
       layout.emptyState.hidden = false;
       layout.moduleGrid.hidden = true;
+      updateAvailabilityPanel();
+      updateManifestDiffView();
       return;
     }
     layout.emptyState.hidden = true;
@@ -109,6 +154,8 @@ export function initAdminDashboard(mount) {
     sorted.forEach((entry) => {
       layout.moduleGrid.append(createModuleCard(entry, actions));
     });
+    updateAvailabilityPanel();
+    updateManifestDiffView();
   }
 
   function renderSyncTimeline(events) {
@@ -224,6 +271,7 @@ export function initAdminDashboard(mount) {
     currentSnapshot = snapshot || {};
     const summaries = summarizeStatuses(currentSnapshot);
     renderStatusCards(layout.statusGrid, summaries);
+    updateManifestDiffView(summaries);
     currentEntries = buildModuleEntries(currentSnapshot);
     updateRuntimePanel(runtimePanel, currentEntries);
     updateFiltersFromSnapshot(currentSnapshot);
@@ -267,6 +315,29 @@ export function initAdminDashboard(mount) {
       previewState.set('ui.pinned', next);
     },
   };
+
+  availabilityController = createModuleAvailabilityPanel(layout.availability, {
+    actions,
+    onAvailabilityChange(bucketId) {
+      filters.availability = bucketId === 'all' ? 'all' : bucketId;
+      renderModules(currentEntries);
+    },
+    onSelectProfile(item) {
+      if (!item?.id) return;
+      filters.profile = item.id;
+      setSelectValue(layout.filters.profile, item.id);
+      renderModules(currentEntries);
+    },
+    onSelectCollection(item) {
+      if (!item?.id) return;
+      filters.collection = item.id;
+      setSelectValue(layout.filters.collection, item.id);
+      renderModules(currentEntries);
+    },
+    onFocusModule(entry) {
+      focusModule(entry);
+    },
+  });
 
   layout.filters.profile.addEventListener('change', () => {
     filters.profile = layout.filters.profile.value;
