@@ -169,6 +169,82 @@ function a11ytb_register_plugin_action_links(array $links): array
 add_filter('plugin_action_links_' . plugin_basename(__FILE__), 'a11ytb_register_plugin_action_links');
 
 /**
+ * Corrige la classe IndexManager du plugin Mon Ajax Search pour ajouter la propriété manquante.
+ */
+function a11ytb_patch_mon_ajax_search_index_manager_file(string $file): bool
+{
+    if ($file === '') {
+        return false;
+    }
+
+    if (!is_file($file) || !is_readable($file) || !is_writable($file)) {
+        return false;
+    }
+
+    $original = file_get_contents($file);
+    if ($original === false) {
+        return false;
+    }
+
+    if (strpos($original, 'public $event_recorder = null;') !== false) {
+        return false;
+    }
+
+    $needle = 'public function __construct';
+    $position = strpos($original, $needle);
+    if ($position === false) {
+        return false;
+    }
+
+    $property = <<<'PHP'
+    /**
+     * Event recorder instance or null when disabled.
+     *
+     * @var mixed|null
+     */
+    public $event_recorder = null;
+
+PHP;
+
+    $property .= PHP_EOL;
+
+    $patched = substr($original, 0, $position) . $property . substr($original, $position);
+
+    if ($patched === $original) {
+        return false;
+    }
+
+    return file_put_contents($file, $patched, LOCK_EX) !== false;
+}
+
+/**
+ * Tente d’appliquer automatiquement le correctif de compatibilité Mon Ajax Search.
+ */
+function a11ytb_apply_mon_ajax_search_compatibility(): void
+{
+    if (!defined('WP_PLUGIN_DIR')) {
+        return;
+    }
+
+    $baseDir = rtrim(WP_PLUGIN_DIR, '/\\') . '/mon-ajax-search';
+    $candidates = [
+        'IndexManager.php',
+        'Search/IndexManager.php',
+        'includes/Search/IndexManager.php',
+        'src/Search/IndexManager.php',
+    ];
+
+    foreach ($candidates as $relative) {
+        $target = $baseDir . '/' . ltrim($relative, '/');
+
+        if (is_file($target)) {
+            a11ytb_patch_mon_ajax_search_index_manager_file($target);
+        }
+    }
+}
+add_action('plugins_loaded', 'a11ytb_apply_mon_ajax_search_compatibility', 9);
+
+/**
  * Retourne la clé de chiffrement dérivée des salts WordPress.
  */
 function a11ytb_get_secret_encryption_key(): string
