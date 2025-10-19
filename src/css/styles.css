@@ -1619,7 +1619,7 @@ body.a11ytb-tts-overlay-open {
 .a11ytb-guides-layout {
   display: grid;
   gap: 24px;
-  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
   align-items: start;
 }
 
@@ -1636,6 +1636,7 @@ body.a11ytb-tts-overlay-open {
 .a11ytb-guides-scenarios {
   display: grid;
   gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .a11ytb-guide-option {
