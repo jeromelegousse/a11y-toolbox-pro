@@ -5,6 +5,13 @@
   padding-right: 20px;
 }
 
+body.toplevel_page_a11y-toolbox-pro #adminmenuwrap,
+body.toplevel_page_a11y-toolbox-pro #adminmenu,
+body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
+  /* Ensure the WordPress admin menu and fly-outs stay above the toolbox layout */
+  z-index: 100100;
+}
+
 .a11ytb-admin-page .description {
   max-width: 72ch;
 }
