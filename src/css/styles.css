@@ -1179,7 +1179,10 @@ body.a11ytb-tts-overlay-open {
 .a11ytb-shortcuts-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(var(--a11ytb-grid-columns), minmax(0, 1fr));
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(320px, calc(100% / var(--a11ytb-grid-columns))), 1fr)
+  );
 }
 
 .a11ytb-shortcuts-custom-panel {
@@ -3948,14 +3951,10 @@ body.a11ytb-tts-overlay-open {
 .a11ytb-config-grid {
   display: grid;
   gap: 18px;
-}
-
-.a11ytb-profile-grid {
-  grid-template-columns: repeat(var(--a11ytb-grid-columns), minmax(0, 1fr));
-}
-
-.a11ytb-config-grid {
-  grid-template-columns: repeat(var(--a11ytb-grid-columns), minmax(0, 1fr));
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(320px, calc(100% / var(--a11ytb-grid-columns))), 1fr)
+  );
 }
 
 .a11ytb-profile-card,
