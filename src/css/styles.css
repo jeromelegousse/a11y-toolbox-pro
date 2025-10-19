@@ -1634,9 +1634,13 @@ body.a11ytb-tts-overlay-open {
 }
 
 .a11ytb-guides-scenarios {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.a11ytb-guides-scenarios .a11ytb-guide-option {
+  width: 100%;
 }
 
 .a11ytb-guide-option {
