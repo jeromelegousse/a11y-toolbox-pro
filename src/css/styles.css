@@ -2318,6 +2318,7 @@ body.a11ytb-tts-overlay-open {
 
 .a11ytb-modules-main {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   align-content: start;
   min-height: 0;
