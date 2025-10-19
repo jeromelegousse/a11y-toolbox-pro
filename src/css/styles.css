@@ -2320,9 +2320,9 @@ body.a11ytb-tts-overlay-open {
 }
 
 .a11ytb-modules-main {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 16px;
+  align-content: start;
   min-height: 0;
 }
 
