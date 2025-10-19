@@ -922,6 +922,13 @@ body.a11ytb-tts-overlay-open {
   transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+.a11ytb-chip--view[data-view='modules'] {
+  order: -1;
+  flex: 1 1 100%;
+  min-width: 100%;
+  max-width: 100%;
+}
+
 .a11ytb-chip--view.is-active,
 .a11ytb-chip--view:hover,
 .a11ytb-chip--view:focus-visible {
