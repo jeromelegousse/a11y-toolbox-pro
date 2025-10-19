@@ -3049,6 +3049,12 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
 
   const viewDefinitions = [
     {
+      id: 'modules',
+      label: 'Modules',
+      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 5h6v6H5zm8 0h6v6h-6zm0 8h6v6h-6zm-8 0h6v6H5z"/></svg>',
+      description: 'Activez, épinglez ou explorez les modules par catégories.',
+    },
+    {
       id: 'status',
       label: 'État temps réel',
       icon: statusIconMarkup,
@@ -3071,12 +3077,6 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       label: 'Activités récentes',
       icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 4h2v5H5zm4 4h2v9H9zm4-3h2v12h-2zm4 6h2v6h-2z"/></svg>',
       description: 'Consultez le journal des alertes, synchronisations et intégrations.',
-    },
-    {
-      id: 'modules',
-      label: 'Modules',
-      icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 5h6v6H5zm8 0h6v6h-6zm0 8h6v6h-6zm-8 0h6v6H5z"/></svg>',
-      description: 'Activez, épinglez ou explorez les modules par catégories.',
     },
     {
       id: 'guides',
