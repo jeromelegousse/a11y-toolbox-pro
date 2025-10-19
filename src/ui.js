@@ -4307,10 +4307,12 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     organizeView
   );
 
-  const activity = document.createElement('details');
+  const activity = document.createElement('div');
   activity.className = 'a11ytb-activity';
   activity.innerHTML = `
-    <summary>Activité récente</summary>
+    <header class="a11ytb-activity-header">
+      <h4 class="a11ytb-activity-title">Activités récentes</h4>
+    </header>
     <div class="a11ytb-activity-actions" role="group" aria-label="Exports du journal">
       <button type="button" class="a11ytb-btn-link" data-action="activity-export-json">Copier JSON</button>
       <button type="button" class="a11ytb-btn-link" data-action="activity-send-sync">Envoyer aux connecteurs</button>
@@ -9284,9 +9286,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
         if (typeof statusCenter?.scrollIntoView === 'function') {
           statusCenter.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-        if (activity) {
-          activity.open = true;
-        }
+        activity?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 160);
     }
   });
