@@ -120,7 +120,7 @@ const baseInitial = {
     search: '',
     moduleLayout: 'double-column',
     moduleFlyoutOpen: false,
-    fullscreen: true,
+    fullscreen: false,
     pinned: [],
     hidden: [],
     disabled: [],

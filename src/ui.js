@@ -3056,7 +3056,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     },
     {
       id: 'options',
-      label: 'Réglages des modules',
+      label: 'Options & Profils',
       icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 6h14v2H5zm0 5h10v2H5zm0 5h14v2H5z"/></svg>',
       description: 'Ajustez finement les options exposées par chaque module.',
     },
@@ -3092,7 +3092,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     },
     {
       id: 'organize',
-      label: 'Optimisation',
+      label: 'Organisation',
       icon: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h9v4H4zm0 5h6v4H4zm0 5h11v4H4zm12-5l4-3v10z"/></svg>',
       description: 'Priorisez, regroupez et synchronisez les modules pour vos équipes.',
     },
