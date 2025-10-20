@@ -746,6 +746,8 @@ body.a11ytb-tts-overlay-open {
   background: color-mix(in srgb, var(--a11ytb-surface) 82%, transparent);
   border: 1px solid color-mix(in srgb, var(--a11ytb-border) 65%, transparent);
   box-shadow: var(--a11ytb-shadow-subtle);
+  position: relative;
+  z-index: calc(var(--a11ytb-z) + 10);
 }
 
 .a11ytb-shell-main {
