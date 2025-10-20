@@ -3273,14 +3273,26 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   const layoutPresets = [
     {
       id: 'double-column',
-      label: 'Double colonne',
-      description: 'Catégories à gauche, modules détaillés à droite.',
+      label: 'Panneau latéral + liste fluide',
+      description: 'Barre latérale détaillée et cartes flex alignées verticalement.',
       tone: 'confirm',
     },
     {
       id: 'mosaic',
-      label: 'Mosaïque filtrable',
-      description: 'Groupes expansibles en grille responsive pour comparer rapidement.',
+      label: 'Mosaïque fluide (Flex)',
+      description: 'Cartes adaptatives qui se réorganisent sur plusieurs colonnes.',
+      tone: 'info',
+    },
+    {
+      id: 'flex-columns',
+      label: 'Colonnes libres (Flex)',
+      description: 'Suppression de la barre latérale pour laisser les cartes occuper la largeur.',
+      tone: 'focus',
+    },
+    {
+      id: 'flex-rows',
+      label: 'Bandes horizontales (Flex)',
+      description: 'Défilement latéral avec cartes larges en enfilade.',
       tone: 'info',
     },
     {
@@ -6994,6 +7006,21 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     const layout = layoutPresetMap.has(requested) ? requested : 'double-column';
     modulesView.dataset.layout = layout;
     modulesLayout.dataset.layout = layout;
+
+    const prefsView =
+      typeof prefs.view === 'string' ? prefs.view : state.get('ui.view') || 'status';
+    const isModulesView = prefsView === 'modules';
+    if (isModulesView) {
+      panel.dataset.layout = layout;
+    } else {
+      panel.removeAttribute('data-layout');
+    }
+
+    const needsWidePanel =
+      isModulesView && (layout === 'mosaic' || layout === 'flex-columns' || layout === 'flex-rows');
+    const needsXlPanel = isModulesView && layout === 'flex-rows';
+    panel.classList.toggle('a11ytb-panel--wide', needsWidePanel);
+    panel.classList.toggle('a11ytb-panel--xl', needsXlPanel);
 
     layoutControls.forEach((input, id) => {
       const active = id === layout;
