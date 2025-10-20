@@ -2511,11 +2511,11 @@ body.a11ytb-tts-overlay-open {
 .a11ytb-modules-layout[data-layout='flex-rows'] .a11ytb-modules,
 .a11ytb-view--modules[data-layout='flex-rows'] .a11ytb-modules {
   flex-flow: row nowrap;
-  overflow: auto hidden;
+  overflow: auto;
   padding: 8px;
   gap: 20px;
   scroll-snap-type: inline proximity;
-  align-items: stretch;
+  align-items: flex-start;
   overscroll-behavior-inline: contain;
   scroll-padding-inline: 12px;
   min-height: 0;
@@ -2537,7 +2537,20 @@ body.a11ytb-tts-overlay-open {
 .a11ytb-modules-layout[data-layout='flex-rows'] .a11ytb-modules-sidebar,
 .a11ytb-view--modules[data-layout='flex-columns'] .a11ytb-modules-sidebar,
 .a11ytb-view--modules[data-layout='flex-rows'] .a11ytb-modules-sidebar {
-  display: none;
+  order: -1;
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 18px;
+}
+
+.a11ytb-modules-layout[data-layout='flex-columns'] .a11ytb-modules-sidebar-scroll,
+.a11ytb-modules-layout[data-layout='flex-rows'] .a11ytb-modules-sidebar-scroll,
+.a11ytb-view--modules[data-layout='flex-columns'] .a11ytb-modules-sidebar-scroll,
+.a11ytb-view--modules[data-layout='flex-rows'] .a11ytb-modules-sidebar-scroll {
+  flex-flow: row wrap;
+  gap: 18px;
+  padding-right: 0;
 }
 
 .a11ytb-view--modules[data-layout='compact-flyout'] .a11ytb-modules-inline {
@@ -4675,7 +4688,7 @@ body.a11ytb-tts-overlay-open {
   flex: 0 0 var(--a11ytb-module-horizontal);
   max-width: var(--a11ytb-module-horizontal);
   scroll-snap-align: start;
-  height: 100%;
+  height: auto;
 }
 
 .a11ytb-module-header {
