@@ -1018,6 +1018,10 @@ body.a11ytb-tts-overlay-open {
   width: 100%;
 }
 
+.a11ytb-view[hidden] {
+  display: none !important;
+}
+
 @media (width >= 1200px) {
   .a11ytb-shell {
     flex-direction: row;
