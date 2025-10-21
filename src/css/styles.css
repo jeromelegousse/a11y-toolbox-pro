@@ -683,6 +683,18 @@ body.a11ytb-tts-overlay-open {
   color: var(--a11ytb-color-bg);
 }
 
+.a11ytb-language-select option,
+.a11ytb-catalog-select option,
+.a11ytb-profile-select option,
+.a11ytb-available-filter-select option,
+.a11ytb-builder-select option,
+.a11ytb-admin-priority-select option,
+.a11ytb-option-select option,
+.a11ytb-module select option {
+  color: var(--a11ytb-bg);
+  background-color: var(--a11ytb-color-text);
+}
+
 .a11ytb-button.is-recording {
   border-color: color-mix(in srgb, var(--a11ytb-accent-strong) 55%, transparent);
   color: var(--a11ytb-accent-strong);
