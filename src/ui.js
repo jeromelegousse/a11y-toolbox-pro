@@ -3493,7 +3493,8 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     modulesMain.append(modulesScrollControls);
   }
 
-  modulesLayout.append(modulesSidebar, modulesMain);
+  modulesMain.prepend(modulesSidebar);
+  modulesLayout.append(modulesMain);
 
   const modulesInline = document.createElement('div');
   modulesInline.className = 'a11ytb-modules-inline';
