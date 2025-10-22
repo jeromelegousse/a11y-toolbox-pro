@@ -1077,6 +1077,31 @@ function a11ytb_preferences_permission_callback(): bool
 }
 
 /**
+ * Vérifie qu’un utilisateur peut accéder aux fonctionnalités d’analyse de vision.
+ */
+function a11ytb_vision_permission_callback(): bool
+{
+    if (!function_exists('current_user_can')) {
+        return false;
+    }
+
+    /**
+     * Permet d’ajuster la capacité requise pour lancer une analyse.
+     *
+     * @param string $capability Capacité WordPress à vérifier.
+     */
+    $capability = function_exists('apply_filters')
+        ? (string) apply_filters('a11ytb/vision_required_capability', 'upload_files')
+        : 'upload_files';
+
+    if ($capability === '') {
+        $capability = 'upload_files';
+    }
+
+    return current_user_can($capability);
+}
+
+/**
  * Construit l’URL publique d’accès aux préférences synchronisées.
  */
 function a11ytb_get_preferences_endpoint(): string
@@ -1090,6 +1115,22 @@ function a11ytb_get_preferences_endpoint(): string
     }
 
     return '/wp-json/a11ytb/v1/preferences';
+}
+
+/**
+ * Construit l’URL publique d’accès à l’analyse de vision.
+ */
+function a11ytb_get_vision_endpoint(): string
+{
+    if (function_exists('rest_url')) {
+        return rest_url('a11ytb/v1/vision');
+    }
+
+    if (function_exists('home_url')) {
+        return home_url('/wp-json/a11ytb/v1/vision');
+    }
+
+    return '/wp-json/a11ytb/v1/vision';
 }
 
 /**
@@ -1176,6 +1217,124 @@ function a11ytb_rest_update_preferences($request)
 }
 
 /**
+ * Analyse une image via le moteur vision-langage.
+ *
+ * @param WP_REST_Request|array<string,mixed>|null $request
+ * @return WP_REST_Response|array<string,mixed>|WP_Error
+ */
+function a11ytb_rest_analyze_image($request)
+{
+    if (!a11ytb_vision_permission_callback()) {
+        $status = function_exists('rest_authorization_required_code')
+            ? rest_authorization_required_code()
+            : 403;
+
+        return new WP_Error(
+            'rest_forbidden',
+            __('Vous n’avez pas l’autorisation d’analyser des images.', 'a11ytb'),
+            ['status' => $status]
+        );
+    }
+
+    $params = [];
+    if ($request instanceof WP_REST_Request) {
+        $params = $request->get_json_params();
+        if (!is_array($params) || !$params) {
+            $params = $request->get_body_params();
+        }
+    } elseif (is_array($request)) {
+        $params = $request;
+    }
+
+    if (!is_array($params)) {
+        $params = [];
+    }
+
+    $image_tmp = '';
+    if (isset($params['imageTmpFile']) && is_string($params['imageTmpFile'])) {
+        $image_tmp = trim($params['imageTmpFile']);
+        if ($image_tmp !== '' && function_exists('wp_normalize_path')) {
+            $image_tmp = wp_normalize_path($image_tmp);
+        }
+    }
+
+    $image_url = '';
+    if (isset($params['imageUrl']) && is_string($params['imageUrl'])) {
+        $image_url = trim($params['imageUrl']);
+        if ($image_url !== '' && function_exists('esc_url_raw')) {
+            $image_url = esc_url_raw($image_url);
+        }
+    }
+
+    $prompt = '';
+    if (isset($params['prompt'])) {
+        $prompt = is_string($params['prompt']) ? $params['prompt'] : '';
+    }
+    $prompt = trim($prompt);
+    if ($prompt !== '' && function_exists('sanitize_text_field')) {
+        $prompt = sanitize_text_field($prompt);
+    }
+
+    if ($prompt === '') {
+        return new WP_Error(
+            'rest_invalid_param',
+            __('Le prompt est obligatoire pour lancer l’analyse.', 'a11ytb'),
+            ['status' => 400]
+        );
+    }
+
+    if ($image_tmp === '' && $image_url === '') {
+        return new WP_Error(
+            'rest_invalid_param',
+            __('Aucune image n’a été fournie pour l’analyse.', 'a11ytb'),
+            ['status' => 400]
+        );
+    }
+
+    if ($image_tmp !== '') {
+        $resolved = realpath($image_tmp);
+        if ($resolved === false) {
+            return new WP_Error(
+                'rest_invalid_param',
+                __('Le fichier temporaire fourni est introuvable.', 'a11ytb'),
+                ['status' => 400]
+            );
+        }
+
+        $image_tmp = $resolved;
+
+        if (!is_readable($image_tmp)) {
+            return new WP_Error(
+                'rest_invalid_param',
+                __('Le fichier image n’est pas accessible.', 'a11ytb'),
+                ['status' => 400]
+            );
+        }
+    }
+
+    $input = $image_tmp !== '' ? $image_tmp : $image_url;
+
+    $result = a11ytb_execute_llava_vision_engine($input, $prompt);
+    if (is_wp_error($result)) {
+        return $result;
+    }
+
+    $text = isset($result['text']) && is_string($result['text']) ? trim($result['text']) : '';
+    if ($text === '') {
+        return new WP_Error(
+            'a11ytb_vision_empty_text',
+            __('Le moteur de vision n’a produit aucun texte exploitable.', 'a11ytb'),
+            ['status' => 502]
+        );
+    }
+
+    return rest_ensure_response([
+        'text' => $text,
+        'raw' => $result['raw'] ?? $result,
+    ]);
+}
+
+/**
  * Déclare la route REST permettant de lire/écrire les préférences utilisateurs.
  */
 function a11ytb_register_preferences_route(): void
@@ -1203,6 +1362,31 @@ function a11ytb_register_preferences_route(): void
 add_action('rest_api_init', 'a11ytb_register_preferences_route');
 
 /**
+ * Déclare la route REST permettant d’analyser une image côté serveur.
+ */
+function a11ytb_register_vision_route(): void
+{
+    if (!function_exists('register_rest_route')) {
+        return;
+    }
+
+    $creatable = defined('WP_REST_Server::CREATABLE') ? WP_REST_Server::CREATABLE : 'POST';
+
+    register_rest_route(
+        'a11ytb/v1',
+        '/vision',
+        [
+            [
+                'methods' => $creatable,
+                'callback' => 'a11ytb_rest_analyze_image',
+                'permission_callback' => 'a11ytb_vision_permission_callback',
+            ],
+        ]
+    );
+}
+add_action('rest_api_init', 'a11ytb_register_vision_route');
+
+/**
  * Construit la configuration exposée au frontal pour la synchronisation des préférences.
  */
 function a11ytb_get_preferences_integration_config(): array
@@ -1222,6 +1406,24 @@ function a11ytb_get_preferences_integration_config(): array
 }
 
 /**
+ * Construit la configuration exposée au frontal pour l’analyse de captures.
+ */
+function a11ytb_get_vision_integration_config(): array
+{
+    $enabled = a11ytb_vision_permission_callback();
+
+    if (!$enabled) {
+        return ['enabled' => false];
+    }
+
+    return [
+        'enabled' => true,
+        'endpoint' => a11ytb_get_vision_endpoint(),
+        'nonce' => function_exists('wp_create_nonce') ? wp_create_nonce('wp_rest') : '',
+    ];
+}
+
+/**
  * @deprecated 1.19.0  Utilisez a11ytb_get_preferences_integration_config().
  */
 function a11ytb_get_preferences_sync_config(): array
@@ -1231,6 +1433,260 @@ function a11ytb_get_preferences_sync_config(): array
     }
 
     return a11ytb_get_preferences_integration_config();
+}
+
+/**
+ * Tente d’exécuter le moteur LLaVA et retourne le texte généré.
+ *
+ * @param string $image   Fichier local ou URL à analyser.
+ * @param string $prompt  Prompt textuel envoyé au moteur.
+ * @return array<string,mixed>|WP_Error
+ */
+function a11ytb_execute_llava_vision_engine(string $image, string $prompt)
+{
+    $payload = ['image' => $image, 'prompt' => $prompt];
+
+    if (function_exists('apply_filters')) {
+        $pre = apply_filters('a11ytb/vision_engine_execute', null, $payload);
+        if ($pre instanceof WP_Error) {
+            return $pre;
+        }
+        if (is_array($pre)) {
+            return $pre;
+        }
+    }
+
+    $command = a11ytb_build_llava_command($image, $prompt);
+    if ($command instanceof WP_Error) {
+        return $command;
+    }
+
+    $result = a11ytb_run_process_with_timeout($command['command'], $command['cwd']);
+    if ($result instanceof WP_Error) {
+        return $result;
+    }
+
+    $decoded = json_decode($result['stdout'], true);
+    if (!is_array($decoded)) {
+        return new WP_Error(
+            'a11ytb_vision_invalid_output',
+            __('La réponse du moteur de vision est invalide.', 'a11ytb'),
+            ['status' => 502]
+        );
+    }
+
+    $text = '';
+    if (isset($decoded['text']) && is_string($decoded['text'])) {
+        $text = trim($decoded['text']);
+    }
+
+    if ($text === '' && isset($decoded['result']) && is_array($decoded['result']) && isset($decoded['result']['text'])) {
+        $candidate = $decoded['result']['text'];
+        if (is_string($candidate)) {
+            $text = trim($candidate);
+        }
+    }
+
+    return [
+        'text' => $text,
+        'raw' => $decoded,
+    ];
+}
+
+/**
+ * Construit la commande shell pour exécuter le moteur LLaVA.
+ *
+ * @param string $image
+ * @param string $prompt
+ * @return array{command:string,cwd:string}|WP_Error
+ */
+function a11ytb_build_llava_command(string $image, string $prompt)
+{
+    $node = a11ytb_locate_node_binary();
+    if ($node === '') {
+        return new WP_Error(
+            'a11ytb_vision_node_missing',
+            __('Node.js est requis pour lancer le moteur de vision.', 'a11ytb'),
+            ['status' => 500]
+        );
+    }
+
+    $plugin_dir = plugin_dir_path(__FILE__);
+    $script = $plugin_dir . 'scripts/integrations/demo-vlm.js';
+    if (!file_exists($script)) {
+        return new WP_Error(
+            'a11ytb_vision_runner_missing',
+            __('Le script llavaVisionEngine est introuvable.', 'a11ytb'),
+            ['status' => 500]
+        );
+    }
+
+    $command = escapeshellcmd($node)
+        . ' '
+        . escapeshellarg($script)
+        . ' --engine='
+        . escapeshellarg('llavaVisionEngine')
+        . ' --image='
+        . escapeshellarg($image)
+        . ' --prompt='
+        . escapeshellarg($prompt);
+
+    return [
+        'command' => $command,
+        'cwd' => $plugin_dir,
+    ];
+}
+
+/**
+ * Localise l’exécutable Node.js.
+ */
+function a11ytb_locate_node_binary(): string
+{
+    $candidates = [];
+
+    if (defined('A11YTB_NODE_BINARY') && is_string(A11YTB_NODE_BINARY) && A11YTB_NODE_BINARY !== '') {
+        $candidates[] = A11YTB_NODE_BINARY;
+    }
+
+    $env_candidate = getenv('A11YTB_NODE_BINARY');
+    if (is_string($env_candidate) && $env_candidate !== '') {
+        $candidates[] = $env_candidate;
+    }
+
+    $candidates[] = '/usr/local/bin/node';
+    $candidates[] = '/usr/bin/node';
+    $candidates[] = 'node';
+
+    foreach ($candidates as $candidate) {
+        if (!is_string($candidate) || $candidate === '') {
+            continue;
+        }
+
+        if ($candidate === 'node') {
+            return 'node';
+        }
+
+        if (file_exists($candidate) && is_executable($candidate)) {
+            return $candidate;
+        }
+    }
+
+    return '';
+}
+
+/**
+ * Exécute une commande shell avec un timeout raisonnable.
+ *
+ * @param string      $command
+ * @param string|null $cwd
+ * @param int         $timeout
+ * @return array{stdout:string,stderr:string}|WP_Error
+ */
+function a11ytb_run_process_with_timeout(string $command, ?string $cwd = null, int $timeout = 60)
+{
+    $descriptor = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+
+    $process = proc_open($command, $descriptor, $pipes, $cwd ?: null);
+    if (!is_resource($process)) {
+        return new WP_Error(
+            'a11ytb_vision_exec_failed',
+            __('Impossible de démarrer le moteur de vision.', 'a11ytb'),
+            ['status' => 500]
+        );
+    }
+
+    fclose($pipes[0]);
+
+    stream_set_blocking($pipes[1], false);
+    stream_set_blocking($pipes[2], false);
+
+    $stdout = '';
+    $stderr = '';
+    $start = time();
+    $timed_out = false;
+
+    do {
+        $read = [];
+        if (!feof($pipes[1])) {
+            $read[] = $pipes[1];
+        }
+        if (!feof($pipes[2])) {
+            $read[] = $pipes[2];
+        }
+
+        if (!$read) {
+            usleep(100000);
+        } else {
+            $write = null;
+            $except = null;
+            $remaining = max(1, $timeout - (time() - $start));
+            $changed = stream_select($read, $write, $except, $remaining, 0);
+
+            if ($changed === false) {
+                break;
+            }
+
+            foreach ($read as $stream) {
+                $chunk = stream_get_contents($stream);
+                if ($chunk === false) {
+                    continue;
+                }
+
+                if ($stream === $pipes[1]) {
+                    $stdout .= $chunk;
+                } else {
+                    $stderr .= $chunk;
+                }
+            }
+        }
+
+        if ((time() - $start) >= $timeout) {
+            $timed_out = true;
+            break;
+        }
+
+        $status = proc_get_status($process);
+    } while ($status['running']);
+
+    foreach ($pipes as $pipe) {
+        if (is_resource($pipe)) {
+            fclose($pipe);
+        }
+    }
+
+    if ($timed_out) {
+        proc_terminate($process, 9);
+        proc_close($process);
+
+        return new WP_Error(
+            'a11ytb_vision_timeout',
+            __('Le moteur de vision a mis trop de temps à répondre.', 'a11ytb'),
+            ['status' => 504]
+        );
+    }
+
+    $exit_code = proc_close($process);
+
+    if ($exit_code !== 0) {
+        return new WP_Error(
+            'a11ytb_vision_exec_failed',
+            sprintf(
+                /* translators: %s: message d’erreur du moteur. */
+                __('L’exécution du moteur de vision a échoué : %s', 'a11ytb'),
+                $stderr !== '' ? trim($stderr) : sprintf(__('code de sortie %d', 'a11ytb'), $exit_code)
+            ),
+            ['status' => 502]
+        );
+    }
+
+    return [
+        'stdout' => $stdout,
+        'stderr' => $stderr,
+    ];
 }
 
 /**
@@ -1585,6 +2041,7 @@ function a11ytb_get_frontend_config(): array
     $integrations = [
         'preferences' => a11ytb_get_preferences_integration_config(),
         'activity' => a11ytb_get_activity_integration_config(),
+        'vision' => a11ytb_get_vision_integration_config(),
     ];
 
     return [
