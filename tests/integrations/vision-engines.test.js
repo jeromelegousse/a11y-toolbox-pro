@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const requireEnvMock = vi.fn();
 const loadImageAsBase64Mock = vi.fn();
+const execFileMock = vi.fn();
 
 vi.mock('../../scripts/integrations/env.js', () => ({
   requireEnv: requireEnvMock,
@@ -9,6 +10,11 @@ vi.mock('../../scripts/integrations/env.js', () => ({
 
 vi.mock('../../src/integrations/vision/utils.js', () => ({
   loadImageAsBase64: loadImageAsBase64Mock,
+}));
+
+vi.mock('node:child_process', () => ({
+  execFile: execFileMock,
+  default: { execFile: execFileMock },
 }));
 
 function createJsonResponse(payload) {
@@ -25,6 +31,7 @@ beforeEach(() => {
   vi.resetModules();
   requireEnvMock.mockReset();
   loadImageAsBase64Mock.mockReset();
+  execFileMock.mockReset();
   globalThis.fetch = vi.fn();
 });
 
@@ -137,5 +144,35 @@ describe('moondreamVisionEngine', () => {
     await expect(
       moondreamVisionEngine.analyze({ imagePath: './image.png', prompt: 'Décrire' })
     ).rejects.toThrow('La réponse Moondream ne contient pas de texte.');
+  });
+});
+
+describe('llavaVisionEngine', () => {
+  it('retourne le texte renvoyé par le script local', async () => {
+    execFileMock.mockImplementation((command, args, options, callback) => {
+      callback(null, JSON.stringify({ text: 'Réponse LLaVA', engine: 'llava-local' }), '');
+    });
+
+    const { llavaVisionEngine } = await import('../../src/integrations/vision/llava-local.js');
+    const result = await llavaVisionEngine.analyze({
+      imagePath: './image.png',
+      prompt: 'Décrire',
+    });
+
+    expect(execFileMock).toHaveBeenCalledTimes(1);
+    expect(result.text).toBe('Réponse LLaVA');
+    expect(result.raw).toEqual({ text: 'Réponse LLaVA', engine: 'llava-local' });
+  });
+
+  it('signale une erreur lorsque le texte est absent', async () => {
+    execFileMock.mockImplementation((command, args, options, callback) => {
+      callback(null, JSON.stringify({ engine: 'llava-local' }), '');
+    });
+
+    const { llavaVisionEngine } = await import('../../src/integrations/vision/llava-local.js');
+
+    await expect(
+      llavaVisionEngine.analyze({ imagePath: './image.png', prompt: 'Décrire' })
+    ).rejects.toThrow('La réponse LLaVA ne contient pas de texte.');
   });
 });

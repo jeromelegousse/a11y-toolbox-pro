@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const loadEnvironmentMock = vi.fn();
 const analyzeMock = vi.fn();
+const llavaAnalyzeMock = vi.fn();
 
 vi.mock('../../scripts/integrations/env.js', () => ({
   loadEnvironment: loadEnvironmentMock,
@@ -30,6 +31,13 @@ vi.mock('../../src/integrations/vision/moondream.js', () => ({
   },
 }));
 
+vi.mock('../../src/integrations/vision/llava-local.js', () => ({
+  llavaVisionEngine: {
+    id: 'llava-local',
+    analyze: llavaAnalyzeMock,
+  },
+}));
+
 describe('demo-vlm CLI', () => {
   const originalArgv = [...process.argv];
   const originalConsoleLog = console.log;
@@ -40,6 +48,7 @@ describe('demo-vlm CLI', () => {
     vi.resetModules();
     loadEnvironmentMock.mockReset();
     analyzeMock.mockReset();
+    llavaAnalyzeMock.mockReset();
     console.log = originalConsoleLog;
     console.error = originalConsoleError;
     process.argv = [...originalArgv];
@@ -80,5 +89,29 @@ describe('demo-vlm CLI', () => {
       prompt: 'Bonjour',
       text: 'Analyse synthétique',
     });
+  });
+
+  it('accepte le moteur local LLaVA', async () => {
+    llavaAnalyzeMock.mockResolvedValue({ text: 'Réponse locale' });
+    const logs = [];
+    console.log = (message) => logs.push(message);
+
+    process.argv = [
+      'node',
+      'demo-vlm.js',
+      `--image=${tempImagePath}`,
+      '--prompt=Hello',
+      '--engine=llava-local',
+    ];
+
+    await import('../../scripts/integrations/demo-vlm.js');
+
+    expect(llavaAnalyzeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'Hello' })
+    );
+
+    const output = JSON.parse(logs.at(-1));
+    expect(output.engine).toBe('llava-local');
+    expect(output.text).toBe('Réponse locale');
   });
 });
