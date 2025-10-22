@@ -1,16 +1,23 @@
-# Intégrations Speech-to-Text locales
+# Intégrations locales (Speech-to-Text & Vision-Language)
 
 Ce dossier regroupe les scripts d'intégration destinés à exécuter des moteurs
-de reconnaissance vocale **en local**, sans dépendre d'une API distante. Chaque
-script expose une CLI compatible avec le contrat `transcribe({ filePath,
-language })` :
+**en local**, sans dépendre d'une API distante. Chaque script expose une CLI
+compatible avec le contrat attendu par les adaptateurs Node et sérialise un
+objet JSON sur la sortie standard.
+
+## Scripts disponibles
+
+### Speech-to-Text
 
 - `whisper_local.py` — Lance [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper).
 - `vosk-transcribe.js` — Utilise le module npm [`vosk`](https://github.com/alphacep/vosk-api).
 - `parakeet.py` — S'appuie sur [`nemo_toolkit[asr]`](https://github.com/NVIDIA/NeMo) et le modèle Parakeet.
 
-Tous les scripts retournent un objet JSON sérialisé sur la sortie standard avec
-au minimum la propriété `text`.
+### Vision-Language (VLM)
+
+- `llava_local.py` — Charge un modèle [`LLaVA`](https://llava-vl.github.io/) via
+  `transformers` (`AutoProcessor` / `AutoModelForVision2Seq`) pour générer une
+  description textuelle d'une image locale.
 
 ## Prérequis d'installation
 
@@ -25,6 +32,9 @@ npm install vosk
 # NVIDIA NeMo Parakeet (Python >= 3.10 recommandé)
 pip install nemo_toolkit[asr]
 # Suivez la documentation NVIDIA pour installer PyTorch + CUDA adaptés à votre GPU.
+
+# LLaVA local (Python >= 3.10 recommandé)
+pip install transformers accelerate pillow
 ```
 
 ### Modèles et paramètres supplémentaires
@@ -56,6 +66,15 @@ pip install nemo_toolkit[asr]
   - Certains modèles exigent une carte GPU ; les performances CPU sont limitées
     aux courtes durées.
 
+- **LLaVA (Vision-Language Model)**
+  - Sélectionnez le modèle via `LLAVA_MODEL_NAME`
+    (ex. `llava-hf/llava-phi-3-mini`). L'argument CLI `--model` a priorité.
+  - Forcez le périphérique avec `LLAVA_DEVICE` (`cpu`, `cuda`). Par défaut, le
+    script choisit automatiquement `cuda` si disponible.
+  - Les poids légers (famille *phi-3-mini*) conviennent aux cartes GPU modestes
+    ou à l'exécution CPU, mais restent coûteux.
+  - Contrôlez la longueur des réponses avec `LLAVA_MAX_NEW_TOKENS` (512 par défaut).
+
 ### Notes sur les performances
 
 - `faster-whisper` exploite `CTranslate2`. Sur CPU, privilégiez les modèles
@@ -64,6 +83,8 @@ pip install nemo_toolkit[asr]
   langue. Les fichiers longs augmentent la latence proportionnellement.
 - `parakeet` est optimisé pour GPU (CUDA). En mode CPU, prévoyez plusieurs
   minutes par minute d'audio selon le modèle.
+- `llava_local.py` requiert beaucoup de mémoire GPU/CPU et peut prendre
+  plusieurs secondes par requête selon la taille du modèle.
 
 ## Mode mock pour les tests
 
@@ -71,3 +92,7 @@ Les tests d'intégration activent `A11Y_TOOLBOX_STT_MOCK_TEXT` afin de bypasser
 les dépendances lourdes et produire une sortie déterministe. Définissez la même
 variable dans votre environnement pour vérifier rapidement l'intégration sans
 télécharger les modèles.
+
+Pour le script VLM, définissez `A11Y_TOOLBOX_VLM_MOCK_TEXT` pour court-circuiter
+l'inférence et retourner la chaîne fournie. Utile pour les tests automatisés
+sans télécharger les poids LLaVA.
