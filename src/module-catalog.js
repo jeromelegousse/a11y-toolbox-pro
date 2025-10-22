@@ -5,6 +5,7 @@ import { manifest as sttManifest } from './modules/stt.manifest.js';
 import { manifest as brailleManifest } from './modules/braille.manifest.js';
 import { manifest as contrastManifest } from './modules/contrast.manifest.js';
 import { manifest as spacingManifest } from './modules/spacing.manifest.js';
+import { manifest as visionAssistantManifest } from './modules/vision-assistant.manifest.js';
 
 export const moduleCatalog = [
   {
@@ -36,6 +37,11 @@ export const moduleCatalog = [
     id: contrastManifest.id,
     manifest: contrastManifest,
     loader: () => import('./modules/contrast.js'),
+  },
+  {
+    id: visionAssistantManifest.id,
+    manifest: visionAssistantManifest,
+    loader: () => import('./modules/vision-assistant.js'),
   },
   {
     id: spacingManifest.id,

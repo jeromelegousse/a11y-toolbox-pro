@@ -290,6 +290,8 @@ const moduleIcons = {
   contrast: '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 2a10 10 0 100 20V2z"/></svg>',
   spacing:
     '<svg viewBox="0 0 24 24" focusable="false"><path d="M7 4h10v2H7V4zm-2 5h14v2H5V9zm3 5h8v2H8v-2zm-3 5h14v2H5v-2z"/></svg>',
+  visionAssistant:
+    '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 5c5.01 0 9.18 3.29 10.4 7-.6 1.86-2.12 4.02-4.27 5.55C16.02 19.88 14.07 20.5 12 20.5s-4.02-.62-6.13-2C3.72 16.02 2.2 13.86 1.6 12 2.82 8.29 6.99 5 12 5zm0 2C8.63 7 5.8 9.11 4.94 12c.86 2.89 3.69 5 7.06 5s6.2-2.11 7.06-5C18.2 9.11 15.37 7 12 7zm0 2a3 3 0 110 6 3 3 0 010-6z"/></svg>',
 };
 
 function downloadTextFile(filename, text, mime = 'text/plain') {
@@ -870,6 +872,157 @@ registerBlock({
     document.documentElement.classList.toggle('a11ytb-contrast', initial);
     btn.textContent = initial ? 'Désactiver' : 'Activer';
     btn.setAttribute('aria-pressed', String(initial));
+  },
+});
+
+function visionAssistantStatusText(status, error) {
+  if (status === 'error' && error) {
+    return `Erreur : ${error}`;
+  }
+  if (status === 'loading') {
+    return 'Analyse en cours…';
+  }
+  if (status === 'ready') {
+    return 'Analyse terminée.';
+  }
+  if (status === 'unconfigured') {
+    return 'Service non configuré.';
+  }
+  return 'En attente d’une analyse.';
+}
+
+registerBlock({
+  id: 'vision-assistant-controls',
+  moduleId: 'vision-assistant',
+  title: 'Assistant visuel IA',
+  icon: moduleIcons.visionAssistant,
+  category: 'vision',
+  keywords: ['vision', 'ia', 'analyse'],
+  render: () => `
+    <form data-ref="upload-form">
+      <label for="vision-assistant-upload">Image locale</label>
+      <input id="vision-assistant-upload" type="file" accept="image/*" data-ref="file-input" />
+      <label for="vision-assistant-prompt">Prompt</label>
+      <textarea id="vision-assistant-prompt" rows="3" data-ref="prompt-input" placeholder="Décrivez la consigne envoyée au moteur."></textarea>
+      <div class="a11ytb-row">
+        <button class="a11ytb-button" type="submit" data-ref="upload-submit">Analyser l’image</button>
+      </div>
+    </form>
+    <form data-ref="fetch-form">
+      <label for="vision-assistant-url">URL d’image distante</label>
+      <input id="vision-assistant-url" type="url" inputmode="url" autocomplete="off" data-ref="url-input" placeholder="https://exemple.test/image.jpg" />
+      <div class="a11ytb-row">
+        <button class="a11ytb-button a11ytb-button--ghost" type="submit" data-ref="fetch-submit">Analyser l’URL</button>
+      </div>
+    </form>
+    <p class="a11ytb-note" role="status" aria-live="polite" data-ref="status"></p>
+    <div class="a11ytb-note" data-ref="response" aria-live="polite"></div>
+  `,
+  wire: ({ root, state }) => {
+    const uploadForm = root.querySelector('[data-ref="upload-form"]');
+    const fetchForm = root.querySelector('[data-ref="fetch-form"]');
+    const promptInput = root.querySelector('[data-ref="prompt-input"]');
+    const urlInput = root.querySelector('[data-ref="url-input"]');
+    const fileInput = root.querySelector('[data-ref="file-input"]');
+    const statusNode = root.querySelector('[data-ref="status"]');
+    const responseNode = root.querySelector('[data-ref="response"]');
+    const uploadButton = root.querySelector('[data-ref="upload-submit"]');
+    const fetchButton = root.querySelector('[data-ref="fetch-submit"]');
+
+    let moduleReady = Boolean(window.a11ytb?.visionAssistant);
+    let cleanupBinding = null;
+
+    const applyState = (snapshot) => {
+      const vision = snapshot?.visionAssistant || {};
+      if (statusNode) {
+        const message = visionAssistantStatusText(vision.status, vision.error);
+        statusNode.textContent = message;
+        if (message) {
+          statusNode.removeAttribute('hidden');
+        } else {
+          statusNode.setAttribute('hidden', '');
+        }
+      }
+      if (responseNode) {
+        responseNode.textContent = vision.lastResponse || 'Aucun résultat pour le moment.';
+      }
+      const isLoading = moduleReady && vision.status === 'loading';
+      if (uploadButton) {
+        if (!moduleReady) {
+          uploadButton.disabled = true;
+          uploadButton.removeAttribute('aria-busy');
+        } else {
+          uploadButton.disabled = isLoading;
+          if (isLoading) {
+            uploadButton.setAttribute('aria-busy', 'true');
+          } else {
+            uploadButton.removeAttribute('aria-busy');
+          }
+        }
+      }
+      if (fetchButton) {
+        if (!moduleReady) {
+          fetchButton.disabled = true;
+          fetchButton.removeAttribute('aria-busy');
+        } else {
+          fetchButton.disabled = isLoading;
+          if (isLoading) {
+            fetchButton.setAttribute('aria-busy', 'true');
+          } else {
+            fetchButton.removeAttribute('aria-busy');
+          }
+        }
+      }
+      if (promptInput && document.activeElement !== promptInput) {
+        const nextPrompt = vision.prompt ?? '';
+        if (promptInput.value !== nextPrompt) {
+          promptInput.value = nextPrompt;
+        }
+      }
+      if (urlInput && document.activeElement !== urlInput) {
+        const nextUrl = vision.lastUrl ?? '';
+        if (urlInput.value !== nextUrl) {
+          urlInput.value = nextUrl;
+        }
+      }
+    };
+
+    applyState(state.get());
+    state.on(applyState);
+
+    const bindModule = () => {
+      if (typeof window.a11ytb?.visionAssistant?.bindUI === 'function') {
+        if (typeof cleanupBinding === 'function') {
+          cleanupBinding();
+        }
+        cleanupBinding = window.a11ytb.visionAssistant.bindUI({
+          uploadForm,
+          fetchForm,
+          promptInput,
+          urlInput,
+          fileInput,
+          statusNode,
+          responseNode,
+          uploadButton,
+          fetchButton,
+        });
+        moduleReady = true;
+        applyState(state.get());
+      }
+    };
+
+    if (window.a11ytb?.visionAssistant) {
+      bindModule();
+    } else if (window.a11ytb?.runtime?.loadModule) {
+      window.a11ytb.runtime
+        .loadModule('vision-assistant')
+        .then(() => {
+          bindModule();
+        })
+        .catch((error) => {
+          console.error('a11ytb: impossible de charger le module assistant visuel.', error);
+        });
+    }
   },
 });
 
