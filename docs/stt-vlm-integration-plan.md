@@ -51,7 +51,7 @@ Prévoir un README dédié dans `scripts/` expliquant l'installation (requiremen
 ### Modèles locaux faciles
 
 - **Moondream** : dispo sur Hugging Face, poids < 1.8 Go. Installer via `pip install moondream`. Script `python scripts/moondream_qa.py`.
-- **LLaVA 1.5 HF Inference** : utiliser `transformers` + `AutoProcessor`.
+- **LLaVA 1.5 HF Inference** ✅ : script local opérationnel via `transformers` + `AutoProcessor` avec le modèle `liuhaotian/llava-v1.5-7b-hf`.
 
 ## 5. Priorités de développement
 
@@ -70,6 +70,7 @@ Prévoir un README dédié dans `scripts/` expliquant l'installation (requiremen
 
 4. **Semaine 4**
    - Étendre aux VLM (OpenAI / Gemini).
+   - ✅ Finaliser le flux LLaVA local (`llava-local`) et documenter la configuration.
    - Prototype Moondream local.
 
 5. **Semaine 5**
