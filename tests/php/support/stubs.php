@@ -12,6 +12,7 @@ $GLOBALS['__a11ytb_user_meta'] = [];
 $GLOBALS['__a11ytb_current_user'] = 0;
 $GLOBALS['__a11ytb_cron_events'] = [];
 $GLOBALS['__a11ytb_shortcodes'] = [];
+$GLOBALS['__a11ytb_capabilities'] = [];
 $GLOBALS['wp_version'] = '6.2';
 
 if (!function_exists('get_locale')) {
@@ -146,6 +147,13 @@ if (!function_exists('plugin_basename')) {
     function plugin_basename($file)
     {
         return basename($file);
+    }
+}
+
+if (!function_exists('plugin_dir_path')) {
+    function plugin_dir_path($file)
+    {
+        return rtrim(dirname($file), '/\\') . '/';
     }
 }
 
@@ -428,6 +436,16 @@ if (!function_exists('is_admin')) {
 if (!function_exists('current_user_can')) {
     function current_user_can($capability)
     {
+        $grants = $GLOBALS['__a11ytb_capabilities'] ?? [];
+
+        if ($grants === true) {
+            return true;
+        }
+
+        if (is_array($grants)) {
+            return in_array($capability, $grants, true);
+        }
+
         return false;
     }
 }
@@ -612,4 +630,16 @@ function a11ytb_test_reset_state(): void
     $GLOBALS['__a11ytb_cron_events'] = [];
     $GLOBALS['__a11ytb_shortcodes'] = [];
     $GLOBALS['__a11ytb_current_user'] = 0;
+    $GLOBALS['__a11ytb_capabilities'] = [];
+}
+
+function a11ytb_test_grant_capabilities($caps): void
+{
+    if ($caps === true) {
+        $GLOBALS['__a11ytb_capabilities'] = true;
+        return;
+    }
+
+    $caps = is_array($caps) ? array_values(array_unique(array_map('strval', $caps))) : [];
+    $GLOBALS['__a11ytb_capabilities'] = $caps;
 }
