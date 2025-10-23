@@ -2,6 +2,8 @@ import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { fetchWithRetry, parseJson } from '../http-client.js';
+import { requireEnv } from '../../../scripts/integrations/env.js';
 import { loadImageAsBase64 } from './utils.js';
 
 const PYTHON_EXECUTABLE = process.env.A11Y_TOOLBOX_VLM_PYTHON || 'python3';
@@ -9,6 +11,8 @@ const DEFAULT_SCRIPT_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../../../scripts/integrations/llava_local.py'
 );
+const DEFAULT_REMOTE_MODEL = 'llava-hf/llava-phi-3-mini';
+const DEFAULT_REMOTE_TIMEOUT = 45000;
 
 function ensurePrompt(prompt) {
   if (!prompt) {
@@ -20,6 +24,11 @@ function ensurePrompt(prompt) {
 function ensureScriptPath() {
   const scriptPath = process.env.LLAVA_SCRIPT_PATH?.trim() || DEFAULT_SCRIPT_PATH;
   return scriptPath;
+}
+
+function resolveRemoteEndpoint() {
+  const modelName = process.env.LLAVA_REMOTE_MODEL?.trim() || DEFAULT_REMOTE_MODEL;
+  return `https://api-inference.huggingface.co/models/${modelName}`;
 }
 
 async function runLlavaScript({ scriptPath, imagePath, prompt, env }) {
@@ -67,8 +76,115 @@ function parsePayload(output) {
   };
 }
 
-export const llavaVisionEngine = {
+function pickGeneratedText(payload) {
+  if (!payload) {
+    return undefined;
+  }
+
+  if (typeof payload === 'string') {
+    return payload;
+  }
+
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const text = pickGeneratedText(item);
+      if (text) {
+        return text;
+      }
+    }
+    return undefined;
+  }
+
+  if (typeof payload === 'object') {
+    if (typeof payload.generated_text === 'string') {
+      return payload.generated_text;
+    }
+
+    if (Array.isArray(payload.output)) {
+      const text = pickGeneratedText(payload.output);
+      if (text) {
+        return text;
+      }
+    }
+
+    if (Array.isArray(payload.outputs)) {
+      const text = pickGeneratedText(payload.outputs);
+      if (text) {
+        return text;
+      }
+    }
+
+    if (Array.isArray(payload.data)) {
+      const text = pickGeneratedText(payload.data);
+      if (text) {
+        return text;
+      }
+    }
+
+    if (Array.isArray(payload.conversation)) {
+      const text = pickGeneratedText(payload.conversation);
+      if (text) {
+        return text;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+export const llavaRemoteVisionEngine = {
   id: 'llava',
+  async analyze({ imagePath, prompt } = {}) {
+    const preparedPrompt = ensurePrompt(prompt);
+    const { data, mimeType } = await loadImageAsBase64(imagePath);
+    const apiToken = requireEnv('HUGGINGFACE_API_TOKEN');
+    const endpoint = resolveRemoteEndpoint();
+
+    const response = await fetchWithRetry(
+      endpoint,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          inputs: {
+            prompt: preparedPrompt,
+            image: `data:${mimeType};base64,${data}`,
+          },
+          parameters: {
+            max_new_tokens: 512,
+          },
+          options: {
+            wait_for_model: true,
+          },
+        }),
+        timeout: DEFAULT_REMOTE_TIMEOUT,
+      },
+      {
+        retries: 1,
+        retryDelayMs: 1000,
+      }
+    );
+
+    const payload = await parseJson(response);
+    const text = pickGeneratedText(payload)?.trim();
+
+    if (!text) {
+      throw new Error('La réponse LLaVA ne contient pas de texte.');
+    }
+
+    return {
+      text,
+      raw: payload,
+    };
+  },
+};
+
+export const llavaLocalVisionEngine = {
+  id: 'llava-local',
   async analyze({ imagePath, prompt } = {}) {
     const preparedPrompt = ensurePrompt(prompt);
     const scriptPath = ensureScriptPath();
@@ -89,4 +205,4 @@ export const llavaVisionEngine = {
   },
 };
 
-export default llavaVisionEngine;
+export default llavaRemoteVisionEngine;

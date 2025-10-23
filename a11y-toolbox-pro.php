@@ -1685,12 +1685,12 @@ function a11ytb_execute_llava_vision_engine(string $image, string $prompt, strin
 /**
  * Construit la commande shell pour exécuter le moteur LLaVA.
  *
- * @param string $image
- * @param string $prompt
- * @param string $engine
+ * @param string      $image
+ * @param string      $prompt
+ * @param string|null $engine
  * @return array{command:string,cwd:string}|WP_Error
  */
-function a11ytb_build_llava_command(string $image, string $prompt, string $engine = '')
+function a11ytb_build_llava_command(string $image, string $prompt, ?string $engine = null)
 {
     $node = a11ytb_locate_node_binary();
     if ($node === '') {
@@ -1711,22 +1711,13 @@ function a11ytb_build_llava_command(string $image, string $prompt, string $engin
         );
     }
 
-    $registry = a11ytb_get_vision_engine_registry();
-    $engine = trim($engine);
-    if ($engine !== '') {
-        $engine = function_exists('sanitize_key') ? sanitize_key($engine) : strtolower($engine);
-    }
-    if ($engine === '') {
-        $engine = $registry['default'] !== '' ? $registry['default'] : 'llava-local';
-    } elseif ($registry['engines'] && !in_array($engine, $registry['engines'], true)) {
-        $engine = $registry['default'] !== '' ? $registry['default'] : 'llava-local';
-    }
+    $engine_id = $engine !== null ? $engine : 'llava';
 
     $command = escapeshellcmd($node)
         . ' '
         . escapeshellarg($script)
         . ' --engine='
-        . escapeshellarg($engine)
+        . escapeshellarg($engine_id)
         . ' --image='
         . escapeshellarg($image)
         . ' --prompt='
