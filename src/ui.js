@@ -1326,42 +1326,9 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   let notificationsContainer = null;
   let currentNotifications = [];
 
-  const DOCK_POSITIONS = ['left', 'right', 'bottom'];
-  const DOCK_LABEL_KEYS = {
-    left: 'toolbar.dockLeft',
-    right: 'toolbar.dockRight',
-    bottom: 'toolbar.dockBottom',
-  };
-  const DOCK_ICONS = {
-    trigger:
-      '<svg viewBox="0 0 24 24" focusable="false"><path d="M5 4a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V5a1 1 0 00-1-1zm0 2h10v12H5zm12 0v12h2V6z"/></svg>',
-    left: '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm8 1H6v12h6V6zm2 0v12h5V6h-5z"/></svg>',
-    right:
-      '<svg viewBox="0 0 24 24" focusable="false"><path d="M5 4a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V5a1 1 0 00-1-1H5zm11 2h3v12h-3V6zm-2 0H6v12h8V6z"/></svg>',
-    bottom:
-      '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm1 8v5h14v-5H5zm0-2h14V6H5v5z"/></svg>',
-  };
-
-  let dockMenuWrapper = null;
-  let dockMenuButton = null;
-  let dockMenuLabel = null;
-  let dockMenuValue = null;
-  let dockMenu = null;
-  let dockMenuAnnouncement = null;
-  const dockMenuItems = new Map();
-  const dockMenuItemLabels = new Map();
-  let dockMenuOpen = false;
-  let dockMenuFocusIndex = 0;
-  let lastDockAnnouncementPosition = null;
-
-  const fab = document.createElement('button');
-  fab.className = 'a11ytb-fab a11ytb-fab--modules';
-  fab.type = 'button';
-  fab.setAttribute('aria-expanded', 'false');
-  fab.setAttribute('aria-label', 'Ouvrir les modules');
-  fab.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M12 8a4 4 0 100 8 4 4 0 000-8zm8.94 3a8.94 8.94 0 00-.5-1.47l2.06-1.5-2-3.46-2.44 1a9.09 9.09 0 00-2.02-1.17l-.37-2.6h-4l-.37 2.6A9.09 9.09 0 007.93 4.6l-2.44-1-2 3.46 2.06 1.5A8.94 8.94 0 005.06 11H2v4h3.06c.12.51.29 1 .5 1.47l-2.06 1.5 2 3.46 2.44-1c.62.47 1.3.86 2.02 1.17l.37 2.6h4l.37-2.6c.72-.31 1.4-.7 2.02-1.17l2.44 1 2-3.46-2.06-1.5c.21-.47.38-.96.5-1.47H22v-4h-3.06z"/>
-  </svg>`;
+  const dockLabelRefs = new Map();
+  const sidebarButtons = new Map();
+  const sidebarQuickAccess = [];
 
   const fullscreenIcons = {
     expand:
@@ -1372,6 +1339,141 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
 
   const statusIconMarkup =
     '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M11.25 3a.75.75 0 011.5 0v1.33a8.92 8.92 0 015.92 5.92H20a.75.75 0 010 1.5h-1.33a8.92 8.92 0 01-5.92 5.92V20a.75.75 0 01-1.5 0v-1.33a8.92 8.92 0 01-5.92-5.92H4a.75.75 0 010-1.5h1.33a8.92 8.92 0 015.92-5.92zm.75 4.5a4.5 4.5 0 104.5 4.5 4.5 4.5 0 00-4.5-4.5zm0 2a2.5 2.5 0 11-2.5 2.5 2.5 2.5 0 012.5-2.5z"/></svg>';
+
+  const sidebarIcons = {
+    modules:
+      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 5h6v6H5zm8 0h6v6h-6zm0 8h6v6h-6zm-8 0h6v6H5z"/></svg>',
+    audit: statusIconMarkup,
+    options:
+      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 7h16v2H4zm0 4h12v2H4zm0 4h16v2H4z"/></svg>',
+    guides:
+      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M6 4h9l3 3v13H6zm2 4v2h8V8zm0 4v2h5v-2z"/></svg>',
+    dock:
+      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v12a1 1 0 01-1 1h-5.59l-2.7 2.7A1 1 0 019 20.3V18H5a1 1 0 01-1-1V5zm2 1v10h12V6H6zm6 2h4v6h-4z"/></svg>',
+  };
+
+  const sidebar = document.createElement('nav');
+  sidebar.className = 'a11ytb-sidebar';
+  sidebar.setAttribute('aria-label', 'Navigation de la boîte à outils');
+
+  const sidebarList = document.createElement('ul');
+  sidebarList.className = 'a11ytb-sidebar-list';
+  sidebar.append(sidebarList);
+
+  const sidebarEntries = [
+    {
+      id: 'modules',
+      action: 'open-modules',
+      icon: sidebarIcons.modules,
+      labelKey: 'sidebar.modules',
+      view: 'modules',
+      activeViews: ['modules', 'organize'],
+    },
+    {
+      id: 'audit',
+      action: 'open-audit-overlay',
+      icon: sidebarIcons.audit,
+      labelKey: 'sidebar.audit',
+      view: 'status',
+      activeViews: ['status'],
+      overlay: 'audit',
+    },
+    {
+      id: 'options',
+      action: 'open-options-overlay',
+      icon: sidebarIcons.options,
+      labelKey: 'sidebar.options',
+      view: 'options',
+      activeViews: ['options', 'profiles'],
+      overlay: 'options',
+    },
+    {
+      id: 'guides',
+      action: 'open-guides-overlay',
+      icon: sidebarIcons.guides,
+      labelKey: 'sidebar.guides',
+      view: 'guides',
+      activeViews: ['guides', 'shortcuts'],
+      overlay: 'guides',
+    },
+    {
+      id: 'dock',
+      action: 'toggle-dock-menu',
+      icon: sidebarIcons.dock,
+      labelKey: 'sidebar.dock',
+    },
+    {
+      id: 'fullscreen',
+      action: 'toggle-fullscreen',
+      icon: fullscreenIcons.expand,
+      labelKeyEnter: 'sidebar.fullscreenEnter',
+      labelKeyExit: 'sidebar.fullscreenExit',
+      toggles: true,
+    },
+  ];
+
+  sidebarEntries.forEach((entry, index) => {
+    const item = document.createElement('li');
+    item.className = 'a11ytb-sidebar-item';
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'a11ytb-sidebar-button';
+    button.dataset.action = entry.action;
+    button.dataset.sidebarId = entry.id;
+    if (entry.view) {
+      button.dataset.view = entry.view;
+    }
+
+    const icon = document.createElement('span');
+    icon.className = 'a11ytb-sidebar-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.innerHTML = entry.icon;
+
+    const label = document.createElement('span');
+    label.className = 'a11ytb-sidebar-label';
+    label.textContent = '';
+
+    button.append(icon, label);
+
+    let badge = null;
+    if (entry.id === 'modules') {
+      badge = document.createElement('span');
+      badge.className = 'a11ytb-sidebar-badge';
+      badge.hidden = true;
+      badge.setAttribute('aria-hidden', 'true');
+      button.append(badge);
+    }
+
+    let indicator = null;
+    if (entry.id === 'dock') {
+      indicator = document.createElement('span');
+      indicator.className = 'a11ytb-sidebar-indicator';
+      indicator.setAttribute('aria-hidden', 'true');
+      indicator.textContent = '';
+      button.append(indicator);
+    }
+
+    item.append(button);
+    sidebarList.append(item);
+
+    sidebarButtons.set(entry.id, {
+      entry,
+      button,
+      icon,
+      label,
+      badge,
+      indicator,
+      baseLabel: '',
+    });
+
+    if (index < 4) {
+      sidebarQuickAccess[index] = button;
+    }
+  });
+
+  const modulesSidebarEntry = sidebarButtons.get('modules');
+  const fullscreenSidebarEntry = sidebarButtons.get('fullscreen');
 
   const overlay = document.createElement('div');
   overlay.className = 'a11ytb-overlay';
@@ -1387,7 +1489,11 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   panel.setAttribute('aria-modal', 'true');
   panel.tabIndex = -1;
   panel.dataset.fullscreen = String(!!state.get('ui.fullscreen'));
-  fab.setAttribute('aria-controls', panel.id);
+  if (modulesSidebarEntry?.button) {
+    modulesSidebarEntry.button.setAttribute('aria-controls', panel.id);
+    modulesSidebarEntry.button.setAttribute('aria-expanded', 'false');
+    modulesSidebarEntry.button.setAttribute('aria-pressed', 'false');
+  }
 
   const ttsOverlayState = {
     overlay: null,
@@ -2727,9 +2833,190 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     notificationsContainer.replaceChildren(...elements);
   }
 
+  function setSidebarButtonLabel(context, text) {
+    if (!context?.button) return;
+    const normalized = typeof text === 'string' ? text : '';
+    context.baseLabel = normalized;
+    if (context.label) {
+      context.label.textContent = normalized;
+    }
+    context.button.setAttribute('aria-label', normalized);
+    context.button.setAttribute('title', normalized);
+  }
+
+  function updateSidebarPanelState(open) {
+    const flag = !!open;
+    if (modulesSidebarEntry?.button) {
+      modulesSidebarEntry.button.setAttribute('aria-expanded', String(flag));
+      modulesSidebarEntry.button.setAttribute('aria-pressed', String(flag));
+      modulesSidebarEntry.button.dataset.open = String(flag);
+      modulesSidebarEntry.button.classList.toggle('is-open', flag);
+    }
+    if (sidebar) {
+      sidebar.dataset.panelOpen = String(flag);
+    }
+  }
+
+  function computeActiveModuleFilters(snapshot = state.get()) {
+    const ui = snapshot?.ui || {};
+    let count = 0;
+    if (ui.category && ui.category !== 'all') count += 1;
+    if (ui.search && String(ui.search).trim() !== '') count += 1;
+    if (ui.showHidden) count += 1;
+    return count;
+  }
+
+  function updateSidebarFilterBadge(snapshot = state.get()) {
+    if (!modulesSidebarEntry?.button) return;
+    const count = computeActiveModuleFilters(snapshot);
+    if (modulesSidebarEntry.badge) {
+      modulesSidebarEntry.badge.textContent = String(count);
+      modulesSidebarEntry.badge.hidden = count === 0;
+      modulesSidebarEntry.badge.setAttribute('aria-hidden', count === 0 ? 'true' : 'false');
+      modulesSidebarEntry.badge.dataset.count = String(count);
+    }
+    const baseLabel = modulesSidebarEntry.baseLabel || modulesSidebarEntry.label?.textContent || '';
+    if (!baseLabel) {
+      modulesSidebarEntry.button.setAttribute('aria-label', baseLabel);
+      modulesSidebarEntry.button.setAttribute('title', baseLabel);
+      return;
+    }
+    if (count > 0) {
+      const filtersLabel = i18n.t('sidebar.filterCount', { count });
+      modulesSidebarEntry.button.setAttribute('aria-label', `${baseLabel} – ${filtersLabel}`);
+      modulesSidebarEntry.button.setAttribute('title', `${baseLabel} · ${filtersLabel}`);
+    } else {
+      modulesSidebarEntry.button.setAttribute('aria-label', baseLabel);
+      modulesSidebarEntry.button.setAttribute('title', baseLabel);
+    }
+  }
+
+  function updateSidebarActiveView(snapshot = state.get()) {
+    const currentView = snapshot?.ui?.view || state.get('ui.view') || 'modules';
+    sidebarButtons.forEach((context) => {
+      const button = context?.button;
+      if (!button) return;
+      const entryViews = Array.isArray(context.entry?.activeViews)
+        ? context.entry.activeViews
+        : context.entry?.view
+          ? [context.entry.view]
+          : [];
+      const isActive = entryViews.includes(currentView);
+      button.classList.toggle('is-active', isActive);
+      if (isActive) {
+        button.setAttribute('aria-current', 'page');
+      } else {
+        button.removeAttribute('aria-current');
+      }
+    });
+  }
+
+  function openOverlayById(id) {
+    const overlayApi = window.a11ytb?.overlays?.[id];
+    if (overlayApi && typeof overlayApi.open === 'function') {
+      overlayApi.open();
+      return true;
+    }
+    return false;
+  }
+
+  const DOCK_SEQUENCE = ['right', 'bottom', 'left'];
+
+  function cycleDockPosition() {
+    const current = state.get('ui.dock') || 'right';
+    const index = DOCK_SEQUENCE.indexOf(current);
+    const next = DOCK_SEQUENCE[(index + 1) % DOCK_SEQUENCE.length];
+    state.set('ui.dock', next);
+    return next;
+  }
+
+  function handleSidebarAction(action, trigger) {
+    if (!action) return;
+    switch (action) {
+      case 'open-modules': {
+        const panelOpen = panel.dataset.open === 'true';
+        const currentView = state.get('ui.view');
+        if (panelOpen && currentView === 'modules') {
+          toggle(false);
+        } else {
+          if (panel.dataset.open !== 'true') {
+            toggle(true);
+          }
+          state.set('ui.view', 'modules');
+        }
+        break;
+      }
+      case 'open-audit-overlay': {
+        const opened = openOverlayById('audit');
+        if (!opened && panel.dataset.open !== 'true') {
+          toggle(true);
+        }
+        state.set('ui.view', 'status');
+        break;
+      }
+      case 'open-options-overlay': {
+        const opened = openOverlayById('options');
+        if (!opened && panel.dataset.open !== 'true') {
+          toggle(true);
+        }
+        state.set('ui.view', 'options');
+        break;
+      }
+      case 'open-guides-overlay': {
+        const opened = openOverlayById('guides');
+        if (!opened && panel.dataset.open !== 'true') {
+          toggle(true);
+        }
+        state.set('ui.view', 'guides');
+        break;
+      }
+      case 'toggle-dock-menu': {
+        cycleDockPosition();
+        break;
+      }
+      case 'toggle-fullscreen': {
+        if (fullscreenToggle) {
+          fullscreenToggle.click();
+        } else {
+          state.set('ui.fullscreen', !state.get('ui.fullscreen'));
+        }
+        break;
+      }
+      default:
+        break;
+    }
+    if (trigger && typeof trigger.focus === 'function') {
+      trigger.focus();
+    }
+  }
+
+  sidebar.addEventListener('click', (event) => {
+    const trigger = event.target.closest('.a11ytb-sidebar-button');
+    if (!trigger) return;
+    event.preventDefault();
+    handleSidebarAction(trigger.dataset.action, trigger);
+  });
+
   function applyLocaleToStaticUI(snapshot = state.get()) {
     updateLocaleFormatters();
-    fab.setAttribute('aria-label', i18n.t('panel.openFab'));
+    if (sidebar) {
+      sidebar.setAttribute('aria-label', i18n.t('sidebar.ariaLabel'));
+    }
+    sidebarButtons.forEach((context) => {
+      if (!context) return;
+      const { entry } = context;
+      if (!entry) return;
+      if (entry.id === 'fullscreen') {
+        const fullscreen = !!(snapshot?.ui?.fullscreen ?? state.get('ui.fullscreen'));
+        const key = fullscreen
+          ? entry.labelKeyExit || entry.labelKeyEnter || entry.labelKey
+          : entry.labelKeyEnter || entry.labelKey;
+        setSidebarButtonLabel(context, i18n.t(key));
+      } else if (entry.labelKey) {
+        setSidebarButtonLabel(context, i18n.t(entry.labelKey));
+      }
+    });
+    updateSidebarFilterBadge(snapshot);
     panel.setAttribute('aria-label', i18n.t('panel.title'));
     if (headerTitle) {
       headerTitle.textContent = i18n.t('panel.title');
@@ -9221,14 +9508,14 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     },
   };
 
-  const fabStack = document.createElement('div');
-  fabStack.className = 'a11ytb-fab-stack';
-  fabStack.append(fab);
-
-  root.append(overlay, fabStack, panel, notificationsContainer);
+  root.append(overlay, sidebar, panel, notificationsContainer);
 
   state.on(syncPanelFocusSection);
+  state.on(updateSidebarActiveView);
+  state.on(updateSidebarFilterBadge);
   syncPanelFocusSection();
+  updateSidebarActiveView();
+  updateSidebarFilterBadge();
 
   let lastFocusedElement = null;
   let releaseOutsideInert = null;
@@ -9360,6 +9647,21 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
         fullscreen ? i18n.t('toolbar.fullscreenExitTitle') : i18n.t('toolbar.fullscreenEnterTitle')
       );
     }
+    if (fullscreenSidebarEntry?.button) {
+      fullscreenSidebarEntry.button.setAttribute('aria-pressed', String(fullscreen));
+      fullscreenSidebarEntry.button.classList.toggle('is-active', fullscreen);
+      if (fullscreenSidebarEntry.icon) {
+        fullscreenSidebarEntry.icon.innerHTML = fullscreen
+          ? fullscreenIcons.collapse
+          : fullscreenIcons.expand;
+      }
+      const key = fullscreen
+        ? fullscreenSidebarEntry.entry?.labelKeyExit || fullscreenSidebarEntry.entry?.labelKeyEnter
+        : fullscreenSidebarEntry.entry?.labelKeyEnter || fullscreenSidebarEntry.entry?.labelKey;
+      if (key) {
+        setSidebarButtonLabel(fullscreenSidebarEntry, i18n.t(key));
+      }
+    }
   }
 
   function syncDockControls(snapshot) {
@@ -9371,13 +9673,25 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       item.classList.toggle('is-active', active);
       item.setAttribute('aria-checked', String(active));
     });
-    const activeItem = dockMenuItems.get(dock);
-    if (dockMenuButton && activeItem) {
-      dockMenuButton.setAttribute('aria-activedescendant', activeItem.id);
+    const dockContext = sidebarButtons.get('dock');
+    if (dockContext?.button) {
+      dockContext.button.dataset.dock = dock;
+      const positionLabel =
+        dock === 'left'
+          ? i18n.t('toolbar.dockLeft')
+          : dock === 'right'
+            ? i18n.t('toolbar.dockRight')
+            : i18n.t('toolbar.dockBottom');
+      const baseLabel = dockContext.baseLabel || dockContext.label?.textContent || '';
+      const combinedLabel = baseLabel ? `${baseLabel} – ${positionLabel}` : positionLabel;
+      dockContext.button.setAttribute('aria-label', combinedLabel);
+      dockContext.button.setAttribute('title', combinedLabel);
+      if (dockContext.indicator) {
+        const parts = positionLabel.split(/\s+/).filter(Boolean);
+        const lastWord = parts.length ? parts[parts.length - 1] : positionLabel;
+        dockContext.indicator.textContent = lastWord.slice(0, 1).toUpperCase();
+      }
     }
-    dockMenuFocusIndex = getDockPositionIndex(dock);
-    updateDockMenuDisplay(dock);
-    announceDockPosition(dock);
   }
 
   function setElementVisibility(element, visible, { manageAriaHidden = true } = {}) {
@@ -9409,9 +9723,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     }
     setElementVisibility(shellMain, true, { manageAriaHidden: false });
     setElementVisibility(viewContainer, true);
-    fab.classList.toggle('is-active', panelOpen);
-    fab.setAttribute('aria-pressed', String(panelOpen));
-    fab.setAttribute('aria-expanded', String(panelOpen));
+    updateSidebarPanelState(panelOpen);
   }
 
   function toggle(open) {
@@ -9419,9 +9731,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     const isFullscreenActive = !!state.get('ui.fullscreen');
     panel.dataset.open = String(shouldOpen);
     panel.setAttribute('aria-hidden', String(!shouldOpen));
-    fab.setAttribute('aria-expanded', String(shouldOpen));
-    fab.setAttribute('aria-pressed', String(shouldOpen));
-    fab.classList.toggle('is-active', shouldOpen);
+    updateSidebarPanelState(shouldOpen);
     overlay.dataset.open = String(shouldOpen);
     overlay.setAttribute('aria-hidden', String(!shouldOpen));
     const body = root?.ownerDocument?.body ?? document.body;
@@ -9453,11 +9763,13 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
         teardownOptionsFocusTrap();
       }
       stopShortcutRecording();
-      const target =
-        lastFocusedElement && typeof lastFocusedElement.focus === 'function'
-          ? lastFocusedElement
-          : fab;
-      target.focus();
+        const target =
+          lastFocusedElement && typeof lastFocusedElement.focus === 'function'
+            ? lastFocusedElement
+            : modulesSidebarEntry?.button || sidebarQuickAccess[0] || sidebar;
+      if (target && typeof target.focus === 'function') {
+        target.focus();
+      }
       lastFocusedElement = null;
     }
   }
@@ -9479,9 +9791,6 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     }
   }
 
-  fab.addEventListener('click', () => {
-    toggle();
-  });
   header.querySelector('[data-action="close"]').addEventListener('click', () => toggle(false));
   header.querySelector('[data-action="reset"]').addEventListener('click', () => {
     state.reset();
@@ -9525,6 +9834,26 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       const isEditable = active.closest('input, textarea, select, [contenteditable="true"]');
       if (isEditable && !event.altKey && !event.ctrlKey && !event.metaKey) {
         return;
+      }
+    }
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
+      let index = Number.isFinite(Number.parseInt(event.key, 10))
+        ? Number.parseInt(event.key, 10) - 1
+        : NaN;
+      if (!Number.isFinite(index) && typeof event.code === 'string' && event.code.startsWith('Digit')) {
+        const parsed = Number.parseInt(event.code.slice(5), 10);
+        if (Number.isFinite(parsed)) {
+          index = parsed - 1;
+        }
+      }
+      if (Number.isFinite(index) && index >= 0 && index < sidebarQuickAccess.length) {
+        const targetButton = sidebarQuickAccess[index];
+        if (targetButton) {
+          event.preventDefault();
+          targetButton.focus();
+          targetButton.click();
+          return;
+        }
       }
     }
     let handled = false;

@@ -18,9 +18,24 @@ function ensureStyle() {
         color: #fff !important;
       }
       .a11ytb-contrast .a11ytb-panel,
-      .a11ytb-contrast .a11ytb-fab {
+      .a11ytb-contrast .a11ytb-sidebar,
+      .a11ytb-contrast .a11ytb-sidebar-button {
         background-color: #0b0b0b !important;
         color: #fff !important;
+      }
+      .a11ytb-contrast .a11ytb-sidebar-button.is-active,
+      .a11ytb-contrast .a11ytb-sidebar-button.is-open {
+        background-color: #4cc3ff !important;
+        color: #000 !important;
+      }
+      .a11ytb-contrast .a11ytb-sidebar-label {
+        background-color: #4cc3ff !important;
+        color: #000 !important;
+      }
+      .a11ytb-contrast .a11ytb-sidebar-badge,
+      .a11ytb-contrast .a11ytb-sidebar-indicator {
+        background-color: #ffe066 !important;
+        color: #000 !important;
       }
       .a11ytb-contrast a,
       .a11ytb-contrast .a11ytb-link {
