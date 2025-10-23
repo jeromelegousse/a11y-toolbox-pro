@@ -16,6 +16,8 @@ const ENGINES = new Map([
   [llavaLocalVisionEngine.id, llavaLocalVisionEngine],
 ]);
 
+const DEFAULT_ENGINE = llavaVisionEngine.id;
+
 function printUsage() {
   console.log(
     'Usage : npm run demo:vlm -- --image=./capture.png --prompt="Décrire la scène" [--engine=openai-gpt4o|google-gemini|moondream|llava|llava-local]'
@@ -23,7 +25,7 @@ function printUsage() {
 }
 
 function parseArgs(rawArgs) {
-  const args = { engine: openAiGpt4oEngine.id };
+  const args = { engine: DEFAULT_ENGINE };
 
   for (const token of rawArgs) {
     if (!token.startsWith('--')) {

@@ -76,7 +76,7 @@ describe('demo-vlm CLI', () => {
   });
 
   it('affiche un JSON structuré avec le moteur par défaut', async () => {
-    analyzeMock.mockResolvedValue({ text: 'Analyse synthétique' });
+    llavaAnalyzeMock.mockResolvedValue({ text: 'Analyse synthétique' });
     const logs = [];
     const errors = [];
     console.log = (message) => logs.push(message);
@@ -88,13 +88,14 @@ describe('demo-vlm CLI', () => {
 
     expect(errors).toEqual([]);
     expect(loadEnvironmentMock).toHaveBeenCalled();
-    const analyzeArgs = analyzeMock.mock.calls.at(-1)?.[0];
+    expect(llavaAnalyzeMock).toHaveBeenCalledTimes(1);
+    const analyzeArgs = llavaAnalyzeMock.mock.calls.at(-1)?.[0];
     expect(analyzeArgs).toMatchObject({ prompt: 'Bonjour' });
     expect(analyzeArgs.imagePath).toContain('tmp-demo-vlm.png');
 
     const output = JSON.parse(logs.at(-1));
     expect(output).toMatchObject({
-      engine: 'openai-gpt4o',
+      engine: 'llava-local',
       prompt: 'Bonjour',
       text: 'Analyse synthétique',
     });
