@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const loadEnvironmentMock = vi.fn();
 const analyzeMock = vi.fn();
 const llavaAnalyzeMock = vi.fn();
-const llavaLocalAnalyzeMock = vi.fn();
+const ensureLocalImageMock = vi.fn();
 
 vi.mock('../../scripts/integrations/env.js', () => ({
   loadEnvironment: loadEnvironmentMock,
@@ -34,9 +34,13 @@ vi.mock('../../src/integrations/vision/moondream.js', () => ({
 
 vi.mock('../../src/integrations/vision/llava.js', () => ({
   llavaVisionEngine: {
-    id: 'llava-local',
-    analyze: llavaLocalAnalyzeMock,
+    id: 'llava',
+    analyze: llavaAnalyzeMock,
   },
+}));
+
+vi.mock('../../src/integrations/vision/utils.js', () => ({
+  ensureLocalImage: ensureLocalImageMock,
 }));
 
 describe('demo-vlm CLI', () => {
@@ -50,7 +54,7 @@ describe('demo-vlm CLI', () => {
     loadEnvironmentMock.mockReset();
     analyzeMock.mockReset();
     llavaAnalyzeMock.mockReset();
-    llavaLocalAnalyzeMock.mockReset();
+    ensureLocalImageMock.mockReset();
     console.log = originalConsoleLog;
     console.error = originalConsoleError;
     process.argv = [...originalArgv];
@@ -69,6 +73,11 @@ describe('demo-vlm CLI', () => {
   });
 
   it('affiche un JSON structuré avec le moteur par défaut', async () => {
+    ensureLocalImageMock.mockResolvedValue({
+      absolutePath: tempImagePath,
+      originalPath: tempImagePath,
+      source: 'local',
+    });
     llavaAnalyzeMock.mockResolvedValue({ text: 'Analyse synthétique' });
     const logs = [];
     const errors = [];
@@ -81,6 +90,7 @@ describe('demo-vlm CLI', () => {
 
     expect(errors).toEqual([]);
     expect(loadEnvironmentMock).toHaveBeenCalled();
+    expect(ensureLocalImageMock).toHaveBeenCalledWith(tempImagePath);
     expect(llavaAnalyzeMock).toHaveBeenCalledTimes(1);
     const analyzeArgs = llavaAnalyzeMock.mock.calls.at(-1)?.[0];
     expect(analyzeArgs).toMatchObject({ prompt: 'Bonjour' });
@@ -88,13 +98,19 @@ describe('demo-vlm CLI', () => {
 
     const output = JSON.parse(logs.at(-1));
     expect(output).toMatchObject({
-      engine: 'llava-local',
+      engine: 'llava',
       prompt: 'Bonjour',
       text: 'Analyse synthétique',
     });
+    expect(output.cachedImagePath).toContain('tmp-demo-vlm.png');
   });
 
   it('accepte le moteur LLaVA sur Hugging Face', async () => {
+    ensureLocalImageMock.mockResolvedValue({
+      absolutePath: tempImagePath,
+      originalPath: tempImagePath,
+      source: 'local',
+    });
     llavaAnalyzeMock.mockResolvedValue({ text: 'Réponse cloud' });
     const logs = [];
     console.log = (message) => logs.push(message);
@@ -109,6 +125,7 @@ describe('demo-vlm CLI', () => {
 
     await import('../../scripts/integrations/demo-vlm.js');
 
+    expect(ensureLocalImageMock).toHaveBeenCalledWith(tempImagePath);
     expect(llavaAnalyzeMock).toHaveBeenCalledWith(expect.objectContaining({ prompt: 'Hello' }));
 
     const output = JSON.parse(logs.at(-1));
@@ -116,8 +133,14 @@ describe('demo-vlm CLI', () => {
     expect(output.text).toBe('Réponse cloud');
   });
 
-  it('accepte le moteur local LLaVA', async () => {
-    llavaLocalAnalyzeMock.mockResolvedValue({ text: 'Réponse locale' });
+  it('préserve la compatibilité avec le flag --engine=llava-local', async () => {
+    ensureLocalImageMock.mockResolvedValue({
+      absolutePath: tempImagePath,
+      originalPath: tempImagePath,
+      source: 'local',
+    });
+    llavaAnalyzeMock.mockResolvedValue({ text: 'Réponse locale' });
+
     const logs = [];
     console.log = (message) => logs.push(message);
 
@@ -125,18 +148,43 @@ describe('demo-vlm CLI', () => {
       'node',
       'demo-vlm.js',
       `--image=${tempImagePath}`,
-      '--prompt=Hello',
+      '--prompt=Compat',
       '--engine=llava-local',
     ];
 
     await import('../../scripts/integrations/demo-vlm.js');
 
-    expect(llavaLocalAnalyzeMock).toHaveBeenCalledWith(
-      expect.objectContaining({ prompt: 'Hello' })
+    expect(llavaAnalyzeMock).toHaveBeenCalledWith(expect.objectContaining({ prompt: 'Compat' }));
+
+    const output = JSON.parse(logs.at(-1));
+    expect(output.engine).toBe('llava');
+    expect(output.text).toBe('Réponse locale');
+  });
+
+  it('récupère une image distante avant de lancer lanalyse', async () => {
+    const remoteUrl = 'https://example.com/demo.png';
+    ensureLocalImageMock.mockResolvedValue({
+      absolutePath: '/tmp/cached/demo.png',
+      originalPath: remoteUrl,
+      source: 'remote',
+    });
+    llavaAnalyzeMock.mockResolvedValue({ text: 'Réponse distante' });
+
+    const logs = [];
+    console.log = (message) => logs.push(message);
+
+    process.argv = ['node', 'demo-vlm.js', `--image=${remoteUrl}`, '--prompt=Remote'];
+
+    await import('../../scripts/integrations/demo-vlm.js');
+
+    expect(ensureLocalImageMock).toHaveBeenCalledWith(remoteUrl);
+    expect(llavaAnalyzeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ imagePath: '/tmp/cached/demo.png', prompt: 'Remote' })
     );
 
     const output = JSON.parse(logs.at(-1));
-    expect(output.engine).toBe('llava-local');
-    expect(output.text).toBe('Réponse locale');
+    expect(output.image).toBe(remoteUrl);
+    expect(output.cachedImagePath).toBe('/tmp/cached/demo.png');
+    expect(output.text).toBe('Réponse distante');
   });
 });
