@@ -5,7 +5,10 @@ import { loadEnvironment } from './env.js';
 import { openAiGpt4oEngine } from '../../src/integrations/vision/openai-gpt4o.js';
 import { googleGeminiVisionEngine } from '../../src/integrations/vision/google-gemini.js';
 import { moondreamVisionEngine } from '../../src/integrations/vision/moondream.js';
-import { llavaVisionEngine } from '../../src/integrations/vision/llava.js';
+import {
+  llavaRemoteVisionEngine,
+  llavaLocalVisionEngine,
+} from '../../src/integrations/vision/llava.js';
 
 const ENGINES = new Map([
   [openAiGpt4oEngine.id, openAiGpt4oEngine],
@@ -15,7 +18,7 @@ const ENGINES = new Map([
   [llavaLocalVisionEngine.id, llavaLocalVisionEngine],
 ]);
 
-const DEFAULT_ENGINE = llavaVisionEngine.id;
+const DEFAULT_ENGINE = llavaRemoteVisionEngine.id;
 
 function printUsage() {
   console.log(

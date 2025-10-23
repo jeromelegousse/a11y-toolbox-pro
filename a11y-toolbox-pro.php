@@ -1589,11 +1589,12 @@ function a11ytb_execute_llava_vision_engine(string $image, string $prompt)
 /**
  * Construit la commande shell pour exécuter le moteur LLaVA.
  *
- * @param string $image
- * @param string $prompt
+ * @param string      $image
+ * @param string      $prompt
+ * @param string|null $engine
  * @return array{command:string,cwd:string}|WP_Error
  */
-function a11ytb_build_llava_command(string $image, string $prompt)
+function a11ytb_build_llava_command(string $image, string $prompt, ?string $engine = null)
 {
     $node = a11ytb_locate_node_binary();
     if ($node === '') {
@@ -1614,11 +1615,13 @@ function a11ytb_build_llava_command(string $image, string $prompt)
         );
     }
 
+    $engine_id = $engine !== null ? $engine : 'llava';
+
     $command = escapeshellcmd($node)
         . ' '
         . escapeshellarg($script)
         . ' --engine='
-        . escapeshellarg('llavaVisionEngine')
+        . escapeshellarg($engine_id)
         . ' --image='
         . escapeshellarg($image)
         . ' --prompt='
