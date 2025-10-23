@@ -72,7 +72,12 @@ function resolveIntegrationConfig() {
         ),
       ]
     : [];
-  return { endpoint, nonce, engines };
+  const defaultEngineRaw =
+    typeof integration.defaultEngine === 'string' ? integration.defaultEngine.trim() : '';
+  const defaultEngine = defaultEngineRaw && engines.includes(defaultEngineRaw)
+    ? defaultEngineRaw
+    : '';
+  return { endpoint, nonce, engines, defaultEngine };
 }
 
 function formatStatus(status, error) {
@@ -80,6 +85,27 @@ function formatStatus(status, error) {
     return `Erreur : ${error}`;
   }
   return STATUS_MESSAGES[status] || STATUS_MESSAGES.idle;
+}
+
+function formatEngineLabel(engine) {
+  if (!engine) {
+    return '';
+  }
+  const knownLabels = {
+    'llava-local': 'LLaVA local',
+    llava: 'LLaVA distant',
+    'openai-gpt4o': 'OpenAI GPT-4o',
+    'google-gemini': 'Google Gemini Vision',
+    moondream: 'Moondream',
+  };
+  if (knownLabels[engine]) {
+    return knownLabels[engine];
+  }
+  return engine
+    .split('-')
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
 }
 
 function playFeedback(tone) {
@@ -125,8 +151,9 @@ async function performAnalysis({ file, url, prompt, engine, source } = {}) {
   }
 
   const config = resolveIntegrationConfig();
-  if (config.engines?.length) {
-    updateVisionState('availableEngines', [...config.engines]);
+  const availableEngines = Array.isArray(config.engines) ? [...config.engines] : [];
+  if (availableEngines.length) {
+    updateVisionState('availableEngines', availableEngines);
   } else {
     updateVisionState('availableEngines', DEFAULT_STATE.availableEngines || []);
   }
@@ -160,24 +187,36 @@ async function performAnalysis({ file, url, prompt, engine, source } = {}) {
 
   const preparedPrompt =
     (prompt || '').trim() || store.get('visionAssistant.prompt') || getDefaultPrompt();
-  const availableEngines = config.engines?.length ? config.engines : [];
-  let selectedEngine = engine || store.get('visionAssistant.engine') || getDefaultEngine();
+  const configDefaultEngine =
+    config.defaultEngine && (!availableEngines.length || availableEngines.includes(config.defaultEngine))
+      ? config.defaultEngine
+      : availableEngines[0] || getDefaultEngine();
+  let selectedEngine =
+    (typeof engine === 'string' ? engine.trim() : '') ||
+    (store.get('visionAssistant.engine') || '') ||
+    '';
 
-  if (availableEngines.length) {
-    if (!selectedEngine || !availableEngines.includes(selectedEngine)) {
-      const fallbackEngine = availableEngines[0];
-      if (selectedEngine && selectedEngine !== fallbackEngine) {
-        window.a11ytb?.logActivity?.(
-          `Moteur assistant visuel indisponible, remplacement par ${fallbackEngine}`,
-          {
-            module: manifest.id,
-            tone: 'info',
-            tags: ['vision', 'assistant', 'engine', 'fallback'],
-          }
-        );
-      }
-      selectedEngine = fallbackEngine;
+  if (!selectedEngine && configDefaultEngine) {
+    selectedEngine = configDefaultEngine;
+  }
+
+  if (!selectedEngine) {
+    selectedEngine = getDefaultEngine();
+  }
+
+  if (availableEngines.length && !availableEngines.includes(selectedEngine)) {
+    const fallbackEngine = configDefaultEngine || availableEngines[0];
+    if (selectedEngine && selectedEngine !== fallbackEngine) {
+      window.a11ytb?.logActivity?.(
+        `Moteur assistant visuel indisponible, remplacement par ${fallbackEngine}`,
+        {
+          module: manifest.id,
+          tone: 'info',
+          tags: ['vision', 'assistant', 'engine', 'fallback'],
+        }
+      );
     }
+    selectedEngine = fallbackEngine;
   }
 
   updateVisionState('prompt', preparedPrompt);
@@ -321,10 +360,47 @@ function bindUI(elements = {}) {
     statusNode,
     uploadButton,
     fetchButton,
+    engineSelect,
   } = elements;
 
   const listeners = [];
   const unsubscribers = [];
+
+  const syncEngineControl = (visionState) => {
+    if (!engineSelect) {
+      return;
+    }
+
+    const engines = Array.isArray(visionState.availableEngines)
+      ? visionState.availableEngines
+      : [];
+    const currentValues = Array.from(engineSelect.options || []).map((option) => option.value);
+    const optionsChanged =
+      engines.length !== currentValues.length ||
+      engines.some((value, index) => currentValues[index] !== value);
+
+    if (optionsChanged) {
+      engineSelect.innerHTML = '';
+      if (!engines.length) {
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Aucun moteur disponible';
+        engineSelect.append(placeholder);
+      } else {
+        engines.forEach((value) => {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = formatEngineLabel(value) || value;
+          engineSelect.append(option);
+        });
+      }
+    }
+
+    const desiredEngine = visionState.engine || (engines.length ? engines[0] : '');
+    if (engineSelect.value !== (desiredEngine || '')) {
+      engineSelect.value = desiredEngine || '';
+    }
+  };
 
   const update = (snapshot) => {
     const visionState = snapshot?.visionAssistant || {};
@@ -358,6 +434,13 @@ function bindUI(elements = {}) {
         fetchButton.removeAttribute('aria-busy');
       }
     }
+    if (engineSelect) {
+      syncEngineControl(visionState);
+      const engines = Array.isArray(visionState.availableEngines)
+        ? visionState.availableEngines
+        : [];
+      engineSelect.disabled = !moduleReady || engines.length <= 1;
+    }
     if (promptInput && document.activeElement !== promptInput) {
       const nextPrompt = prompt ?? getDefaultPrompt();
       if (promptInput.value !== nextPrompt) {
@@ -381,6 +464,17 @@ function bindUI(elements = {}) {
     };
     promptInput.addEventListener('input', onPromptInput);
     listeners.push(() => promptInput.removeEventListener('input', onPromptInput));
+  }
+
+  if (engineSelect) {
+    engineSelect.disabled = true;
+    const onEngineChange = (event) => {
+      const next = typeof event.target.value === 'string' ? event.target.value : '';
+      updateVisionState('engine', next);
+      window.a11ytb?.visionAssistant?.setEngine?.(next);
+    };
+    engineSelect.addEventListener('change', onEngineChange);
+    listeners.push(() => engineSelect.removeEventListener('change', onEngineChange));
   }
 
   if (uploadForm) {
@@ -467,6 +561,25 @@ const visionAssistant = {
     store = state;
     ensureStateDefaults(state);
 
+    const config = resolveIntegrationConfig();
+    const engines = Array.isArray(config.engines) ? config.engines : [];
+    if (engines.length) {
+      updateVisionState('availableEngines', engines);
+      const currentEngine = state.get('visionAssistant.engine');
+      const defaultEngine =
+        config.defaultEngine && engines.includes(config.defaultEngine)
+          ? config.defaultEngine
+          : engines[0] || getDefaultEngine();
+      if (!currentEngine || !engines.includes(currentEngine)) {
+        updateVisionState('engine', defaultEngine);
+      }
+    } else if (config.defaultEngine) {
+      const currentEngine = state.get('visionAssistant.engine');
+      if (!currentEngine) {
+        updateVisionState('engine', config.defaultEngine);
+      }
+    }
+
     const api = {
       analyzeFile(file, options = {}) {
         return performAnalysis({ file, ...options, source: options.source || 'upload' });
@@ -482,10 +595,47 @@ const visionAssistant = {
         return store?.get('visionAssistant');
       },
       getIntegrationConfig: resolveIntegrationConfig,
+      setEngine(value) {
+        if (!store) {
+          return '';
+        }
+        const requested = typeof value === 'string' ? value.trim() : '';
+        const integration = resolveIntegrationConfig();
+        const available = Array.isArray(integration.engines)
+          ? integration.engines
+          : store.get('visionAssistant.availableEngines') || [];
+        const defaultEngine =
+          integration.defaultEngine && (!available.length || available.includes(integration.defaultEngine))
+            ? integration.defaultEngine
+            : available[0] || getDefaultEngine();
+        let nextEngine = requested || defaultEngine || getDefaultEngine();
+        if (available.length && !available.includes(nextEngine)) {
+          nextEngine = defaultEngine || available[0];
+        }
+        updateVisionState('engine', nextEngine);
+        return nextEngine;
+      },
     };
 
     if (!window.a11ytb) window.a11ytb = {};
     window.a11ytb.visionAssistant = api;
+  },
+};
+
+export const __testables = {
+  resolveIntegrationConfig,
+  performAnalysis,
+  ensureStateDefaults,
+  updateVisionState,
+  getDefaultEngine,
+  getDefaultPrompt,
+  formatEngineLabel,
+  setStore(value) {
+    store = value;
+  },
+  reset() {
+    store = null;
+    activeRequestId = 0;
   },
 };
 

@@ -181,6 +181,36 @@ body {
   overflow: hidden;
 }
 
+body.a11ytb-fullscreen {
+  position: relative;
+  overflow: hidden;
+}
+
+body.a11ytb-fullscreen::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--a11ytb-z) - 8);
+  background: color-mix(in srgb, var(--a11ytb-overlay) 94%, transparent);
+  backdrop-filter: blur(18px) saturate(130%);
+  pointer-events: none;
+}
+
+body.a11ytb-fullscreen .a11ytb-overlay {
+  background: transparent;
+  backdrop-filter: none;
+}
+
+body.a11ytb-fullscreen .a11ytb-fab-stack,
+body.a11ytb-fullscreen .a11ytb-notifications {
+  opacity: 0;
+  pointer-events: none;
+}
+
+body.a11ytb-fullscreen .a11ytb-panel[data-open='true'] {
+  box-shadow: none;
+}
+
 .a11ytb-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -572,6 +602,8 @@ body.a11ytb-tts-overlay-open {
   max-height: none;
   transform: none;
   border-radius: 0;
+  background: color-mix(in srgb, var(--a11ytb-surface) 95%, transparent);
+  backdrop-filter: blur(28px) saturate(125%);
 }
 
 .a11ytb-header {
@@ -594,6 +626,113 @@ body.a11ytb-tts-overlay-open {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.a11ytb-menubutton {
+  position: relative;
+  display: inline-flex;
+}
+
+.a11ytb-button--menu {
+  position: relative;
+  padding-right: 36px;
+}
+
+.a11ytb-button--menu::after {
+  content: '';
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border: solid currentcolor;
+  border-width: 0 2px 2px 0;
+  transform: translateY(-50%) rotate(45deg);
+  transition: transform 0.2s ease;
+  pointer-events: none;
+}
+
+.a11ytb-button--menu[aria-expanded='true'] {
+  background: var(--a11ytb-accent);
+  border-color: var(--a11ytb-accent-strong);
+  color: var(--a11ytb-color-bg);
+}
+
+.a11ytb-button--menu[aria-expanded='true']::after {
+  transform: translateY(-50%) rotate(-135deg);
+}
+
+.a11ytb-button-value {
+  font-size: 12px;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--a11ytb-fg) 70%, transparent);
+}
+
+.a11ytb-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  min-width: 200px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--a11ytb-border) 70%, transparent);
+  background: var(--a11ytb-surface-elevated);
+  box-shadow: var(--a11ytb-shadow);
+  z-index: calc(var(--a11ytb-z) + 2);
+}
+
+.a11ytb-menu[hidden] {
+  display: none;
+}
+
+.a11ytb-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--a11ytb-fg);
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.a11ytb-menu__item:hover,
+.a11ytb-menu__item:focus-visible {
+  background: color-mix(in srgb, var(--a11ytb-accent) 16%, transparent);
+  color: var(--a11ytb-color-bg);
+  transform: translateY(-1px);
+}
+
+.a11ytb-menu__item[aria-checked='true'],
+.a11ytb-menu__item.is-active {
+  background: var(--a11ytb-accent);
+  color: var(--a11ytb-color-bg);
+}
+
+.a11ytb-menu__item:focus-visible {
+  outline: var(--a11ytb-focus-ring-tight);
+  outline-offset: 2px;
+}
+
+.a11ytb-menu__icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+}
+
+.a11ytb-menu__icon svg {
+  width: 20px;
+  height: 20px;
 }
 
 .a11ytb-button {
@@ -693,6 +832,30 @@ body.a11ytb-tts-overlay-open {
 .a11ytb-module select option {
   color: var(--a11ytb-bg);
   background-color: var(--a11ytb-color-text);
+}
+
+.a11ytb-engine-select {
+  appearance: none;
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid color-mix(in srgb, var(--a11ytb-border) 70%, transparent);
+  border-radius: var(--a11ytb-radius-sm);
+  background: var(--a11ytb-surface);
+  color: var(--a11ytb-fg);
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.a11ytb-engine-select:focus-visible {
+  outline: var(--a11ytb-focus-ring-tight);
+  outline-offset: 2px;
+}
+
+.a11ytb-engine-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .a11ytb-button.is-recording {

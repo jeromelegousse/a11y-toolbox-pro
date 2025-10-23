@@ -1,11 +1,10 @@
 #!/usr/bin/env node
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { loadEnvironment } from './env.js';
 import { openAiGpt4oEngine } from '../../src/integrations/vision/openai-gpt4o.js';
 import { googleGeminiVisionEngine } from '../../src/integrations/vision/google-gemini.js';
 import { moondreamVisionEngine } from '../../src/integrations/vision/moondream.js';
 import { llavaVisionEngine } from '../../src/integrations/vision/llava.js';
+import { ensureLocalImage } from '../../src/integrations/vision/utils.js';
 
 function normalizeEngine(candidate, { id, analyze }) {
   if (!candidate || typeof candidate !== 'object') {
@@ -57,7 +56,7 @@ if (!ENGINES.has(DEFAULT_ENGINE_OUTPUT)) {
 
 function printUsage() {
   console.log(
-    'Usage : npm run demo:vlm -- --image=./capture.png --prompt="Décrire la scène" [--engine=openai-gpt4o|google-gemini|moondream|llava|llava-local]'
+    'Usage : npm run demo:vlm -- --image=./capture.png|https://exemple.tld/image.png --prompt="Décrire la scène" [--engine=openai-gpt4o|google-gemini|moondream|llava|llava-local]'
   );
 }
 
@@ -109,7 +108,7 @@ async function main() {
   }
 
   const result = await engine.analyze({
-    imagePath: absoluteImage,
+    imagePath: image.absolutePath,
     prompt: args.prompt,
   });
 
