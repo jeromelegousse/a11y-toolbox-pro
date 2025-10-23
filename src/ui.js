@@ -8975,7 +8975,11 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       }
       if (event.key === 'Escape') {
         event.stopPropagation();
-        toggle(false);
+        if (state.get('ui.fullscreen')) {
+          state.set('ui.fullscreen', false);
+        } else {
+          toggle(false);
+        }
         return;
       }
       if (event.key !== 'Tab') {
@@ -9046,6 +9050,16 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   function syncFullscreenMode(snapshot) {
     const fullscreen = !!snapshot?.ui?.fullscreen;
     panel.dataset.fullscreen = String(fullscreen);
+    const body = root?.ownerDocument?.body ?? document.body;
+    if (body) {
+      body.classList.toggle('a11ytb-fullscreen', fullscreen);
+    }
+    if (fullscreen && panel.dataset.open !== 'true') {
+      toggle(true);
+    }
+    if (fullscreen && panel.dataset.open === 'true' && typeof releasePanelFocusTrap !== 'function') {
+      setupPanelFocusTrap();
+    }
     if (fullscreenToggle) {
       fullscreenToggle.setAttribute('aria-pressed', String(fullscreen));
       fullscreenToggle.classList.toggle('is-active', fullscreen);
@@ -9110,6 +9124,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
 
   function toggle(open) {
     const shouldOpen = open ?? panel.dataset.open !== 'true';
+    const isFullscreenActive = !!state.get('ui.fullscreen');
     panel.dataset.open = String(shouldOpen);
     panel.setAttribute('aria-hidden', String(!shouldOpen));
     fab.setAttribute('aria-expanded', String(shouldOpen));
@@ -9117,7 +9132,13 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     fab.classList.toggle('is-active', shouldOpen);
     overlay.dataset.open = String(shouldOpen);
     overlay.setAttribute('aria-hidden', String(!shouldOpen));
-    document.body.classList.toggle('a11ytb-modal-open', shouldOpen);
+    const body = root?.ownerDocument?.body ?? document.body;
+    if (body) {
+      body.classList.toggle('a11ytb-modal-open', shouldOpen);
+    }
+    if (!shouldOpen && isFullscreenActive) {
+      state.set('ui.fullscreen', false);
+    }
     if (shouldOpen) {
       if (typeof releaseOutsideInert === 'function') {
         releaseOutsideInert();
