@@ -35,6 +35,8 @@ Ajouter ces variables à `.env.local` pour qu'elles soient chargées automatique
 
 ## Commande de démonstration
 
+Exécuter la CLI de démonstration depuis la racine du projet :
+
 ```bash
 npm run demo:vlm -- --engine=llava --image=./capture.png --prompt="Décrire la scène"
 ```
