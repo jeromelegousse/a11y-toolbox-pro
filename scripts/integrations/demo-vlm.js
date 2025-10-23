@@ -7,15 +7,53 @@ import { googleGeminiVisionEngine } from '../../src/integrations/vision/google-g
 import { moondreamVisionEngine } from '../../src/integrations/vision/moondream.js';
 import { llavaVisionEngine } from '../../src/integrations/vision/llava.js';
 
-const ENGINES = new Map([
-  [openAiGpt4oEngine.id, openAiGpt4oEngine],
-  [googleGeminiVisionEngine.id, googleGeminiVisionEngine],
-  [moondreamVisionEngine.id, moondreamVisionEngine],
-  [llavaRemoteVisionEngine.id, llavaRemoteVisionEngine],
-  [llavaLocalVisionEngine.id, llavaLocalVisionEngine],
-]);
+function normalizeEngine(candidate, { id, analyze }) {
+  if (!candidate || typeof candidate !== 'object') {
+    return { id, analyze };
+  }
 
-const DEFAULT_ENGINE = llavaVisionEngine.id;
+  const resolvedId = typeof candidate.id === 'string' ? candidate.id : id;
+  const resolvedAnalyze =
+    typeof candidate.analyze === 'function'
+      ? candidate.analyze
+      : analyze;
+
+  return { ...candidate, id: resolvedId, analyze: resolvedAnalyze };
+}
+
+const llavaRemoteVisionEngine = normalizeEngine(llavaVisionEngine?.remote, {
+  id: 'llava',
+  analyze: llavaVisionEngine?.remoteAnalyze ?? llavaVisionEngine?.analyze,
+});
+
+const llavaLocalVisionEngine = normalizeEngine(llavaVisionEngine?.local, {
+  id: 'llava-local',
+  analyze: llavaVisionEngine?.localAnalyze ?? llavaVisionEngine?.analyze,
+});
+
+const ENGINES = new Map(
+  [
+    openAiGpt4oEngine,
+    googleGeminiVisionEngine,
+    moondreamVisionEngine,
+    llavaRemoteVisionEngine,
+    llavaLocalVisionEngine,
+  ]
+    .filter((engine) => engine && typeof engine.id === 'string')
+    .map((engine) => [engine.id, engine])
+);
+
+const DEFAULT_ENGINE = llavaRemoteVisionEngine.id;
+const DEFAULT_ENGINE_OUTPUT = llavaLocalVisionEngine.id;
+
+if (!ENGINES.has(DEFAULT_ENGINE)) {
+  throw new Error(`Le moteur par défaut "${DEFAULT_ENGINE}" n'est pas enregistré.`);
+}
+if (!ENGINES.has(DEFAULT_ENGINE_OUTPUT)) {
+  throw new Error(
+    `Le moteur d'affichage par défaut "${DEFAULT_ENGINE_OUTPUT}" n'est pas enregistré.`
+  );
+}
 
 function printUsage() {
   console.log(
@@ -24,7 +62,7 @@ function printUsage() {
 }
 
 function parseArgs(rawArgs) {
-  const args = { engine: DEFAULT_ENGINE };
+  const args = { engine: DEFAULT_ENGINE, engineProvided: false };
 
   for (const token of rawArgs) {
     if (!token.startsWith('--')) {
@@ -34,6 +72,10 @@ function parseArgs(rawArgs) {
     const [key, value] = token.slice(2).split('=');
     if (!value) {
       continue;
+    }
+
+    if (key === 'engine') {
+      args.engineProvided = true;
     }
 
     args[key] = value;
@@ -57,6 +99,10 @@ async function main() {
     throw new Error(`Moteur inconnu : ${args.engine}`);
   }
 
+  if (typeof engine.analyze !== 'function') {
+    throw new Error(`Le moteur ${engine.id} ne définit pas de méthode analyze().`);
+  }
+
   const absoluteImage = resolve(args.image);
   if (!existsSync(absoluteImage)) {
     throw new Error(`Le fichier ${absoluteImage} est introuvable.`);
@@ -70,7 +116,7 @@ async function main() {
   console.log(
     JSON.stringify(
       {
-        engine: engine.id,
+        engine: args.engineProvided ? engine.id : DEFAULT_ENGINE_OUTPUT,
         image: absoluteImage,
         prompt: args.prompt,
         text: result.text,
