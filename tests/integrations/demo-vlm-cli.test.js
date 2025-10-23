@@ -109,9 +109,7 @@ describe('demo-vlm CLI', () => {
 
     await import('../../scripts/integrations/demo-vlm.js');
 
-    expect(llavaAnalyzeMock).toHaveBeenCalledWith(
-      expect.objectContaining({ prompt: 'Hello' })
-    );
+    expect(llavaAnalyzeMock).toHaveBeenCalledWith(expect.objectContaining({ prompt: 'Hello' }));
 
     const output = JSON.parse(logs.at(-1));
     expect(output.engine).toBe('llava');
