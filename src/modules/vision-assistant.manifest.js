@@ -27,7 +27,7 @@ export const manifest = {
           "Décris le visuel en soulignant la hiérarchie, les textes affichés et tout élément important pour un rapport d'accessibilité.",
         lastResponse: '',
         status: 'idle',
-        engine: 'llava-local',
+        engine: 'llava',
         error: null,
         lastUrl: '',
       },
@@ -46,7 +46,7 @@ export const manifest = {
           'Sélectionnez le moteur utilisé pour analyser les images envoyées à WordPress.',
         emptyLabel: 'Défini côté serveur',
         options: [
-          { value: 'llava-local', label: 'LLaVA local (GPU serveur)' },
+          { value: 'llava', label: 'LLaVA local (serveur HTTP)' },
           { value: 'openai-gpt4o', label: 'OpenAI GPT-4o' },
           { value: 'google-gemini', label: 'Google Gemini Pro Vision' },
           { value: 'moondream', label: 'Moondream (CPU local)' },

@@ -7,7 +7,7 @@ const DEFAULT_STATE = manifest?.defaults?.state?.visionAssistant || {
   prompt: '',
   lastResponse: '',
   status: 'idle',
-  engine: 'llava-local',
+  engine: 'llava',
   error: null,
   lastUrl: '',
 };
@@ -41,7 +41,7 @@ function getDefaultPrompt() {
 }
 
 function getDefaultEngine() {
-  return DEFAULT_STATE.engine || 'llava-local';
+  return DEFAULT_STATE.engine || 'llava';
 }
 
 function ensureStateDefaults(state) {

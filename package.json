@@ -19,7 +19,7 @@
     "test": "npm run lint && npm run test:unit && npm run test:visual",
     "demo:stt": "node scripts/integrations/demo-stt.js",
     "demo:vlm": "node scripts/integrations/demo-vlm.js",
-    "demo:vlm:llava": "node scripts/integrations/demo-vlm.js --engine=llava-local",
+    "demo:vlm:llava": "node scripts/integrations/demo-vlm.js --engine=llava",
     "sync:axe": "node scripts/sync-axe-core.mjs"
   },
   "devDependencies": {
