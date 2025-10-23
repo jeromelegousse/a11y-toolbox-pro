@@ -153,7 +153,13 @@ describe('llavaVisionEngine', () => {
       callback(null, JSON.stringify({ text: 'Réponse LLaVA', engine: 'llava-local' }), '');
     });
 
-    const { llavaVisionEngine } = await import('../../src/integrations/vision/llava-local.js');
+    loadImageAsBase64Mock.mockResolvedValue({
+      data: 'AAA=',
+      mimeType: 'image/png',
+      absolutePath: '/tmp/image.png',
+    });
+
+    const { llavaVisionEngine } = await import('../../src/integrations/vision/llava.js');
     const result = await llavaVisionEngine.analyze({
       imagePath: './image.png',
       prompt: 'Décrire',
@@ -169,7 +175,13 @@ describe('llavaVisionEngine', () => {
       callback(null, JSON.stringify({ engine: 'llava-local' }), '');
     });
 
-    const { llavaVisionEngine } = await import('../../src/integrations/vision/llava-local.js');
+    loadImageAsBase64Mock.mockResolvedValue({
+      data: 'AAA=',
+      mimeType: 'image/png',
+      absolutePath: '/tmp/image.png',
+    });
+
+    const { llavaVisionEngine } = await import('../../src/integrations/vision/llava.js');
 
     await expect(
       llavaVisionEngine.analyze({ imagePath: './image.png', prompt: 'Décrire' })

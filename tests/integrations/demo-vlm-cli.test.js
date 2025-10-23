@@ -31,7 +31,7 @@ vi.mock('../../src/integrations/vision/moondream.js', () => ({
   },
 }));
 
-vi.mock('../../src/integrations/vision/llava-local.js', () => ({
+vi.mock('../../src/integrations/vision/llava.js', () => ({
   llavaVisionEngine: {
     id: 'llava-local',
     analyze: llavaAnalyzeMock,

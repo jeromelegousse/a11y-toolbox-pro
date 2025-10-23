@@ -1,11 +1,13 @@
-import { spawn } from 'node:child_process';
-import { resolve } from 'node:path';
+import { execFile } from 'node:child_process';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { loadImageAsBase64 } from './utils.js';
 
-const DEFAULT_SCRIPT_PATH = fileURLToPath(
-  new URL('../../../scripts/integrations/llava_local.py', import.meta.url)
+const PYTHON_EXECUTABLE = process.env.A11Y_TOOLBOX_VLM_PYTHON || 'python3';
+const DEFAULT_SCRIPT_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../../scripts/integrations/llava_local.py'
 );
 
 function ensurePrompt(prompt) {
@@ -15,105 +17,75 @@ function ensurePrompt(prompt) {
   return prompt;
 }
 
-function resolveScriptPath() {
-  const scriptPath = process.env.LLAVA_SCRIPT_PATH ?? DEFAULT_SCRIPT_PATH;
-  return resolve(scriptPath);
+function ensureScriptPath() {
+  const scriptPath = process.env.LLAVA_SCRIPT_PATH?.trim() || DEFAULT_SCRIPT_PATH;
+  return scriptPath;
 }
 
-function runPythonScript(scriptPath, args = [], { input } = {}) {
-  return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn('python3', [scriptPath, ...args], {
-      env: process.env,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
-
-    child.stdout.on('data', (chunk) => {
-      stdout += chunk;
-    });
-
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk;
-    });
-
-    child.on('error', (error) => {
-      rejectPromise(error);
-    });
-
-    child.on('close', (code) => {
-      if (code !== 0) {
-        const error = new Error(
-          `Le script LLaVA a échoué avec le code ${code}: ${stderr || stdout}`
-        );
-        error.code = code;
-        rejectPromise(error);
-        return;
+async function runLlavaScript({ scriptPath, imagePath, prompt, env }) {
+  return new Promise((resolve, reject) => {
+    const child = execFile(
+      PYTHON_EXECUTABLE,
+      [scriptPath, '--image', imagePath, '--prompt', prompt],
+      {
+        env,
+        maxBuffer: 10 * 1024 * 1024,
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          const message = stderr?.toString()?.trim() || error.message;
+          reject(new Error(`Échec de l'exécution du script LLaVA : ${message}`));
+          return;
+        }
+        resolve(stdout);
       }
+    );
 
-      resolvePromise({ stdout, stderr });
+    child.on('error', (spawnError) => {
+      reject(new Error(`Impossible de lancer le script LLaVA : ${spawnError.message}`));
     });
-
-    if (input) {
-      child.stdin.write(input);
-    }
-    child.stdin.end();
   });
+}
+
+function parsePayload(output) {
+  let payload;
+  try {
+    payload = JSON.parse(output);
+  } catch (error) {
+    throw new Error("La sortie du script LLaVA n'est pas un JSON valide.");
+  }
+
+  const text = typeof payload.text === 'string' ? payload.text.trim() : '';
+
+  if (!text) {
+    throw new Error('La réponse LLaVA ne contient pas de texte.');
+  }
+
+  return {
+    text,
+    raw: payload.raw ?? payload,
+  };
 }
 
 export const llavaVisionEngine = {
   id: 'llava-local',
   async analyze({ imagePath, prompt } = {}) {
     const preparedPrompt = ensurePrompt(prompt);
-    const { data, mimeType, absolutePath, filename, size } = await loadImageAsBase64(
-      imagePath
-    );
-    const scriptPath = resolveScriptPath();
+    const scriptPath = ensureScriptPath();
+    const imageData = await loadImageAsBase64(imagePath);
 
-    const payload = JSON.stringify({
+    const stdout = await runLlavaScript({
+      scriptPath,
+      imagePath: imageData.absolutePath,
       prompt: preparedPrompt,
-      image: {
-        path: absolutePath,
-        filename,
-        size,
-        data,
-        mimeType,
+      env: {
+        ...process.env,
+        LLAVA_IMAGE_BASE64: imageData.data,
+        LLAVA_IMAGE_MIME_TYPE: imageData.mimeType,
       },
     });
 
-    const { stdout } = await runPythonScript(
-      scriptPath,
-      [absolutePath, preparedPrompt],
-      { input: payload }
-    );
-
-    const trimmedOutput = stdout.trim();
-
-    if (!trimmedOutput) {
-      throw new Error('Le script LLaVA n\'a produit aucune sortie.');
-    }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(trimmedOutput);
-    } catch (error) {
-      throw new Error(`Réponse LLaVA invalide : ${error.message}`);
-    }
-
-    const text = parsed?.text?.trim?.();
-
-    if (!text) {
-      throw new Error('La réponse LLaVA ne contient pas de texte.');
-    }
-
-    return {
-      text,
-      raw: parsed,
-    };
+    return parsePayload(stdout);
   },
 };
 
