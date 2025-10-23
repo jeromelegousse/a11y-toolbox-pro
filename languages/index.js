@@ -10,6 +10,21 @@ const TRANSLATIONS = {
       title: 'A11y Toolbox Pro',
       openFab: 'Ouvrir la boîte à outils d’accessibilité',
     },
+    sidebar: {
+      ariaLabel: 'Navigation de la boîte à outils',
+      modules: 'Modules & filtres',
+      audit: 'Audit temps réel',
+      options: 'Profils & options',
+      guides: 'Guides & aides',
+      dock: 'Position du panneau',
+      fullscreenEnter: 'Activer le plein écran',
+      fullscreenExit: 'Quitter le plein écran',
+      filterCount: {
+        zero: 'Aucun filtre actif',
+        one: '1 filtre actif',
+        other: '{count} filtres actifs',
+      },
+    },
     toolbar: {
       ariaLabel: 'Actions d’interface',
       dockLeft: 'Dock gauche',
@@ -100,6 +115,21 @@ const TRANSLATIONS = {
     panel: {
       title: 'A11y Toolbox Pro',
       openFab: 'Open the accessibility toolbox',
+    },
+    sidebar: {
+      ariaLabel: 'Toolbox navigation',
+      modules: 'Modules & filters',
+      audit: 'Real-time audit',
+      options: 'Profiles & options',
+      guides: 'Guides & help',
+      dock: 'Panel position',
+      fullscreenEnter: 'Enter fullscreen',
+      fullscreenExit: 'Exit fullscreen',
+      filterCount: {
+        zero: 'No active filters',
+        one: '1 active filter',
+        other: '{count} active filters',
+      },
     },
     toolbar: {
       ariaLabel: 'Interface actions',
