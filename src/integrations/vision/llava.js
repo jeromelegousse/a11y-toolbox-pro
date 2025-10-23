@@ -1,12 +1,9 @@
-import { spawn } from 'node:child_process';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
+import { fetchWithRetry, parseJson } from '../http-client.js';
+import { requireEnv } from '../../../scripts/integrations/env.js';
 import { loadImageAsBase64 } from './utils.js';
 
-const DEFAULT_SCRIPT_PATH = fileURLToPath(
-  new URL('../../../scripts/integrations/llava_local.py', import.meta.url)
-);
+const HUGGING_FACE_LLaVA_ENDPOINT =
+  'https://api-inference.huggingface.co/models/liuhaotian/llava-phi-3-mini-hf';
 
 function ensurePrompt(prompt) {
   if (!prompt) {
@@ -15,96 +12,46 @@ function ensurePrompt(prompt) {
   return prompt;
 }
 
-function resolveScriptPath() {
-  const scriptPath = process.env.LLAVA_SCRIPT_PATH ?? DEFAULT_SCRIPT_PATH;
-  return resolve(scriptPath);
-}
+function pickGeneratedText(payload) {
+  if (!Array.isArray(payload)) {
+    return undefined;
+  }
 
-function runPythonScript(scriptPath, args = [], { input } = {}) {
-  return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn('python3', [scriptPath, ...args], {
-      env: process.env,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
-
-    child.stdout.on('data', (chunk) => {
-      stdout += chunk;
-    });
-
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk;
-    });
-
-    child.on('error', (error) => {
-      rejectPromise(error);
-    });
-
-    child.on('close', (code) => {
-      if (code !== 0) {
-        const error = new Error(
-          `Le script LLaVA a échoué avec le code ${code}: ${stderr || stdout}`
-        );
-        error.code = code;
-        rejectPromise(error);
-        return;
-      }
-
-      resolvePromise({ stdout, stderr });
-    });
-
-    if (input) {
-      child.stdin.write(input);
-    }
-    child.stdin.end();
-  });
+  return payload[0]?.generated_text;
 }
 
 export const llavaVisionEngine = {
-  id: 'llava-local',
+  id: 'llava',
   async analyze({ imagePath, prompt } = {}) {
     const preparedPrompt = ensurePrompt(prompt);
-    const { data, mimeType, absolutePath, filename, size } = await loadImageAsBase64(
-      imagePath
-    );
-    const scriptPath = resolveScriptPath();
+    const { data } = await loadImageAsBase64(imagePath);
+    const apiKey = requireEnv('HUGGINGFACE_API_TOKEN');
 
-    const payload = JSON.stringify({
-      prompt: preparedPrompt,
-      image: {
-        path: absolutePath,
-        filename,
-        size,
-        data,
-        mimeType,
+    const response = await fetchWithRetry(
+      HUGGING_FACE_LLaVA_ENDPOINT,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          inputs: {
+            image: data,
+            question: preparedPrompt,
+          },
+        }),
+        timeout: 30000,
       },
-    });
-
-    const { stdout } = await runPythonScript(
-      scriptPath,
-      [absolutePath, preparedPrompt],
-      { input: payload }
+      {
+        retries: 1,
+        retryDelayMs: 1000,
+      }
     );
 
-    const trimmedOutput = stdout.trim();
-
-    if (!trimmedOutput) {
-      throw new Error('Le script LLaVA n\'a produit aucune sortie.');
-    }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(trimmedOutput);
-    } catch (error) {
-      throw new Error(`Réponse LLaVA invalide : ${error.message}`);
-    }
-
-    const text = parsed?.text?.trim?.();
+    const payload = await parseJson(response);
+    const text = pickGeneratedText(payload)?.trim();
 
     if (!text) {
       throw new Error('La réponse LLaVA ne contient pas de texte.');
@@ -112,7 +59,7 @@ export const llavaVisionEngine = {
 
     return {
       text,
-      raw: parsed,
+      raw: payload,
     };
   },
 };

@@ -5,18 +5,20 @@ import { loadEnvironment } from './env.js';
 import { openAiGpt4oEngine } from '../../src/integrations/vision/openai-gpt4o.js';
 import { googleGeminiVisionEngine } from '../../src/integrations/vision/google-gemini.js';
 import { moondreamVisionEngine } from '../../src/integrations/vision/moondream.js';
-import { llavaVisionEngine } from '../../src/integrations/vision/llava-local.js';
+import { llavaVisionEngine as llavaRemoteVisionEngine } from '../../src/integrations/vision/llava.js';
+import { llavaVisionEngine as llavaLocalVisionEngine } from '../../src/integrations/vision/llava-local.js';
 
 const ENGINES = new Map([
   [openAiGpt4oEngine.id, openAiGpt4oEngine],
   [googleGeminiVisionEngine.id, googleGeminiVisionEngine],
   [moondreamVisionEngine.id, moondreamVisionEngine],
-  [llavaVisionEngine.id, llavaVisionEngine],
+  [llavaRemoteVisionEngine.id, llavaRemoteVisionEngine],
+  [llavaLocalVisionEngine.id, llavaLocalVisionEngine],
 ]);
 
 function printUsage() {
   console.log(
-    'Usage : npm run demo:vlm -- --image=./capture.png --prompt="Décrire la scène" [--engine=openai-gpt4o|google-gemini|moondream|llava-local]'
+    'Usage : npm run demo:vlm -- --image=./capture.png --prompt="Décrire la scène" [--engine=openai-gpt4o|google-gemini|moondream|llava|llava-local]'
   );
 }
 
