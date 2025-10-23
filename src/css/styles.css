@@ -695,6 +695,30 @@ body.a11ytb-tts-overlay-open {
   background-color: var(--a11ytb-color-text);
 }
 
+.a11ytb-engine-select {
+  appearance: none;
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid color-mix(in srgb, var(--a11ytb-border) 70%, transparent);
+  border-radius: var(--a11ytb-radius-sm);
+  background: var(--a11ytb-surface);
+  color: var(--a11ytb-fg);
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.a11ytb-engine-select:focus-visible {
+  outline: var(--a11ytb-focus-ring-tight);
+  outline-offset: 2px;
+}
+
+.a11ytb-engine-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .a11ytb-button.is-recording {
   border-color: color-mix(in srgb, var(--a11ytb-accent-strong) 55%, transparent);
   color: var(--a11ytb-accent-strong);
