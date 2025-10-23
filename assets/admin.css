@@ -103,7 +103,7 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
 .a11ytb-admin-app-grid {
   display: grid;
   gap: 24px;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 320px);
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px) minmax(240px, 300px);
 }
 
 .a11ytb-admin-app-main {
