@@ -92,7 +92,41 @@ if (!function_exists('add_action')) {
 if (!function_exists('add_filter')) {
     function add_filter($hook, $callback, $priority = 10, $accepted_args = 1)
     {
-        // no-op for tests
+        $hook = (string) $hook;
+        if (!isset($GLOBALS['__a11ytb_filters'][$hook])) {
+            $GLOBALS['__a11ytb_filters'][$hook] = [];
+        }
+
+        $GLOBALS['__a11ytb_filters'][$hook][] = [
+            'callback' => $callback,
+            'priority' => (int) $priority,
+            'accepted_args' => max(1, (int) $accepted_args),
+        ];
+
+        usort($GLOBALS['__a11ytb_filters'][$hook], static function ($left, $right) {
+            return $left['priority'] <=> $right['priority'];
+        });
+    }
+}
+
+if (!function_exists('remove_filter')) {
+    function remove_filter($hook, $callback, $priority = 10)
+    {
+        $hook = (string) $hook;
+        if (empty($GLOBALS['__a11ytb_filters'][$hook])) {
+            return;
+        }
+
+        $GLOBALS['__a11ytb_filters'][$hook] = array_values(array_filter(
+            $GLOBALS['__a11ytb_filters'][$hook],
+            static function ($entry) use ($callback, $priority) {
+                return !($entry['callback'] === $callback && $entry['priority'] === (int) $priority);
+            }
+        ));
+
+        if (!$GLOBALS['__a11ytb_filters'][$hook]) {
+            unset($GLOBALS['__a11ytb_filters'][$hook]);
+        }
     }
 }
 
@@ -123,9 +157,20 @@ if (!function_exists('do_action')) {
 }
 
 if (!function_exists('apply_filters')) {
-    function apply_filters($hook, $value)
+    function apply_filters($hook, $value, ...$args)
     {
-        return $value;
+        $hook = (string) $hook;
+        if (empty($GLOBALS['__a11ytb_filters'][$hook])) {
+            return $value;
+        }
+
+        $filtered = $value;
+        foreach ($GLOBALS['__a11ytb_filters'][$hook] as $entry) {
+            $params = array_slice([$filtered, ...$args], 0, $entry['accepted_args']);
+            $filtered = call_user_func_array($entry['callback'], $params);
+        }
+
+        return $filtered;
     }
 }
 
@@ -631,6 +676,7 @@ function a11ytb_test_reset_state(): void
     $GLOBALS['__a11ytb_shortcodes'] = [];
     $GLOBALS['__a11ytb_current_user'] = 0;
     $GLOBALS['__a11ytb_capabilities'] = [];
+    $GLOBALS['__a11ytb_filters'] = [];
 }
 
 function a11ytb_test_grant_capabilities($caps): void

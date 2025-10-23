@@ -36,6 +36,15 @@ if (empty($vision['endpoint']) || empty($vision['nonce'])) {
     throw new RuntimeException('Endpoint ou nonce REST manquant pour la vision.');
 }
 
+$engines = $vision['engines'] ?? null;
+if (!is_array($engines) || $engines !== ['llava-local', 'llava']) {
+    throw new RuntimeException('La liste des moteurs disponibles est inattendue.');
+}
+
+if (($vision['defaultEngine'] ?? '') !== 'llava-local') {
+    throw new RuntimeException('Le moteur par défaut devrait être llava-local.');
+}
+
 $missingPrompt = a11ytb_rest_analyze_image([
     'imageTmpFile' => __FILE__,
 ]);
@@ -52,9 +61,53 @@ if (!is_wp_error($missingImage) || $missingImage->get_error_message() === '') {
     throw new RuntimeException('Une image absente devrait retourner une erreur explicite.');
 }
 
+$capturedPayload = null;
+$visionFilter = static function ($pre, $payload) use (&$capturedPayload) {
+    $capturedPayload = $payload;
+
+    return [
+        'text' => 'Analyse fictive',
+        'raw' => $payload,
+    ];
+};
+
+add_filter('a11ytb/vision_engine_execute', $visionFilter, 10, 2);
+
+$success = a11ytb_rest_analyze_image([
+    'prompt' => 'Décrire la scène',
+    'imageTmpFile' => __FILE__,
+    'engine' => 'llava',
+]);
+
+if (is_wp_error($success)) {
+    throw new RuntimeException('Le moteur simulé ne devrait pas échouer : ' . $success->get_error_message());
+}
+
+if (($capturedPayload['engine'] ?? null) !== 'llava') {
+    throw new RuntimeException('Le moteur demandé doit être transmis au filtre.');
+}
+
+$capturedPayload = null;
+$defaulted = a11ytb_rest_analyze_image([
+    'prompt' => 'Décrire la scène',
+    'imageTmpFile' => __FILE__,
+    'engine' => 'inconnu',
+]);
+
+if (is_wp_error($defaulted)) {
+    throw new RuntimeException('Le moteur devrait être remplacé par défaut en cas d’erreur.');
+}
+
+if (($capturedPayload['engine'] ?? null) !== 'llava-local') {
+    throw new RuntimeException('Le moteur non autorisé doit basculer sur la valeur par défaut.');
+}
+
+remove_filter('a11ytb/vision_engine_execute', $visionFilter, 10);
+
 $execution = a11ytb_rest_analyze_image([
     'prompt' => 'Décrire la scène',
     'imageTmpFile' => __FILE__,
+    'engine' => 'llava-local',
 ]);
 
 if (!is_wp_error($execution)) {
