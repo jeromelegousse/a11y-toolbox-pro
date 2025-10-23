@@ -17,9 +17,11 @@ function createAvailabilityButton(bucket, activeBucket, handler) {
   button.dataset.tone = bucket.tone || 'info';
   button.disabled = bucket.id !== 'all' && bucket.count === 0;
   button.textContent = `${bucket.label} (${bucket.count})`;
-  if (bucket.id === activeBucket) {
+  const isActive = bucket.id === activeBucket;
+  if (isActive) {
     button.classList.add('is-active');
   }
+  button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
   button.addEventListener('click', () => {
     handler(bucket.id);
   });
@@ -150,6 +152,13 @@ export function createModuleAvailabilityPanel(layout, handlers = {}) {
       buckets.forEach((bucket) => {
         const button = createAvailabilityButton(bucket, state.activeBucket, (bucketId) => {
           state.activeBucket = bucketId;
+          layout.toolbar
+            .querySelectorAll('.a11ytb-admin-availability-toggle')
+            .forEach((toolbarButton) => {
+              const isActive = toolbarButton.dataset.bucket === state.activeBucket;
+              toolbarButton.classList.toggle('is-active', isActive);
+              toolbarButton.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            });
           handlers.onAvailabilityChange?.(bucketId);
         });
         layout.toolbar.append(button);

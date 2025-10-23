@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { loadEnvironment } from './env.js';
 import { openAiGpt4oEngine } from '../../src/integrations/vision/openai-gpt4o.js';
 import { googleGeminiVisionEngine } from '../../src/integrations/vision/google-gemini.js';
@@ -14,15 +12,15 @@ const ENGINES = new Map([
   [openAiGpt4oEngine.id, openAiGpt4oEngine],
   [googleGeminiVisionEngine.id, googleGeminiVisionEngine],
   [moondreamVisionEngine.id, moondreamVisionEngine],
-  [llavaRemoteVisionEngine.id, llavaRemoteVisionEngine],
-  [llavaLocalVisionEngine.id, llavaLocalVisionEngine],
+  [llavaVisionEngine.id, llavaVisionEngine],
+  ['llava-local', llavaVisionEngine],
 ]);
 
 const DEFAULT_ENGINE = llavaRemoteVisionEngine.id;
 
 function printUsage() {
   console.log(
-    'Usage : npm run demo:vlm -- --image=./capture.png --prompt="Décrire la scène" [--engine=openai-gpt4o|google-gemini|moondream|llava|llava-local]'
+    'Usage : npm run demo:vlm -- --image=./capture.png|https://exemple.tld/image.png --prompt="Décrire la scène" [--engine=openai-gpt4o|google-gemini|moondream|llava|llava-local]'
   );
 }
 
@@ -60,13 +58,10 @@ async function main() {
     throw new Error(`Moteur inconnu : ${args.engine}`);
   }
 
-  const absoluteImage = resolve(args.image);
-  if (!existsSync(absoluteImage)) {
-    throw new Error(`Le fichier ${absoluteImage} est introuvable.`);
-  }
+  const image = await ensureLocalImage(args.image);
 
   const result = await engine.analyze({
-    imagePath: absoluteImage,
+    imagePath: image.absolutePath,
     prompt: args.prompt,
   });
 
@@ -74,7 +69,8 @@ async function main() {
     JSON.stringify(
       {
         engine: engine.id,
-        image: absoluteImage,
+        image: image.originalPath,
+        cachedImagePath: image.absolutePath,
         prompt: args.prompt,
         text: result.text,
       },
