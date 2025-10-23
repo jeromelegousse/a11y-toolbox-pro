@@ -4,12 +4,12 @@ L'intégration `llava-local` s'appuie sur un script Python pour exécuter un mod
 
 ## Prérequis
 
-| Composant | Détails |
-| --- | --- |
-| **Python** | Version 3.10 ou supérieure avec `pip`. Un environnement virtuel est recommandé (`python -m venv .venv && source .venv/bin/activate`). |
-| **Dépendances** | Installer PyTorch avant `transformers` :<br>`pip install --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121`<br>`pip install transformers accelerate safetensors pillow` |
-| **Modèle recommandé** | `liuhaotian/llava-v1.5-7b-hf` pour l'équilibre précision ↔ performance. Télécharger en amont via `huggingface-cli download`. |
-| **Variables d'environnement** | `LLAVA_SCRIPT_PATH` et `LLAVA_MODEL_NAME` doivent être définies (voir section dédiée). |
+| Composant                     | Détails                                                                                                                                                                                                         |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Python**                    | Version 3.10 ou supérieure avec `pip`. Un environnement virtuel est recommandé (`python -m venv .venv && source .venv/bin/activate`).                                                                           |
+| **Dépendances**               | Installer PyTorch avant `transformers` :<br>`pip install --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121`<br>`pip install transformers accelerate safetensors pillow` |
+| **Modèle recommandé**         | `liuhaotian/llava-v1.5-7b-hf` pour l'équilibre précision ↔ performance. Télécharger en amont via `huggingface-cli download`.                                                                                   |
+| **Variables d'environnement** | `LLAVA_SCRIPT_PATH` et `LLAVA_MODEL_NAME` doivent être définies (voir section dédiée).                                                                                                                          |
 
 ## Commande de démonstration
 
@@ -32,10 +32,10 @@ La CLI charge automatiquement `LLAVA_SCRIPT_PATH`. Par défaut, le script consom
 
 ## Variables d'environnement
 
-| Variable | Description | Exemple |
-| --- | --- | --- |
+| Variable            | Description                                                  | Exemple                                  |
+| ------------------- | ------------------------------------------------------------ | ---------------------------------------- |
 | `LLAVA_SCRIPT_PATH` | Chemin absolu vers le script Python déclenchant l'inférence. | `/home/user/a11y/scripts/llava_infer.py` |
-| `LLAVA_MODEL_NAME` | Nom du modèle Hugging Face chargé par le script. | `liuhaotian/llava-v1.5-7b-hf` |
+| `LLAVA_MODEL_NAME`  | Nom du modèle Hugging Face chargé par le script.             | `liuhaotian/llava-v1.5-7b-hf`            |
 
 > Astuce : ajouter ces variables dans `.env.local` afin que `loadEnvironment()` les charge automatiquement pour les scripts Node.
 
@@ -49,11 +49,11 @@ La CLI charge automatiquement `LLAVA_SCRIPT_PATH`. Par défaut, le script consom
 
 Le module « Assistant visuel » expose les options suivantes dans le panneau global afin de guider les équipes produit et support :
 
-| Option (clé de config) | Type | Utilisation côté produit/support |
-| --- | --- | --- |
-| `vision.assistant.engine` | Liste déroulante | Choisir le moteur actif (`llava-local`, `openai-gpt4o`, `google-gemini`, `moondream`). |
-| `vision.assistant.localFallback` | Toggle | Forcer la préférence pour les scripts locaux (`llava-local`) lorsque les clés API distantes sont absentes ou indisponibles. |
-| `vision.assistant.promptTemplate` | Texte multi-ligne | Personnaliser l'instruction envoyée au modèle (ajout de consignes d'accessibilité, tonalité, etc.). |
-| `vision.assistant.shareToClipboard` | Toggle | Copier automatiquement la réponse générée dans le presse-papiers pour accélérer l'assistance aux utilisateurs. |
+| Option (clé de config)              | Type              | Utilisation côté produit/support                                                                                            |
+| ----------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `vision.assistant.engine`           | Liste déroulante  | Choisir le moteur actif (`llava-local`, `openai-gpt4o`, `google-gemini`, `moondream`).                                      |
+| `vision.assistant.localFallback`    | Toggle            | Forcer la préférence pour les scripts locaux (`llava-local`) lorsque les clés API distantes sont absentes ou indisponibles. |
+| `vision.assistant.promptTemplate`   | Texte multi-ligne | Personnaliser l'instruction envoyée au modèle (ajout de consignes d'accessibilité, tonalité, etc.).                         |
+| `vision.assistant.shareToClipboard` | Toggle            | Copier automatiquement la réponse générée dans le presse-papiers pour accélérer l'assistance aux utilisateurs.              |
 
 Chaque changement déclenche `window.a11ytb?.logActivity?.(...)` : les équipes support peuvent ainsi auditer les réglages utilisés au cours d'une session.
