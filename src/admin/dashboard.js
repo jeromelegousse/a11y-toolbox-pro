@@ -21,6 +21,7 @@ import {
   ensureArray,
   formatDateRelative,
   getGeminiConfig,
+  getLlavaConfig,
   updateFilterOptions,
 } from './utils.js';
 
@@ -65,6 +66,22 @@ export function initAdminDashboard(mount) {
     } else {
       layout.geminiStatus.textContent =
         'Aucune clé Gemini enregistrée. Les intégrations IA restent désactivées.';
+    }
+  }
+
+  const llavaConfig = getLlavaConfig();
+  if (layout.llavaStatus) {
+    layout.llavaStatus.hidden = false;
+    if (llavaConfig?.isReady) {
+      const endpointLabel = llavaConfig.endpoint ? `endpoint ${llavaConfig.endpoint}` : 'endpoint actif';
+      const secretLabel = llavaConfig.maskedToken ? llavaConfig.maskedToken : 'secret masqué';
+      layout.llavaStatus.textContent = `LLaVA prêt (${endpointLabel} • ${secretLabel}).`;
+    } else {
+      let message = 'LLaVA non configuré. Renseignez un endpoint et un secret chiffré dans les réglages.';
+      if (llavaConfig?.tokenError) {
+        message += ' Le secret stocké est illisible : regénérez-le puis réenregistrez le formulaire.';
+      }
+      layout.llavaStatus.textContent = message;
     }
   }
 

@@ -76,6 +76,11 @@ export function createAdminLayout(runtimePanel) {
   geminiStatus.hidden = true;
   dashboardHeader.append(geminiStatus);
 
+  const llavaStatus = document.createElement('p');
+  llavaStatus.className = 'a11ytb-admin-llava';
+  llavaStatus.hidden = true;
+  dashboardHeader.append(llavaStatus);
+
   const statusGrid = document.createElement('div');
   statusGrid.className = 'a11ytb-admin-status-grid';
 
@@ -548,6 +553,7 @@ export function createAdminLayout(runtimePanel) {
     emptyState,
     connectionStatus,
     geminiStatus,
+    llavaStatus,
     syncList,
     syncEmpty,
     syncStatus,

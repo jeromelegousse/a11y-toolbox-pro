@@ -19,6 +19,8 @@ $option_keys = [
     'a11ytb_activity_linear_api_key',
     'a11ytb_activity_linear_team_id',
     'a11ytb_activity_slack_webhook_url',
+    'a11ytb_llava_endpoint',
+    'a11ytb_llava_token',
     'a11ytb_activity_sync_errors',
     'a11ytb_activity_sync_last_run',
 ];

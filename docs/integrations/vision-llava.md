@@ -38,6 +38,12 @@ La CLI charge automatiquement `LLAVA_SCRIPT_PATH`. Par défaut, le script consom
 
 > Astuce : ajouter ces variables dans `.env.local` afin que `loadEnvironment()` les charge automatiquement pour les scripts Node.
 
+## Configuration WordPress
+
+- Dans l'onglet **Intégrations vocales & IA** du plugin WordPress, renseignez l'**endpoint LLaVA** (URL HTTPS vers votre proxy ou passerelle).
+- Saisissez ensuite le **secret LLaVA** généré côté serveur. La valeur est chiffrée via les salts WordPress avant stockage puis masquée dans l'interface.
+- Le tableau de bord indique si le duo endpoint/secret est prêt ou s'il manque une information (ou si le secret doit être régénéré).
+
 ## Options du module front
 
 Le module « Assistant visuel » exposera les options suivantes dans le panneau global pour faciliter le support produit :
