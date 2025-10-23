@@ -522,11 +522,7 @@ function a11ytb_enqueue_frontend_assets(): void
     wp_enqueue_script('a11ytb/app');
 
     $config = a11ytb_get_frontend_config();
-    wp_add_inline_script(
-        'a11ytb/app',
-        'window.a11ytbPluginConfig = ' . wp_json_encode($config) . ';',
-        'before'
-    );
+    wp_localize_script('a11ytb/app', 'a11ytbPluginConfig', $config);
 
 }
 add_action('wp_enqueue_scripts', 'a11ytb_enqueue_frontend_assets');
