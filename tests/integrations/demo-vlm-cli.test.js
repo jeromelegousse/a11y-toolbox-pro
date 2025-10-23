@@ -32,8 +32,16 @@ vi.mock('../../src/integrations/vision/moondream.js', () => ({
 }));
 
 vi.mock('../../src/integrations/vision/llava-local.js', () => ({
+  llavaLocalEngine: {
+    id: 'llava',
+    analyze: llavaAnalyzeMock,
+  },
   llavaVisionEngine: {
-    id: 'llava-local',
+    id: 'llava',
+    analyze: llavaAnalyzeMock,
+  },
+  default: {
+    id: 'llava',
     analyze: llavaAnalyzeMock,
   },
 }));
@@ -101,7 +109,7 @@ describe('demo-vlm CLI', () => {
       'demo-vlm.js',
       `--image=${tempImagePath}`,
       '--prompt=Hello',
-      '--engine=llava-local',
+      '--engine=llava',
     ];
 
     await import('../../scripts/integrations/demo-vlm.js');
@@ -111,7 +119,7 @@ describe('demo-vlm CLI', () => {
     );
 
     const output = JSON.parse(logs.at(-1));
-    expect(output.engine).toBe('llava-local');
+    expect(output.engine).toBe('llava');
     expect(output.text).toBe('Réponse locale');
   });
 });

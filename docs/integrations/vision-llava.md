@@ -1,50 +1,48 @@
 # Intégration LLaVA locale (vision)
 
-L'intégration `llava-local` s'appuie sur un script Python pour exécuter un modèle LLaVA via la bibliothèque `transformers`. Le bridge Node charge le script (déclaré via `LLAVA_SCRIPT_PATH`) et lui transmet l'image ainsi que le prompt texte afin de récupérer une description de scène exploitable dans les modules front.
+Le moteur `llava` délègue l'inférence à un serveur HTTP local exposant un point d'entrée compatible LLaVA. L'image est encodée en base64 via `loadImageAsBase64`, puis envoyée au service local aux côtés du prompt utilisateur. Le serveur doit renvoyer un JSON contenant un champ `text`.
 
 ## Prérequis
 
-- Python 3.10+ avec `pip`
+- Python 3.10+
 - Environnement virtuel recommandé (`python -m venv .venv` puis `source .venv/bin/activate`)
-- Installation des dépendances :
+- Installation des dépendances minimales pour lancer le serveur :
   ```bash
-  pip install --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-  pip install transformers accelerate safetensors pillow
+  pip install transformers accelerate
   ```
-- Accès au modèle Hugging Face `liuhaotian/llava-v1.5-7b-hf` (recommandé pour l'équilibre précision/performance)
-- Variables d'environnement `LLAVA_SCRIPT_PATH` et `LLAVA_MODEL_NAME` renseignées (voir plus bas)
+- Modèle LLaVA téléchargé localement (ex. `liuhaotian/llava-v1.5-7b-hf` via `git lfs` ou `huggingface-cli download`)
+
+## Lancement du serveur
+
+1. Cloner le dépôt [liuhaotian/llava](https://github.com/haotian-liu/LLaVA) ou un fork compatible.
+2. Charger les poids désirés, puis démarrer l'API REST (exemple) :
+   ```bash
+   python -m llava.serve.controller --host 0.0.0.0 --port 11435 &
+   python -m llava.serve.openai_api_server \
+     --controller http://127.0.0.1:11435 \
+     --model-path liuhaotian/llava-v1.5-7b-hf \
+     --port 8081 \
+     --api-key token-test
+   ```
+3. L'API OpenAI-compatible exposée ci-dessus accepte un JSON `{ "prompt": "…", "image": "…" }` et renvoie `{ "text": "…" }`.
+
+## Variables d'environnement
+
+- `LLAVA_SERVER_URL` : URL complète du serveur HTTP (ex. `http://127.0.0.1:8081/v1/vision`).
+- `LLAVA_AUTH_TOKEN` (optionnelle) : jeton transmis dans l'en-tête `Authorization: Bearer <token>`.
+
+Ajouter ces variables à `.env.local` pour qu'elles soient chargées automatiquement par `loadEnvironment()`.
 
 ## Commande de démonstration
 
 ```bash
-npm run demo:vlm -- --engine=llava-local --image=./capture.png --prompt="Décrire la scène"
+npm run demo:vlm -- --engine=llava --image=./capture.png --prompt="Décrire la scène"
 ```
 
-La CLI charge automatiquement `LLAVA_SCRIPT_PATH`. Par défaut, le script consomme `LLAVA_MODEL_NAME` pour choisir le modèle (ex. `liuhaotian/llava-v1.5-7b-hf`). Les sorties sont normalisées pour renvoyer un champ `text` cohérent avec les autres moteurs (`openai-gpt4o`, `google-gemini`, `moondream`).
+La sortie inclut l'identifiant du moteur, le prompt, le chemin de l'image et la réponse textuelle renvoyée par le serveur local.
 
 ## Limitations actuelles
 
-- **Poids du modèle** : la version 7B pèse ~13 Go en 16 bits. Prévoir ~26 Go d'espace disque libre (cache + fichiers temporaires). Une variante quantifiée (4 bits) réduit la taille mais augmente le temps d'initialisation.
-- **Temps de chargement** : compter 45 à 90 secondes sur CPU avant la première réponse. Sur GPU (>= 12 Go VRAM), l'initialisation descend à 10-15 secondes.
-- **Ressources GPU/CPU** :
-  - GPU conseillé : NVIDIA RTX 3060 (12 Go VRAM) ou supérieur pour des latences < 6 s.
-  - CPU de secours : 8 cœurs (ou plus) et 32 Go de RAM pour rester sous 25 s par requête.
-- **Compatibilité** : `transformers` requiert `torch` compilé avec CUDA 12.1 pour l'accélération GPU. Sur CPU pur, supprimer la roue CUDA et installer `pip install torch==2.2.*` pour la version `cpu`.
-
-## Variables d'environnement
-
-- `LLAVA_SCRIPT_PATH` : chemin absolu vers le script Python déclenchant l'inférence (ex. `~/workspace/a11y/scripts/llava_infer.py`).
-- `LLAVA_MODEL_NAME` : nom du modèle Hugging Face chargé par le script (par défaut `liuhaotian/llava-v1.5-7b-hf`).
-
-> Astuce : ajouter ces variables dans `.env.local` afin que `loadEnvironment()` les charge automatiquement pour les scripts Node.
-
-## Options du module front
-
-Le module « Assistant visuel » exposera les options suivantes dans le panneau global pour faciliter le support produit :
-
-- **Sélection du moteur** (`config.fields[].path = 'vision.assistant.engine'`) : liste déroulante permettant d'alterner entre `llava-local`, `openai-gpt4o`, `google-gemini` et `moondream`.
-- **Mode exécution locale** (`'vision.assistant.localFallback'`) : toggle activant la préférence pour les scripts locaux (`llava-local`) lorsque les clés API sont absentes.
-- **Gabarit de prompt** (`'vision.assistant.promptTemplate'`) : champ texte multi-ligne pour personnaliser l'instruction envoyée au modèle (ex. ajouter des consignes d'accessibilité).
-- **Partage de descriptions** (`'vision.assistant.shareToClipboard'`) : toggle qui copie automatiquement la réponse dans le presse-papiers pour accélérer l'assistance utilisateur.
-
-Chaque modification déclenchera un événement `window.a11ytb?.logActivity?.(...)` afin que les équipes support puissent auditer les réglages utilisés lors d'une session.
+- Les performances dépendent fortement du matériel disponible (CPU vs GPU, VRAM, RAM).
+- Le serveur doit impérativement renvoyer un JSON valide avec un champ `text`, faute de quoi l'intégration lèvera une erreur.
+- Aucune gestion de file d'attente n'est fournie : prévoir une orchestration externe pour traiter plusieurs requêtes simultanées.

@@ -1,70 +1,45 @@
-import { execFile } from 'node:child_process';
-import { resolve } from 'node:path';
-
-const DEFAULT_PYTHON = process.env.A11Y_TOOLBOX_VLM_PYTHON || 'python3';
-const SCRIPT_PATH = resolve('scripts', 'integrations', 'llava_local.py');
-
-function ensureImagePath(imagePath) {
-  if (!imagePath) {
-    throw new Error('Le paramètre "imagePath" est obligatoire pour LLaVA.');
-  }
-
-  return resolve(imagePath);
-}
+import { fetchWithRetry, parseJson } from '../http-client.js';
+import { requireEnv } from '../../../scripts/integrations/env.js';
+import { loadImageAsBase64 } from './utils.js';
 
 function ensurePrompt(prompt) {
   if (!prompt) {
     throw new Error('Le paramètre "prompt" est obligatoire pour LLaVA.');
   }
-
   return prompt;
 }
 
-function runScript(pythonExecutable, args, options) {
-  return new Promise((resolvePromise, rejectPromise) => {
-    execFile(pythonExecutable, args, options, (error, stdout, stderr) => {
-      if (error) {
-        error.stderr = stderr;
-        rejectPromise(error);
-        return;
-      }
-
-      resolvePromise({ stdout, stderr });
-    });
-  });
-}
-
-export const llavaVisionEngine = {
-  id: 'llava-local',
+export const llavaLocalEngine = {
+  id: 'llava',
   async analyze({ imagePath, prompt } = {}) {
-    const absoluteImagePath = ensureImagePath(imagePath);
     const preparedPrompt = ensurePrompt(prompt);
+    const { data } = await loadImageAsBase64(imagePath);
+    const serverUrl = requireEnv('LLAVA_SERVER_URL');
+    const authToken = process.env.LLAVA_AUTH_TOKEN;
 
-    const { stdout } = await runScript(
-      DEFAULT_PYTHON,
-      [
-        SCRIPT_PATH,
-        '--engine=llava-local',
-        '--format=json',
-        '--image',
-        absoluteImagePath,
-        '--prompt',
-        preparedPrompt,
-      ],
+    const response = await fetchWithRetry(
+      serverUrl,
       {
-        env: process.env,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({
+          prompt: preparedPrompt,
+          image: data,
+        }),
+        timeout: 30000,
+      },
+      {
+        retries: 1,
+        retryDelayMs: 1000,
       }
     );
 
-    let payload;
-
-    try {
-      payload = JSON.parse(stdout);
-    } catch (error) {
-      throw new Error("La sortie du script LLaVA n'est pas un JSON valide.");
-    }
-
-    const text = payload?.text?.trim();
+    const payload = await parseJson(response);
+    const text = payload?.text?.trim?.();
 
     if (!text) {
       throw new Error('La réponse LLaVA ne contient pas de texte.');
@@ -77,4 +52,6 @@ export const llavaVisionEngine = {
   },
 };
 
-export default llavaVisionEngine;
+export const llavaVisionEngine = llavaLocalEngine;
+
+export default llavaLocalEngine;
