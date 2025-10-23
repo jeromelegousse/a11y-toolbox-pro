@@ -1326,7 +1326,33 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   let notificationsContainer = null;
   let currentNotifications = [];
 
-  const dockLabelRefs = new Map();
+  const DOCK_POSITIONS = ['left', 'right', 'bottom'];
+  const DOCK_LABEL_KEYS = {
+    left: 'toolbar.dockLeft',
+    right: 'toolbar.dockRight',
+    bottom: 'toolbar.dockBottom',
+  };
+  const DOCK_ICONS = {
+    trigger:
+      '<svg viewBox="0 0 24 24" focusable="false"><path d="M5 4a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V5a1 1 0 00-1-1zm0 2h10v12H5zm12 0v12h2V6z"/></svg>',
+    left: '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm8 1H6v12h6V6zm2 0v12h5V6h-5z"/></svg>',
+    right:
+      '<svg viewBox="0 0 24 24" focusable="false"><path d="M5 4a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V5a1 1 0 00-1-1H5zm11 2h3v12h-3V6zm-2 0H6v12h8V6z"/></svg>',
+    bottom:
+      '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm1 8v5h14v-5H5zm0-2h14V6H5v5z"/></svg>',
+  };
+
+  let dockMenuWrapper = null;
+  let dockMenuButton = null;
+  let dockMenuLabel = null;
+  let dockMenuValue = null;
+  let dockMenu = null;
+  let dockMenuAnnouncement = null;
+  const dockMenuItems = new Map();
+  const dockMenuItemLabels = new Map();
+  let dockMenuOpen = false;
+  let dockMenuFocusIndex = 0;
+  let lastDockAnnouncementPosition = null;
 
   const fab = document.createElement('button');
   fab.className = 'a11ytb-fab a11ytb-fab--modules';
@@ -1417,26 +1443,6 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   actionsToolbar.setAttribute('role', 'toolbar');
   header.append(actionsToolbar);
 
-  function createDockButton(position, iconMarkup) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'a11ytb-button';
-    button.dataset.action = `dock-${position}`;
-    button.setAttribute('aria-pressed', 'false');
-    const icon = document.createElement('span');
-    icon.className = 'a11ytb-button-icon';
-    icon.setAttribute('aria-hidden', 'true');
-    icon.innerHTML = iconMarkup;
-    const label = document.createElement('span');
-    label.className = 'a11ytb-button-label';
-    button.append(icon, label);
-    button.addEventListener('click', () => {
-      state.set('ui.dock', position);
-    });
-    dockLabelRefs.set(position, label);
-    return button;
-  }
-
   const SCROLL_ICONS = {
     up: '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 5l7 7h-4v7h-6v-7H5l7-7z"/></svg>',
     down: '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 19l-7-7h4V5h6v7h4l-7 7z"/></svg>',
@@ -1490,6 +1496,226 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
 
     controls.append(createButton('backward'), createButton('forward'));
     return controls;
+  }
+
+  function getDockPositionIndex(position) {
+    return Math.max(0, DOCK_POSITIONS.indexOf(position));
+  }
+
+  function getActiveDockPosition(snapshot) {
+    const next = snapshot?.ui?.dock || state.get('ui.dock') || 'right';
+    return DOCK_POSITIONS.includes(next) ? next : 'right';
+  }
+
+  function focusDockMenuItem(position) {
+    if (!dockMenuItems.size) return;
+    const normalized = DOCK_POSITIONS.includes(position) ? position : DOCK_POSITIONS[0];
+    const item = dockMenuItems.get(normalized);
+    if (!item) return;
+    dockMenuFocusIndex = getDockPositionIndex(normalized);
+    if (dockMenuButton) {
+      dockMenuButton.setAttribute('aria-activedescendant', item.id);
+    }
+    item.focus();
+  }
+
+  function moveDockMenuFocus(offset) {
+    if (!dockMenuOpen) {
+      return;
+    }
+    const total = DOCK_POSITIONS.length;
+    const nextIndex = (dockMenuFocusIndex + offset + total) % total;
+    const nextPosition = DOCK_POSITIONS[nextIndex];
+    focusDockMenuItem(nextPosition);
+  }
+
+  function handleDockMenuDocumentPointer(event) {
+    if (!dockMenuOpen || !dockMenuWrapper) return;
+    if (!dockMenuWrapper.contains(event.target)) {
+      closeDockMenu({ returnFocus: false });
+    }
+  }
+
+  function handleDockMenuDocumentFocus(event) {
+    if (!dockMenuOpen || !dockMenuWrapper) return;
+    if (!dockMenuWrapper.contains(event.target)) {
+      closeDockMenu({ returnFocus: false });
+    }
+  }
+
+  function openDockMenu(snapshot = state.get()) {
+    if (!dockMenu || dockMenuOpen) {
+      return;
+    }
+    const activePosition = getActiveDockPosition(snapshot);
+    dockMenuFocusIndex = getDockPositionIndex(activePosition);
+    dockMenuOpen = true;
+    dockMenu.hidden = false;
+    dockMenu.dataset.open = 'true';
+    if (dockMenuWrapper) {
+      dockMenuWrapper.dataset.open = 'true';
+    }
+    if (dockMenuButton) {
+      dockMenuButton.setAttribute('aria-expanded', 'true');
+    }
+    document.addEventListener('pointerdown', handleDockMenuDocumentPointer, true);
+    document.addEventListener('focusin', handleDockMenuDocumentFocus, true);
+    window.requestAnimationFrame(() => {
+      focusDockMenuItem(activePosition);
+    });
+  }
+
+  function closeDockMenu({ returnFocus = true } = {}) {
+    if (!dockMenuOpen) {
+      return;
+    }
+    dockMenuOpen = false;
+    if (dockMenu) {
+      dockMenu.hidden = true;
+      dockMenu.dataset.open = 'false';
+    }
+    if (dockMenuWrapper) {
+      dockMenuWrapper.dataset.open = 'false';
+    }
+    if (dockMenuButton) {
+      dockMenuButton.setAttribute('aria-expanded', 'false');
+    }
+    document.removeEventListener('pointerdown', handleDockMenuDocumentPointer, true);
+    document.removeEventListener('focusin', handleDockMenuDocumentFocus, true);
+    if (returnFocus && dockMenuButton) {
+      window.requestAnimationFrame(() => {
+        dockMenuButton.focus();
+      });
+    }
+  }
+
+  function selectDockPosition(position) {
+    if (!DOCK_POSITIONS.includes(position)) {
+      return;
+    }
+    state.set('ui.dock', position);
+    closeDockMenu({ returnFocus: true });
+  }
+
+  function handleDockMenuButtonKeydown(event) {
+    const rawKey = event.key || '';
+    const key = rawKey.toLowerCase();
+    const isSpace = rawKey === ' ' || key === ' ' || key === 'spacebar' || key === 'space';
+    if (key === 'arrowdown') {
+      event.preventDefault();
+      if (!dockMenuOpen) {
+        openDockMenu();
+      }
+      moveDockMenuFocus(1);
+    } else if (key === 'arrowup') {
+      event.preventDefault();
+      if (!dockMenuOpen) {
+        openDockMenu();
+      }
+      moveDockMenuFocus(-1);
+    } else if (key === 'enter' || isSpace) {
+      event.preventDefault();
+      if (dockMenuOpen) {
+        closeDockMenu({ returnFocus: false });
+      } else {
+        openDockMenu();
+      }
+    } else if (key === 'escape') {
+      if (dockMenuOpen) {
+        event.preventDefault();
+        closeDockMenu({ returnFocus: false });
+      }
+    }
+  }
+
+  function handleDockMenuKeydown(event) {
+    const rawKey = event.key || '';
+    const key = rawKey.toLowerCase();
+    const isSpace = rawKey === ' ' || key === ' ' || key === 'spacebar' || key === 'space';
+    if (key === 'arrowdown') {
+      event.preventDefault();
+      moveDockMenuFocus(1);
+    } else if (key === 'arrowup') {
+      event.preventDefault();
+      moveDockMenuFocus(-1);
+    } else if (key === 'enter' || isSpace) {
+      const target = event.target?.closest('.a11ytb-menu__item');
+      if (target?.dataset?.position) {
+        event.preventDefault();
+        selectDockPosition(target.dataset.position);
+      }
+    } else if (key === 'escape') {
+      event.preventDefault();
+      closeDockMenu({ returnFocus: true });
+    } else if (key === 'tab') {
+      closeDockMenu({ returnFocus: false });
+    }
+  }
+
+  function handleDockMenuClick(event) {
+    const item = event.target?.closest('.a11ytb-menu__item');
+    if (!item?.dataset?.position) {
+      return;
+    }
+    event.preventDefault();
+    focusDockMenuItem(item.dataset.position);
+    selectDockPosition(item.dataset.position);
+  }
+
+  function handleDockMenuHover(event) {
+    if (!dockMenuOpen) {
+      return;
+    }
+    const item = event.target?.closest('.a11ytb-menu__item');
+    if (!item?.dataset?.position) {
+      return;
+    }
+    focusDockMenuItem(item.dataset.position);
+  }
+
+  function handleDockMenuItemFocus(event) {
+    const item = event.target?.closest('.a11ytb-menu__item');
+    if (!item?.dataset?.position) {
+      return;
+    }
+    dockMenuFocusIndex = getDockPositionIndex(item.dataset.position);
+    if (dockMenuButton) {
+      dockMenuButton.setAttribute('aria-activedescendant', item.id);
+    }
+  }
+
+  function announceDockPosition(position, { force = false } = {}) {
+    if (!dockMenuAnnouncement) {
+      return;
+    }
+    const normalized = DOCK_POSITIONS.includes(position) ? position : 'right';
+    if (!force && lastDockAnnouncementPosition === normalized) {
+      return;
+    }
+    const labelKey = DOCK_LABEL_KEYS[normalized] || DOCK_LABEL_KEYS.right;
+    const positionLabel = i18n.t(labelKey);
+    dockMenuAnnouncement.textContent = i18n.t('toolbar.dockAnnouncement', {
+      position: positionLabel,
+    });
+    lastDockAnnouncementPosition = normalized;
+  }
+
+  function updateDockMenuDisplay(position) {
+    if (!dockMenuButton && !dockMenuValue) {
+      return;
+    }
+    const normalized = DOCK_POSITIONS.includes(position) ? position : 'right';
+    const labelKey = DOCK_LABEL_KEYS[normalized] || DOCK_LABEL_KEYS.right;
+    const positionLabel = i18n.t(labelKey);
+    if (dockMenuValue) {
+      dockMenuValue.textContent = i18n.t('toolbar.dockCurrent', { position: positionLabel });
+    }
+    if (dockMenuButton) {
+      const baseLabel = i18n.t('toolbar.dockMenu');
+      const combinedLabel = `${baseLabel} – ${positionLabel}`;
+      dockMenuButton.setAttribute('aria-label', combinedLabel);
+      dockMenuButton.setAttribute('title', combinedLabel);
+    }
   }
 
   function ensureTtsOverlay() {
@@ -2206,31 +2432,92 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     }
   }
 
-  const dockButtons = new Map([
-    [
-      'left',
-      createDockButton(
-        'left',
-        '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm8 1H6v12h6V6zm2 0v12h5V6h-5z"/></svg>'
-      ),
-    ],
-    [
-      'right',
-      createDockButton(
-        'right',
-        '<svg viewBox="0 0 24 24" focusable="false"><path d="M5 4a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V5a1 1 0 00-1-1H5zm11 2h3v12h-3V6zm-2 0H6v12h8V6z"/></svg>'
-      ),
-    ],
-    [
-      'bottom',
-      createDockButton(
-        'bottom',
-        '<svg viewBox="0 0 24 24" focusable="false"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm1 8v5h14v-5H5zm0-2h14V6H5v5z"/></svg>'
-      ),
-    ],
-  ]);
+  dockMenuWrapper = document.createElement('div');
+  dockMenuWrapper.className = 'a11ytb-menubutton';
+  dockMenuWrapper.dataset.open = 'false';
 
-  dockButtons.forEach((button) => actionsToolbar.append(button));
+  dockMenuButton = document.createElement('button');
+  dockMenuButton.type = 'button';
+  dockMenuButton.className = 'a11ytb-button a11ytb-button--menu';
+  dockMenuButton.id = 'a11ytb-dock-button';
+  dockMenuButton.dataset.ref = 'dock-menu-button';
+  dockMenuButton.setAttribute('aria-haspopup', 'menu');
+  dockMenuButton.setAttribute('aria-expanded', 'false');
+  dockMenuButton.setAttribute('aria-controls', 'a11ytb-dock-menu');
+
+  const dockMenuIcon = document.createElement('span');
+  dockMenuIcon.className = 'a11ytb-button-icon';
+  dockMenuIcon.setAttribute('aria-hidden', 'true');
+  dockMenuIcon.innerHTML = DOCK_ICONS.trigger;
+
+  dockMenuLabel = document.createElement('span');
+  dockMenuLabel.className = 'a11ytb-button-label';
+  dockMenuLabel.dataset.ref = 'dock-menu-label';
+
+  dockMenuValue = document.createElement('span');
+  dockMenuValue.className = 'a11ytb-button-value';
+  dockMenuValue.dataset.ref = 'dock-menu-value';
+
+  dockMenuButton.append(dockMenuIcon, dockMenuLabel, dockMenuValue);
+  dockMenuWrapper.append(dockMenuButton);
+
+  dockMenu = document.createElement('div');
+  dockMenu.className = 'a11ytb-menu';
+  dockMenu.dataset.ref = 'dock-menu';
+  dockMenu.id = 'a11ytb-dock-menu';
+  dockMenu.hidden = true;
+  dockMenu.setAttribute('role', 'menu');
+  dockMenu.setAttribute('aria-labelledby', dockMenuButton.id);
+
+  DOCK_POSITIONS.forEach((position) => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'a11ytb-menu__item';
+    item.id = `a11ytb-dock-option-${position}`;
+    item.dataset.position = position;
+    item.setAttribute('role', 'menuitemradio');
+    item.setAttribute('aria-checked', 'false');
+    item.tabIndex = -1;
+
+    const icon = document.createElement('span');
+    icon.className = 'a11ytb-menu__icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.innerHTML = DOCK_ICONS[position];
+
+    const label = document.createElement('span');
+    label.className = 'a11ytb-menu__label';
+
+    item.append(icon, label);
+    dockMenuItems.set(position, item);
+    dockMenuItemLabels.set(position, label);
+    dockMenu.append(item);
+  });
+
+  dockMenuWrapper.append(dockMenu);
+
+  dockMenuAnnouncement = document.createElement('div');
+  dockMenuAnnouncement.className = 'a11ytb-sr-only';
+  dockMenuAnnouncement.dataset.ref = 'dock-menu-announcement';
+  dockMenuAnnouncement.setAttribute('role', 'status');
+  dockMenuAnnouncement.setAttribute('aria-live', 'polite');
+  dockMenuWrapper.append(dockMenuAnnouncement);
+
+  actionsToolbar.append(dockMenuWrapper);
+
+  dockMenuButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    if (dockMenuOpen) {
+      closeDockMenu({ returnFocus: false });
+    } else {
+      openDockMenu();
+    }
+  });
+
+  dockMenuButton.addEventListener('keydown', handleDockMenuButtonKeydown);
+  dockMenu.addEventListener('keydown', handleDockMenuKeydown);
+  dockMenu.addEventListener('click', handleDockMenuClick);
+  dockMenu.addEventListener('mouseover', handleDockMenuHover);
+  dockMenu.addEventListener('focusin', handleDockMenuItemFocus);
 
   const fullscreenToggle = document.createElement('button');
   fullscreenToggle.type = 'button';
@@ -2450,20 +2737,17 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     if (actionsToolbar) {
       actionsToolbar.setAttribute('aria-label', i18n.t('toolbar.ariaLabel'));
     }
-    dockButtons.forEach((button, position) => {
-      const key =
-        position === 'left'
-          ? 'toolbar.dockLeft'
-          : position === 'right'
-            ? 'toolbar.dockRight'
-            : 'toolbar.dockBottom';
-      const labelText = i18n.t(key);
-      const labelEl = dockLabelRefs.get(position);
+    if (dockMenuLabel) {
+      dockMenuLabel.textContent = i18n.t('toolbar.dockMenu');
+    }
+    DOCK_POSITIONS.forEach((position) => {
+      const labelEl = dockMenuItemLabels.get(position);
       if (labelEl) {
-        labelEl.textContent = labelText;
+        labelEl.textContent = i18n.t(DOCK_LABEL_KEYS[position]);
       }
-      button.setAttribute('aria-label', labelText);
     });
+    updateDockMenuDisplay(getActiveDockPosition(snapshot));
+    announceDockPosition(getActiveDockPosition(snapshot), { force: true });
     const fullscreenState = !!(snapshot?.ui?.fullscreen ?? state.get('ui.fullscreen'));
     if (fullscreenLabel) {
       fullscreenLabel.textContent = fullscreenState
@@ -8975,7 +9259,11 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       }
       if (event.key === 'Escape') {
         event.stopPropagation();
-        toggle(false);
+        if (state.get('ui.fullscreen')) {
+          state.set('ui.fullscreen', false);
+        } else {
+          toggle(false);
+        }
         return;
       }
       if (event.key !== 'Tab') {
@@ -9046,6 +9334,16 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   function syncFullscreenMode(snapshot) {
     const fullscreen = !!snapshot?.ui?.fullscreen;
     panel.dataset.fullscreen = String(fullscreen);
+    const body = root?.ownerDocument?.body ?? document.body;
+    if (body) {
+      body.classList.toggle('a11ytb-fullscreen', fullscreen);
+    }
+    if (fullscreen && panel.dataset.open !== 'true') {
+      toggle(true);
+    }
+    if (fullscreen && panel.dataset.open === 'true' && typeof releasePanelFocusTrap !== 'function') {
+      setupPanelFocusTrap();
+    }
     if (fullscreenToggle) {
       fullscreenToggle.setAttribute('aria-pressed', String(fullscreen));
       fullscreenToggle.classList.toggle('is-active', fullscreen);
@@ -9065,13 +9363,21 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   }
 
   function syncDockControls(snapshot) {
-    const dock = snapshot?.ui?.dock || state.get('ui.dock') || 'right';
-    dockButtons.forEach((button, position) => {
-      if (!button) return;
+    const dock = getActiveDockPosition(snapshot);
+    DOCK_POSITIONS.forEach((position) => {
+      const item = dockMenuItems.get(position);
+      if (!item) return;
       const active = position === dock;
-      button.classList.toggle('is-active', active);
-      button.setAttribute('aria-pressed', String(active));
+      item.classList.toggle('is-active', active);
+      item.setAttribute('aria-checked', String(active));
     });
+    const activeItem = dockMenuItems.get(dock);
+    if (dockMenuButton && activeItem) {
+      dockMenuButton.setAttribute('aria-activedescendant', activeItem.id);
+    }
+    dockMenuFocusIndex = getDockPositionIndex(dock);
+    updateDockMenuDisplay(dock);
+    announceDockPosition(dock);
   }
 
   function setElementVisibility(element, visible, { manageAriaHidden = true } = {}) {
@@ -9110,6 +9416,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
 
   function toggle(open) {
     const shouldOpen = open ?? panel.dataset.open !== 'true';
+    const isFullscreenActive = !!state.get('ui.fullscreen');
     panel.dataset.open = String(shouldOpen);
     panel.setAttribute('aria-hidden', String(!shouldOpen));
     fab.setAttribute('aria-expanded', String(shouldOpen));
@@ -9117,7 +9424,13 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     fab.classList.toggle('is-active', shouldOpen);
     overlay.dataset.open = String(shouldOpen);
     overlay.setAttribute('aria-hidden', String(!shouldOpen));
-    document.body.classList.toggle('a11ytb-modal-open', shouldOpen);
+    const body = root?.ownerDocument?.body ?? document.body;
+    if (body) {
+      body.classList.toggle('a11ytb-modal-open', shouldOpen);
+    }
+    if (!shouldOpen && isFullscreenActive) {
+      state.set('ui.fullscreen', false);
+    }
     if (shouldOpen) {
       if (typeof releaseOutsideInert === 'function') {
         releaseOutsideInert();

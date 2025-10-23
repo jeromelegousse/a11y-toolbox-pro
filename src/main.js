@@ -902,6 +902,13 @@ registerBlock({
     <form data-ref="upload-form">
       <label for="vision-assistant-upload">Image locale</label>
       <input id="vision-assistant-upload" type="file" accept="image/*" data-ref="file-input" />
+      <label for="vision-assistant-engine">Moteur IA</label>
+      <select
+        id="vision-assistant-engine"
+        class="a11ytb-engine-select"
+        data-ref="engine-select"
+        aria-describedby="vision-assistant-status"
+      ></select>
       <label for="vision-assistant-prompt">Prompt</label>
       <textarea id="vision-assistant-prompt" rows="3" data-ref="prompt-input" placeholder="Décrivez la consigne envoyée au moteur."></textarea>
       <div class="a11ytb-row">
@@ -915,7 +922,13 @@ registerBlock({
         <button class="a11ytb-button a11ytb-button--ghost" type="submit" data-ref="fetch-submit">Analyser l’URL</button>
       </div>
     </form>
-    <p class="a11ytb-note" role="status" aria-live="polite" data-ref="status"></p>
+    <p
+      id="vision-assistant-status"
+      class="a11ytb-note"
+      role="status"
+      aria-live="polite"
+      data-ref="status"
+    ></p>
     <div class="a11ytb-note" data-ref="response" aria-live="polite"></div>
   `,
   wire: ({ root, state }) => {
@@ -928,9 +941,48 @@ registerBlock({
     const responseNode = root.querySelector('[data-ref="response"]');
     const uploadButton = root.querySelector('[data-ref="upload-submit"]');
     const fetchButton = root.querySelector('[data-ref="fetch-submit"]');
+    const engineSelect = root.querySelector('[data-ref="engine-select"]');
 
     let moduleReady = Boolean(window.a11ytb?.visionAssistant);
     let cleanupBinding = null;
+    let detachEngineListener = null;
+
+    const syncEngineControl = (vision) => {
+      if (!engineSelect) {
+        return;
+      }
+      const engines = Array.isArray(vision.availableEngines) ? vision.availableEngines : [];
+      const currentValues = Array.from(engineSelect.options).map((option) => option.value);
+      const changed =
+        engines.length !== currentValues.length ||
+        engines.some((value, index) => currentValues[index] !== value);
+
+      if (changed) {
+        engineSelect.innerHTML = '';
+        if (!engines.length) {
+          const placeholder = document.createElement('option');
+          placeholder.value = '';
+          placeholder.textContent = 'Aucun moteur disponible';
+          engineSelect.append(placeholder);
+        } else {
+          engines.forEach((value) => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = value
+              .split('-')
+              .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+              .join(' ');
+            engineSelect.append(option);
+          });
+        }
+      }
+
+      const desired = vision.engine || (engines.length ? engines[0] : '');
+      if (engineSelect.value !== (desired || '')) {
+        engineSelect.value = desired || '';
+      }
+      engineSelect.disabled = !moduleReady || engines.length <= 1;
+    };
 
     const applyState = (snapshot) => {
       const vision = snapshot?.visionAssistant || {};
@@ -985,15 +1037,32 @@ registerBlock({
           urlInput.value = nextUrl;
         }
       }
+      if (engineSelect) {
+        syncEngineControl(vision);
+      }
     };
 
     applyState(state.get());
     state.on(applyState);
 
+    if (engineSelect) {
+      const onEngineChange = (event) => {
+        const next = event.target.value || '';
+        state.set('visionAssistant.engine', next);
+        window.a11ytb?.visionAssistant?.setEngine?.(next);
+      };
+      engineSelect.addEventListener('change', onEngineChange);
+      detachEngineListener = () => engineSelect.removeEventListener('change', onEngineChange);
+    }
+
     const bindModule = () => {
       if (typeof window.a11ytb?.visionAssistant?.bindUI === 'function') {
         if (typeof cleanupBinding === 'function') {
           cleanupBinding();
+        }
+        if (typeof detachEngineListener === 'function') {
+          detachEngineListener();
+          detachEngineListener = null;
         }
         cleanupBinding = window.a11ytb.visionAssistant.bindUI({
           uploadForm,
@@ -1005,6 +1074,7 @@ registerBlock({
           responseNode,
           uploadButton,
           fetchButton,
+          engineSelect,
         });
         moduleReady = true;
         applyState(state.get());

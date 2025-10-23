@@ -1368,6 +1368,24 @@ function a11ytb_rest_analyze_image($request)
         $prompt = sanitize_text_field($prompt);
     }
 
+    $engine = '';
+    if (isset($params['engine']) && is_string($params['engine'])) {
+        $engine = trim($params['engine']);
+        if ($engine !== '' && function_exists('sanitize_key')) {
+            $engine = sanitize_key($engine);
+        }
+    }
+
+    $engine_options = a11ytb_get_vision_engine_registry();
+    $available_engines = $engine_options['engines'];
+    $default_engine = $engine_options['default'];
+
+    if ($engine === '' && $default_engine !== '') {
+        $engine = $default_engine;
+    } elseif ($engine !== '' && $available_engines && !in_array($engine, $available_engines, true)) {
+        $engine = $default_engine !== '' ? $default_engine : '';
+    }
+
     if ($prompt === '') {
         return new WP_Error(
             'rest_invalid_param',
@@ -1407,7 +1425,7 @@ function a11ytb_rest_analyze_image($request)
 
     $input = $image_tmp !== '' ? $image_tmp : $image_url;
 
-    $result = a11ytb_execute_llava_vision_engine($input, $prompt);
+    $result = a11ytb_execute_llava_vision_engine($input, $prompt, $engine);
     if (is_wp_error($result)) {
         return $result;
     }
@@ -1499,6 +1517,75 @@ function a11ytb_get_preferences_integration_config(): array
 }
 
 /**
+ * Retourne les moteurs de vision disponibles et le moteur par défaut.
+ *
+ * @return array{engines:array<int,string>,default:string}
+ */
+function a11ytb_get_vision_engine_registry(): array
+{
+    $engines = ['llava-local', 'llava'];
+
+    if (function_exists('apply_filters')) {
+        $filtered = apply_filters('a11ytb/vision_available_engines', $engines);
+        if (is_array($filtered)) {
+            $engines = $filtered;
+        }
+    }
+
+    $normalized = [];
+    foreach ($engines as $engine) {
+        if (!is_string($engine)) {
+            continue;
+        }
+        $engine = trim($engine);
+        if ($engine === '') {
+            continue;
+        }
+        if (function_exists('sanitize_key')) {
+            $engine = sanitize_key($engine);
+        } else {
+            $engine = strtolower($engine);
+        }
+        if ($engine === '') {
+            continue;
+        }
+        $normalized[$engine] = true;
+    }
+
+    $engines = array_keys($normalized);
+    $default = $engines[0] ?? '';
+
+    if (function_exists('apply_filters')) {
+        $filtered_default = apply_filters('a11ytb/vision_default_engine', $default, $engines);
+        if (is_string($filtered_default)) {
+            $filtered_default = trim($filtered_default);
+            if ($filtered_default !== '') {
+                if (function_exists('sanitize_key')) {
+                    $filtered_default = sanitize_key($filtered_default);
+                } else {
+                    $filtered_default = strtolower($filtered_default);
+                }
+            }
+        } else {
+            $filtered_default = $default;
+        }
+
+        if ($filtered_default !== '' && in_array($filtered_default, $engines, true)) {
+            $default = $filtered_default;
+        }
+    }
+
+    if ($default !== '' && !in_array($default, $engines, true)) {
+        $default = $engines[0] ?? '';
+    }
+
+    return [
+        'engines' => $engines,
+        'default' => $default,
+    ];
+}
+
+/**
  * Construit la configuration exposée au frontal pour l’analyse de captures.
  */
 function a11ytb_get_vision_integration_config(): array
@@ -1509,10 +1596,14 @@ function a11ytb_get_vision_integration_config(): array
         return ['enabled' => false];
     }
 
+    $engine_options = a11ytb_get_vision_engine_registry();
+
     return [
         'enabled' => true,
         'endpoint' => a11ytb_get_vision_endpoint(),
         'nonce' => function_exists('wp_create_nonce') ? wp_create_nonce('wp_rest') : '',
+        'engines' => $engine_options['engines'],
+        'defaultEngine' => $engine_options['default'],
     ];
 }
 
@@ -1533,11 +1624,16 @@ function a11ytb_get_preferences_sync_config(): array
  *
  * @param string $image   Fichier local ou URL à analyser.
  * @param string $prompt  Prompt textuel envoyé au moteur.
+ * @param string $engine  Identifiant du moteur à utiliser.
  * @return array<string,mixed>|WP_Error
  */
-function a11ytb_execute_llava_vision_engine(string $image, string $prompt)
+function a11ytb_execute_llava_vision_engine(string $image, string $prompt, string $engine = '')
 {
-    $payload = ['image' => $image, 'prompt' => $prompt];
+    if ($engine !== '') {
+        $engine = function_exists('sanitize_key') ? sanitize_key($engine) : strtolower($engine);
+    }
+
+    $payload = ['image' => $image, 'prompt' => $prompt, 'engine' => $engine];
 
     if (function_exists('apply_filters')) {
         $pre = apply_filters('a11ytb/vision_engine_execute', null, $payload);
@@ -1549,7 +1645,7 @@ function a11ytb_execute_llava_vision_engine(string $image, string $prompt)
         }
     }
 
-    $command = a11ytb_build_llava_command($image, $prompt);
+    $command = a11ytb_build_llava_command($image, $prompt, $engine);
     if ($command instanceof WP_Error) {
         return $command;
     }
