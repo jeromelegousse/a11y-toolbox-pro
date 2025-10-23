@@ -79,6 +79,8 @@ function a11ytb_initialize_options(): void
         'a11ytb_activity_linear_api_key' => '',
         'a11ytb_activity_linear_team_id' => '',
         'a11ytb_activity_slack_webhook_url' => '',
+        'a11ytb_llava_endpoint' => '',
+        'a11ytb_llava_token' => '',
     ];
 
     foreach ($defaults as $key => $value) {
@@ -598,6 +600,11 @@ function a11ytb_sanitize_activity_webhook_token($value): string
     return a11ytb_sanitize_secret_option($value, 'a11ytb_activity_webhook_token');
 }
 
+function a11ytb_sanitize_llava_token($value): string
+{
+    return a11ytb_sanitize_secret_option($value, 'a11ytb_llava_token');
+}
+
 function a11ytb_sanitize_webhook_url($value): string
 {
     if (!is_string($value)) {
@@ -624,6 +631,36 @@ function a11ytb_sanitize_webhook_url($value): string
     );
 
     $previous = get_option('a11ytb_activity_webhook_url', '');
+
+    return is_string($previous) ? $previous : '';
+}
+
+function a11ytb_sanitize_llava_endpoint($value): string
+{
+    if (!is_string($value)) {
+        return '';
+    }
+
+    $normalized = trim($value);
+
+    if ($normalized === '') {
+        return '';
+    }
+
+    $sanitized = esc_url_raw($normalized);
+
+    if ($sanitized !== '') {
+        return $sanitized;
+    }
+
+    add_settings_error(
+        'a11ytb_options',
+        'a11ytb_llava_endpoint_invalid',
+        esc_html__('Endpoint LLaVA invalide. La valeur précédente a été conservée.', 'a11ytb'),
+        'error'
+    );
+
+    $previous = get_option('a11ytb_llava_endpoint', '');
 
     return is_string($previous) ? $previous : '';
 }
@@ -740,6 +777,66 @@ function a11ytb_register_settings(): void
         ['label_for' => 'a11ytb_auto_open_panel']
     );
 
+
+    register_setting(
+        'a11ytb_options',
+        'a11ytb_gemini_api_key',
+        [
+            'type' => 'string',
+            'default' => '',
+            'sanitize_callback' => 'a11ytb_sanitize_secret',
+        ]
+    );
+
+    register_setting(
+        'a11ytb_options',
+        'a11ytb_gemini_quota',
+        [
+            'type' => 'integer',
+            'default' => 15,
+            'sanitize_callback' => 'a11ytb_sanitize_quota',
+        ]
+    );
+
+    register_setting(
+        'a11ytb_options',
+        'a11ytb_activity_webhook_url',
+        [
+            'type' => 'string',
+            'default' => '',
+            'sanitize_callback' => 'a11ytb_sanitize_webhook_url',
+        ]
+    );
+
+    register_setting(
+        'a11ytb_options',
+        'a11ytb_activity_webhook_token',
+        [
+            'type' => 'string',
+            'default' => '',
+            'sanitize_callback' => 'a11ytb_sanitize_activity_webhook_token',
+        ]
+    );
+
+    register_setting(
+        'a11ytb_options',
+        'a11ytb_llava_endpoint',
+        [
+            'type' => 'string',
+            'default' => '',
+            'sanitize_callback' => 'a11ytb_sanitize_llava_endpoint',
+        ]
+    );
+
+    register_setting(
+        'a11ytb_options',
+        'a11ytb_llava_token',
+        [
+            'type' => 'string',
+            'default' => '',
+            'sanitize_callback' => 'a11ytb_sanitize_llava_token',
+        ]
+    );
 }
 add_action('admin_init', 'a11ytb_register_settings');
 
@@ -793,7 +890,7 @@ function a11ytb_render_interface_section(): void
  */
 function a11ytb_render_integrations_section(): void
 {
-    echo '<p class="description">' . esc_html__('Renseignez vos identifiants Gemini pour activer la dictée assistée ou les fonctionnalités IA prévues par la feuille de route.', 'a11ytb') . '</p>';
+    echo '<p class="description">' . esc_html__('Renseignez vos identifiants Gemini ainsi que l’endpoint/secret LLaVA pour activer les connecteurs IA côté administrateur.', 'a11ytb') . '</p>';
 }
 
 /**
@@ -2063,6 +2160,34 @@ function a11ytb_get_gemini_admin_config(): array
         $config['masked'] = a11ytb_mask_secret($api_key);
         $config['hasKey'] = true;
     }
+
+    return $config;
+}
+
+function a11ytb_get_llava_admin_config(): array
+{
+    $endpoint = get_option('a11ytb_llava_endpoint', '');
+    $normalized_endpoint = is_string($endpoint) ? trim($endpoint) : '';
+    $stored_token = get_option('a11ytb_llava_token', '');
+
+    $config = [
+        'endpoint' => $normalized_endpoint,
+        'hasEndpoint' => $normalized_endpoint !== '',
+        'hasToken' => false,
+        'tokenError' => false,
+    ];
+
+    if ($stored_token !== '' && $stored_token !== null) {
+        $decrypted = a11ytb_decrypt_secret((string) $stored_token);
+        if ($decrypted === null) {
+            $config['tokenError'] = true;
+        } elseif ($decrypted !== '') {
+            $config['hasToken'] = true;
+            $config['maskedToken'] = a11ytb_mask_secret($decrypted);
+        }
+    }
+
+    $config['isReady'] = $config['hasEndpoint'] && $config['hasToken'];
 
     return $config;
 }
@@ -4000,6 +4125,7 @@ function a11ytb_enqueue_admin_assets(string $hook): void
     if (current_user_can('manage_options')) {
         $admin_data = [
             'gemini' => a11ytb_get_gemini_admin_config(),
+            'llava' => a11ytb_get_llava_admin_config(),
             'activity' => a11ytb_get_activity_integration_config(),
         ];
 
@@ -4072,6 +4198,11 @@ function a11ytb_render_admin_page(): void
     $decrypted_activity_webhook_token = a11ytb_decrypt_secret($stored_activity_webhook_token);
     $activity_token_error = ($stored_activity_webhook_token !== '' && $decrypted_activity_webhook_token === null);
     $activity_webhook_token = ($decrypted_activity_webhook_token === null) ? '' : (string) $decrypted_activity_webhook_token;
+    $llava_endpoint = (string) get_option('a11ytb_llava_endpoint', '');
+    $stored_llava_token = get_option('a11ytb_llava_token', '');
+    $decrypted_llava_token = a11ytb_decrypt_secret($stored_llava_token);
+    $llava_token_error = ($stored_llava_token !== '' && $decrypted_llava_token === null);
+    $llava_token = ($decrypted_llava_token === null) ? '' : (string) $decrypted_llava_token;
     ?>
     <div class="wrap a11ytb-admin-page">
         <h1><?php esc_html_e('A11y Toolbox Pro', 'a11ytb'); ?></h1>
@@ -4150,6 +4281,53 @@ function a11ytb_render_admin_page(): void
                 />
                 <p class="description">
                     <?php esc_html_e('15 requêtes/minute offertes sur Gemini 1.5 Flash.', 'a11ytb'); ?>
+                </p>
+            </div>
+
+            <div class="a11ytb-admin-field">
+                <label for="a11ytb_llava_endpoint" class="a11ytb-admin-label">
+                    <?php esc_html_e('Endpoint LLaVA (URL)', 'a11ytb'); ?>
+                </label>
+                <input
+                    type="url"
+                    id="a11ytb_llava_endpoint"
+                    name="a11ytb_llava_endpoint"
+                    value="<?php echo esc_attr($llava_endpoint); ?>"
+                    class="regular-text"
+                />
+                <p class="description">
+                    <?php esc_html_e('Indiquez l’URL sécurisée de votre proxy LLaVA (HTTPS recommandé, ex. https://ia.exemple.com/llava).', 'a11ytb'); ?>
+                </p>
+            </div>
+
+            <div class="a11ytb-admin-field">
+                <label for="a11ytb_llava_token" class="a11ytb-admin-label">
+                    <?php esc_html_e('Secret LLaVA (jeton)', 'a11ytb'); ?>
+                </label>
+                <input
+                    type="password"
+                    id="a11ytb_llava_token"
+                    name="a11ytb_llava_token"
+                    value="<?php echo esc_attr($llava_token); ?>"
+                    class="regular-text"
+                    autocomplete="off"
+                />
+                <p class="description">
+                    <?php
+                    if ($llava_token !== '') {
+                        printf(
+                            /* translators: %s: masked LLaVA secret */
+                            esc_html__('Secret actuel : %s', 'a11ytb'),
+                            esc_html(a11ytb_mask_secret($llava_token))
+                        );
+                        echo '<br />';
+                    }
+                    if ($llava_token_error) {
+                        esc_html_e('Le secret enregistré n’a pas pu être déchiffré. Veuillez vérifier vos salts WordPress ou saisir une nouvelle valeur.', 'a11ytb');
+                        echo '<br />';
+                    }
+                    esc_html_e('La valeur est chiffrée à l’enregistrement via les salts WordPress.', 'a11ytb');
+                    ?>
                 </p>
             </div>
 

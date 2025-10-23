@@ -109,3 +109,15 @@ export function getGeminiConfig() {
 
   return null;
 }
+
+export function getLlavaConfig() {
+  const globalData = globalThis?.a11ytbAdminData;
+  if (globalData && typeof globalData === 'object' && globalData !== null) {
+    const config = globalData.llava;
+    if (config && typeof config === 'object') {
+      return config;
+    }
+  }
+
+  return null;
+}
