@@ -10,6 +10,7 @@ const DEFAULT_STATE = manifest?.defaults?.state?.visionAssistant || {
   engine: 'llava-local',
   error: null,
   lastUrl: '',
+  availableEngines: [],
 };
 
 function cloneState(value) {
@@ -63,7 +64,13 @@ function resolveIntegrationConfig() {
   const endpoint = typeof integration.endpoint === 'string' ? integration.endpoint.trim() : '';
   const nonce = typeof integration.nonce === 'string' ? integration.nonce : '';
   const engines = Array.isArray(integration.engines)
-    ? integration.engines.filter((value) => typeof value === 'string' && value)
+    ? [
+        ...new Set(
+          integration.engines
+            .map((value) => (typeof value === 'string' ? value.trim() : ''))
+            .filter(Boolean)
+        ),
+      ]
     : [];
   return { endpoint, nonce, engines };
 }
@@ -86,17 +93,48 @@ function playFeedback(tone) {
 let store = null;
 let activeRequestId = 0;
 
+function arraysEqual(left, right) {
+  if (left === right) return true;
+  if (!Array.isArray(left) || !Array.isArray(right)) return false;
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function updateVisionState(key, value) {
+  if (!store) return;
+  const path = `visionAssistant.${key}`;
+  const current = store.get(path);
+  if (Array.isArray(value)) {
+    if (arraysEqual(current, value)) {
+      return;
+    }
+  } else if (current === value) {
+    return;
+  }
+  store.set(path, value);
+}
+
 async function performAnalysis({ file, url, prompt, engine, source } = {}) {
   if (!store) {
     throw new Error('Store non initialisé.');
   }
 
   const config = resolveIntegrationConfig();
+  if (config.engines?.length) {
+    updateVisionState('availableEngines', [...config.engines]);
+  } else {
+    updateVisionState('availableEngines', DEFAULT_STATE.availableEngines || []);
+  }
   if (!config.endpoint) {
     const message =
       'Le proxy WordPress pour l’assistant visuel n’est pas configuré. Contactez un administrateur.';
-    store.set('visionAssistant.status', 'unconfigured');
-    store.set('visionAssistant.error', message);
+    updateVisionState('status', 'unconfigured');
+    updateVisionState('error', message);
     playFeedback('alert');
     if (typeof window !== 'undefined' && typeof window.alert === 'function') {
       // eslint-disable-next-line no-alert
@@ -122,14 +160,35 @@ async function performAnalysis({ file, url, prompt, engine, source } = {}) {
 
   const preparedPrompt =
     (prompt || '').trim() || store.get('visionAssistant.prompt') || getDefaultPrompt();
-  const selectedEngine = engine || store.get('visionAssistant.engine') || getDefaultEngine();
+  const availableEngines = config.engines?.length ? config.engines : [];
+  let selectedEngine = engine || store.get('visionAssistant.engine') || getDefaultEngine();
 
-  store.set('visionAssistant.prompt', preparedPrompt);
-  if (url) {
-    store.set('visionAssistant.lastUrl', url);
+  if (availableEngines.length) {
+    if (!selectedEngine || !availableEngines.includes(selectedEngine)) {
+      const fallbackEngine = availableEngines[0];
+      if (selectedEngine && selectedEngine !== fallbackEngine) {
+        window.a11ytb?.logActivity?.(
+          `Moteur assistant visuel indisponible, remplacement par ${fallbackEngine}`,
+          {
+            module: manifest.id,
+            tone: 'info',
+            tags: ['vision', 'assistant', 'engine', 'fallback'],
+          }
+        );
+      }
+      selectedEngine = fallbackEngine;
+    }
   }
-  store.set('visionAssistant.status', 'loading');
-  store.set('visionAssistant.error', null);
+
+  updateVisionState('prompt', preparedPrompt);
+  if (url) {
+    updateVisionState('lastUrl', url);
+  }
+  if (selectedEngine) {
+    updateVisionState('engine', selectedEngine);
+  }
+  updateVisionState('status', 'loading');
+  updateVisionState('error', null);
 
   const requestId = ++activeRequestId;
 
@@ -162,8 +221,8 @@ async function performAnalysis({ file, url, prompt, engine, source } = {}) {
 
   if (typeof fetch !== 'function') {
     const message = 'L’API fetch n’est pas disponible dans ce navigateur.';
-    store.set('visionAssistant.status', 'error');
-    store.set('visionAssistant.error', message);
+    updateVisionState('status', 'error');
+    updateVisionState('error', message);
     playFeedback('alert');
     throw new Error(message);
   }
@@ -214,9 +273,9 @@ async function performAnalysis({ file, url, prompt, engine, source } = {}) {
     }
 
     if (requestId === activeRequestId) {
-      store.set('visionAssistant.lastResponse', cleaned);
-      store.set('visionAssistant.status', 'ready');
-      store.set('visionAssistant.error', null);
+      updateVisionState('lastResponse', cleaned);
+      updateVisionState('status', 'ready');
+      updateVisionState('error', null);
     }
 
     playFeedback('confirm');
@@ -230,8 +289,8 @@ async function performAnalysis({ file, url, prompt, engine, source } = {}) {
   } catch (error) {
     if (requestId === activeRequestId) {
       const message = error?.message || 'Analyse visuelle impossible.';
-      store.set('visionAssistant.status', 'error');
-      store.set('visionAssistant.error', message);
+      updateVisionState('status', 'error');
+      updateVisionState('error', message);
     }
     playFeedback('alert');
     window.a11ytb?.logActivity?.(`Erreur assistant visuel : ${error?.message || 'inconnue'}`, {
@@ -318,7 +377,7 @@ function bindUI(elements = {}) {
 
   if (promptInput) {
     const onPromptInput = (event) => {
-      store.set('visionAssistant.prompt', event.target.value || '');
+      updateVisionState('prompt', event.target.value || '');
     };
     promptInput.addEventListener('input', onPromptInput);
     listeners.push(() => promptInput.removeEventListener('input', onPromptInput));
