@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const loadEnvironmentMock = vi.fn();
 const analyzeMock = vi.fn();
 const llavaAnalyzeMock = vi.fn();
+const llavaLocalAnalyzeMock = vi.fn();
 
 vi.mock('../../scripts/integrations/env.js', () => ({
   loadEnvironment: loadEnvironmentMock,
@@ -34,7 +35,7 @@ vi.mock('../../src/integrations/vision/moondream.js', () => ({
 vi.mock('../../src/integrations/vision/llava.js', () => ({
   llavaVisionEngine: {
     id: 'llava-local',
-    analyze: llavaAnalyzeMock,
+    analyze: llavaLocalAnalyzeMock,
   },
 }));
 
@@ -49,6 +50,7 @@ describe('demo-vlm CLI', () => {
     loadEnvironmentMock.mockReset();
     analyzeMock.mockReset();
     llavaAnalyzeMock.mockReset();
+    llavaLocalAnalyzeMock.mockReset();
     console.log = originalConsoleLog;
     console.error = originalConsoleError;
     process.argv = [...originalArgv];
@@ -67,7 +69,7 @@ describe('demo-vlm CLI', () => {
   });
 
   it('affiche un JSON structuré avec le moteur par défaut', async () => {
-    analyzeMock.mockResolvedValue({ text: 'Analyse synthétique' });
+    llavaAnalyzeMock.mockResolvedValue({ text: 'Analyse synthétique' });
     const logs = [];
     const errors = [];
     console.log = (message) => logs.push(message);
@@ -79,20 +81,45 @@ describe('demo-vlm CLI', () => {
 
     expect(errors).toEqual([]);
     expect(loadEnvironmentMock).toHaveBeenCalled();
-    const analyzeArgs = analyzeMock.mock.calls.at(-1)?.[0];
+    expect(llavaAnalyzeMock).toHaveBeenCalledTimes(1);
+    const analyzeArgs = llavaAnalyzeMock.mock.calls.at(-1)?.[0];
     expect(analyzeArgs).toMatchObject({ prompt: 'Bonjour' });
     expect(analyzeArgs.imagePath).toContain('tmp-demo-vlm.png');
 
     const output = JSON.parse(logs.at(-1));
     expect(output).toMatchObject({
-      engine: 'openai-gpt4o',
+      engine: 'llava-local',
       prompt: 'Bonjour',
       text: 'Analyse synthétique',
     });
   });
 
+  it('accepte le moteur LLaVA sur Hugging Face', async () => {
+    llavaAnalyzeMock.mockResolvedValue({ text: 'Réponse cloud' });
+    const logs = [];
+    console.log = (message) => logs.push(message);
+
+    process.argv = [
+      'node',
+      'demo-vlm.js',
+      `--image=${tempImagePath}`,
+      '--prompt=Hello',
+      '--engine=llava',
+    ];
+
+    await import('../../scripts/integrations/demo-vlm.js');
+
+    expect(llavaAnalyzeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'Hello' })
+    );
+
+    const output = JSON.parse(logs.at(-1));
+    expect(output.engine).toBe('llava');
+    expect(output.text).toBe('Réponse cloud');
+  });
+
   it('accepte le moteur local LLaVA', async () => {
-    llavaAnalyzeMock.mockResolvedValue({ text: 'Réponse locale' });
+    llavaLocalAnalyzeMock.mockResolvedValue({ text: 'Réponse locale' });
     const logs = [];
     console.log = (message) => logs.push(message);
 
@@ -106,7 +133,7 @@ describe('demo-vlm CLI', () => {
 
     await import('../../scripts/integrations/demo-vlm.js');
 
-    expect(llavaAnalyzeMock).toHaveBeenCalledWith(
+    expect(llavaLocalAnalyzeMock).toHaveBeenCalledWith(
       expect.objectContaining({ prompt: 'Hello' })
     );
 

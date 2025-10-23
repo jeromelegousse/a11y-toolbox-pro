@@ -11,17 +11,20 @@ const ENGINES = new Map([
   [openAiGpt4oEngine.id, openAiGpt4oEngine],
   [googleGeminiVisionEngine.id, googleGeminiVisionEngine],
   [moondreamVisionEngine.id, moondreamVisionEngine],
-  [llavaVisionEngine.id, llavaVisionEngine],
+  [llavaRemoteVisionEngine.id, llavaRemoteVisionEngine],
+  [llavaLocalVisionEngine.id, llavaLocalVisionEngine],
 ]);
+
+const DEFAULT_ENGINE = llavaVisionEngine.id;
 
 function printUsage() {
   console.log(
-    'Usage : npm run demo:vlm -- --image=./capture.png --prompt="Décrire la scène" [--engine=openai-gpt4o|google-gemini|moondream|llava-local]'
+    'Usage : npm run demo:vlm -- --image=./capture.png --prompt="Décrire la scène" [--engine=openai-gpt4o|google-gemini|moondream|llava|llava-local]'
   );
 }
 
 function parseArgs(rawArgs) {
-  const args = { engine: openAiGpt4oEngine.id };
+  const args = { engine: DEFAULT_ENGINE };
 
   for (const token of rawArgs) {
     if (!token.startsWith('--')) {

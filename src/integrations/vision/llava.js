@@ -68,7 +68,7 @@ function parsePayload(output) {
 }
 
 export const llavaVisionEngine = {
-  id: 'llava-local',
+  id: 'llava',
   async analyze({ imagePath, prompt } = {}) {
     const preparedPrompt = ensurePrompt(prompt);
     const scriptPath = ensureScriptPath();

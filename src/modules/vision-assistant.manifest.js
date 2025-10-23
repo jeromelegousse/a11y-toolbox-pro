@@ -30,6 +30,7 @@ export const manifest = {
         engine: 'llava-local',
         error: null,
         lastUrl: '',
+        availableEngines: [],
       },
     },
   },

@@ -19,6 +19,13 @@ objet JSON sur la sortie standard.
   `transformers` (`AutoProcessor` / `AutoModelForVision2Seq`) pour générer une
   description textuelle d'une image locale.
 
+  ```bash
+  # Exemple d'exécution (utilise llava-hf/llava-phi-3-mini par défaut)
+  python scripts/integrations/llava_local.py \
+    --image ./assets/demo-image.jpg \
+    --prompt "Décris la scène"
+  ```
+
 ## Prérequis d'installation
 
 ```bash
@@ -67,13 +74,16 @@ pip install transformers accelerate pillow
     aux courtes durées.
 
 - **LLaVA (Vision-Language Model)**
-  - Sélectionnez le modèle via `LLAVA_MODEL_NAME`
-    (ex. `llava-hf/llava-phi-3-mini`). L'argument CLI `--model` a priorité.
+  - Définissez `LLAVA_MODEL_NAME` pour choisir le modèle (`llava-hf/llava-phi-3-mini`
+    est utilisé par défaut si aucune valeur n'est fournie et que `--model`
+    n'est pas passé en CLI).
   - Forcez le périphérique avec `LLAVA_DEVICE` (`cpu`, `cuda`). Par défaut, le
     script choisit automatiquement `cuda` si disponible.
   - Les poids légers (famille *phi-3-mini*) conviennent aux cartes GPU modestes
     ou à l'exécution CPU, mais restent coûteux.
   - Contrôlez la longueur des réponses avec `LLAVA_MAX_NEW_TOKENS` (512 par défaut).
+  - Activez un mode mock déterministe via `A11Y_TOOLBOX_VLM_MOCK_TEXT` pour
+    contourner le téléchargement des poids lors des tests.
 
 ### Notes sur les performances
 

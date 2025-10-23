@@ -4,17 +4,16 @@ L'intégration `llava-local` s'appuie sur un script Python pour exécuter un mod
 
 ## Prérequis
 
-- Python 3.10+ avec `pip`
-- Environnement virtuel recommandé (`python -m venv .venv` puis `source .venv/bin/activate`)
-- Installation des dépendances :
-  ```bash
-  pip install --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-  pip install transformers accelerate safetensors pillow
-  ```
-- Accès au modèle Hugging Face `liuhaotian/llava-v1.5-7b-hf` (recommandé pour l'équilibre précision/performance)
-- Variables d'environnement `LLAVA_SCRIPT_PATH` et `LLAVA_MODEL_NAME` renseignées (voir plus bas)
+| Composant | Détails |
+| --- | --- |
+| **Python** | Version 3.10 ou supérieure avec `pip`. Un environnement virtuel est recommandé (`python -m venv .venv && source .venv/bin/activate`). |
+| **Dépendances** | Installer PyTorch avant `transformers` :<br>`pip install --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121`<br>`pip install transformers accelerate safetensors pillow` |
+| **Modèle recommandé** | `liuhaotian/llava-v1.5-7b-hf` pour l'équilibre précision ↔ performance. Télécharger en amont via `huggingface-cli download`. |
+| **Variables d'environnement** | `LLAVA_SCRIPT_PATH` et `LLAVA_MODEL_NAME` doivent être définies (voir section dédiée). |
 
 ## Commande de démonstration
+
+Exécuter la CLI de démonstration depuis la racine du projet :
 
 ```bash
 npm run demo:vlm -- --engine=llava-local --image=./capture.png --prompt="Décrire la scène"
@@ -33,18 +32,22 @@ La CLI charge automatiquement `LLAVA_SCRIPT_PATH`. Par défaut, le script consom
 
 ## Variables d'environnement
 
-- `LLAVA_SCRIPT_PATH` : chemin absolu vers le script Python déclenchant l'inférence (ex. `~/workspace/a11y/scripts/llava_infer.py`).
-- `LLAVA_MODEL_NAME` : nom du modèle Hugging Face chargé par le script (par défaut `liuhaotian/llava-v1.5-7b-hf`).
+| Variable | Description | Exemple |
+| --- | --- | --- |
+| `LLAVA_SCRIPT_PATH` | Chemin absolu vers le script Python déclenchant l'inférence. | `/home/user/a11y/scripts/llava_infer.py` |
+| `LLAVA_MODEL_NAME` | Nom du modèle Hugging Face chargé par le script. | `liuhaotian/llava-v1.5-7b-hf` |
 
 > Astuce : ajouter ces variables dans `.env.local` afin que `loadEnvironment()` les charge automatiquement pour les scripts Node.
 
 ## Options du module front
 
-Le module « Assistant visuel » exposera les options suivantes dans le panneau global pour faciliter le support produit :
+Le module « Assistant visuel » expose les options suivantes dans le panneau global afin de guider les équipes produit et support :
 
-- **Sélection du moteur** (`config.fields[].path = 'vision.assistant.engine'`) : liste déroulante permettant d'alterner entre `llava-local`, `openai-gpt4o`, `google-gemini` et `moondream`.
-- **Mode exécution locale** (`'vision.assistant.localFallback'`) : toggle activant la préférence pour les scripts locaux (`llava-local`) lorsque les clés API sont absentes.
-- **Gabarit de prompt** (`'vision.assistant.promptTemplate'`) : champ texte multi-ligne pour personnaliser l'instruction envoyée au modèle (ex. ajouter des consignes d'accessibilité).
-- **Partage de descriptions** (`'vision.assistant.shareToClipboard'`) : toggle qui copie automatiquement la réponse dans le presse-papiers pour accélérer l'assistance utilisateur.
+| Option (clé de config) | Type | Utilisation côté produit/support |
+| --- | --- | --- |
+| `vision.assistant.engine` | Liste déroulante | Choisir le moteur actif (`llava-local`, `openai-gpt4o`, `google-gemini`, `moondream`). |
+| `vision.assistant.localFallback` | Toggle | Forcer la préférence pour les scripts locaux (`llava-local`) lorsque les clés API distantes sont absentes ou indisponibles. |
+| `vision.assistant.promptTemplate` | Texte multi-ligne | Personnaliser l'instruction envoyée au modèle (ajout de consignes d'accessibilité, tonalité, etc.). |
+| `vision.assistant.shareToClipboard` | Toggle | Copier automatiquement la réponse générée dans le presse-papiers pour accélérer l'assistance aux utilisateurs. |
 
-Chaque modification déclenchera un événement `window.a11ytb?.logActivity?.(...)` afin que les équipes support puissent auditer les réglages utilisés lors d'une session.
+Chaque changement déclenche `window.a11ytb?.logActivity?.(...)` : les équipes support peuvent ainsi auditer les réglages utilisés au cours d'une session.
