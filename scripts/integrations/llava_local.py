@@ -11,6 +11,9 @@ from pathlib import Path
 from typing import Any, Dict, Tuple
 
 
+DEFAULT_MODEL_NAME = "llava-hf/llava-phi-3-mini"
+
+
 def _print_error(message: str) -> None:
     sys.stderr.write(message + "\n")
 
@@ -78,33 +81,44 @@ def _load_model_and_processor(model_name: str) -> Tuple[Any, Any, str]:
     return processor, model, device
 
 
-def _prepare_inputs(processor: Any, image: Any, prompt: str, device: str) -> Dict[str, Any]:
+def _prepare_inputs(
+    processor: Any,
+    image: Any,
+    prompt: str,
+    device: str,
+) -> Dict[str, Any]:
     conversation = [
         {
             "role": "user",
             "content": [
                 {"type": "text", "text": prompt},
-                {"type": "image"}
-            ]
+                {"type": "image"},
+            ],
         }
     ]
 
     if hasattr(processor, "apply_chat_template"):
-        text_inputs = processor.apply_chat_template(
+        chat_prompt = processor.apply_chat_template(
             conversation,
             add_generation_prompt=True,
-            return_tensors="pt"
         )
-        image_inputs = processor(images=image, return_tensors="pt")
-        inputs: Dict[str, Any] = {**dict(text_inputs), **dict(image_inputs)}
     else:  # pragma: no cover - dépend de la version des Transformers
-        inputs = processor(images=image, text=prompt, return_tensors="pt")
+        chat_prompt = prompt
 
-    for key, value in list(inputs.items()):
+    inputs = processor(images=image, text=chat_prompt, return_tensors="pt")
+
+    if hasattr(inputs, "to"):
+        inputs = inputs.to(device=device)
+        return dict(inputs)
+
+    prepared: Dict[str, Any] = {}
+    for key, value in inputs.items():
         if hasattr(value, "to"):
-            inputs[key] = value.to(device)
+            prepared[key] = value.to(device=device)
+        else:
+            prepared[key] = value
 
-    return inputs
+    return prepared
 
 
 def _generate_caption(image_path: Path, prompt: str, model_name: str) -> Dict[str, Any]:
@@ -159,7 +173,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    model_name = args.model or os.environ.get("LLAVA_MODEL_NAME", "llava-hf/llava-phi-3-mini")
+    model_name = args.model or os.environ.get("LLAVA_MODEL_NAME", DEFAULT_MODEL_NAME)
 
     try:
         image_file = _ensure_file(Path(args.image_path).expanduser().resolve())
