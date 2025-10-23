@@ -79,7 +79,7 @@ pip install transformers accelerate pillow
     n'est pas passé en CLI).
   - Forcez le périphérique avec `LLAVA_DEVICE` (`cpu`, `cuda`). Par défaut, le
     script choisit automatiquement `cuda` si disponible.
-  - Les poids légers (famille *phi-3-mini*) conviennent aux cartes GPU modestes
+  - Les poids légers (famille _phi-3-mini_) conviennent aux cartes GPU modestes
     ou à l'exécution CPU, mais restent coûteux.
   - Contrôlez la longueur des réponses avec `LLAVA_MAX_NEW_TOKENS` (512 par défaut).
   - Activez un mode mock déterministe via `A11Y_TOOLBOX_VLM_MOCK_TEXT` pour
