@@ -147,6 +147,41 @@ describe('moondreamVisionEngine', () => {
   });
 });
 
+describe('llavaVisionEngine (Hugging Face)', () => {
+  it('retourne le texte généré', async () => {
+    requireEnvMock.mockReturnValue('hf-token');
+    loadImageAsBase64Mock.mockResolvedValue({ data: 'AAA=', mimeType: 'image/png' });
+    globalThis.fetch.mockResolvedValue(
+      createJsonResponse([
+        {
+          generated_text: 'Réponse distante',
+        },
+      ])
+    );
+
+    const { llavaVisionEngine } = await import('../../src/integrations/vision/llava.js');
+    const result = await llavaVisionEngine.analyze({
+      imagePath: './image.png',
+      prompt: 'Décrire',
+    });
+
+    expect(requireEnvMock).toHaveBeenCalledWith('HUGGINGFACE_API_TOKEN');
+    expect(result.text).toBe('Réponse distante');
+  });
+
+  it('signale une erreur lorsque le texte est absent', async () => {
+    requireEnvMock.mockReturnValue('hf-token');
+    loadImageAsBase64Mock.mockResolvedValue({ data: 'AAA=', mimeType: 'image/png' });
+    globalThis.fetch.mockResolvedValue(createJsonResponse([{ other: 'value' }]));
+
+    const { llavaVisionEngine } = await import('../../src/integrations/vision/llava.js');
+
+    await expect(
+      llavaVisionEngine.analyze({ imagePath: './image.png', prompt: 'Décrire' })
+    ).rejects.toThrow('La réponse LLaVA ne contient pas de texte.');
+  });
+});
+
 describe('llavaVisionEngine', () => {
   it('retourne le texte renvoyé par le script local', async () => {
     execFileMock.mockImplementation((command, args, options, callback) => {
