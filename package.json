@@ -35,5 +35,8 @@
     "stylelint": "^15.11.0",
     "stylelint-config-standard": "^34.0.0",
     "vitest": "^1.6.0"
+  },
+  "dependencies": {
+    "libsodium-wrappers": "^0.7.15"
   }
 }

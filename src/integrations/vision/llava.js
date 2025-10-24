@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { fetchWithRetry, parseJson } from '../http-client.js';
 import { requireEnv } from '../../../scripts/integrations/env.js';
 import { loadImageAsBase64 } from './utils.js';
+import { getLlavaRemoteConfig } from './remote-config.js';
 
 const PYTHON_EXECUTABLE = process.env.A11Y_TOOLBOX_VLM_PYTHON || 'python3';
 const DEFAULT_SCRIPT_PATH = path.resolve(
@@ -137,8 +138,19 @@ export const llavaRemoteVisionEngine = {
   async analyze({ imagePath, prompt } = {}) {
     const preparedPrompt = ensurePrompt(prompt);
     const { data, mimeType } = await loadImageAsBase64(imagePath);
-    const apiToken = requireEnv('HUGGINGFACE_API_TOKEN');
-    const endpoint = resolveRemoteEndpoint();
+    let endpoint = resolveRemoteEndpoint();
+    let apiToken;
+
+    const remoteConfig = await getLlavaRemoteConfig().catch((error) => {
+      throw new Error(`Configuration LLaVA distante invalide : ${error.message}`);
+    });
+
+    if (remoteConfig?.endpoint && remoteConfig?.token) {
+      endpoint = remoteConfig.endpoint;
+      apiToken = remoteConfig.token;
+    } else {
+      apiToken = requireEnv('HUGGINGFACE_API_TOKEN');
+    }
 
     const response = await fetchWithRetry(
       endpoint,
@@ -205,4 +217,13 @@ export const llavaLocalVisionEngine = {
   },
 };
 
-export default llavaRemoteVisionEngine;
+export const llavaVisionEngine = {
+  id: llavaRemoteVisionEngine.id,
+  analyze: (...args) => llavaRemoteVisionEngine.analyze(...args),
+  remote: llavaRemoteVisionEngine,
+  remoteAnalyze: (...args) => llavaRemoteVisionEngine.analyze(...args),
+  local: llavaLocalVisionEngine,
+  localAnalyze: (...args) => llavaLocalVisionEngine.analyze(...args),
+};
+
+export default llavaVisionEngine;

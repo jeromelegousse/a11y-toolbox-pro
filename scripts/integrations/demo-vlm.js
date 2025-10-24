@@ -3,10 +3,8 @@ import { loadEnvironment } from './env.js';
 import { openAiGpt4oEngine } from '../../src/integrations/vision/openai-gpt4o.js';
 import { googleGeminiVisionEngine } from '../../src/integrations/vision/google-gemini.js';
 import { moondreamVisionEngine } from '../../src/integrations/vision/moondream.js';
-import {
-  llavaRemoteVisionEngine,
-  llavaLocalVisionEngine,
-} from '../../src/integrations/vision/llava.js';
+import { llavaVisionEngine } from '../../src/integrations/vision/llava.js';
+import { ensureLocalImage } from '../../src/integrations/vision/utils.js';
 
 function normalizeEngine(candidate, { id, analyze }) {
   if (!candidate || typeof candidate !== 'object') {
@@ -45,6 +43,16 @@ const ENGINES = new Map(
 );
 
 const DEFAULT_ENGINE = llavaRemoteVisionEngine.id;
+const DEFAULT_ENGINE_OUTPUT = llavaLocalVisionEngine.id;
+
+if (!ENGINES.has(DEFAULT_ENGINE)) {
+  throw new Error(`Le moteur par défaut "${DEFAULT_ENGINE}" n'est pas enregistré.`);
+}
+if (!ENGINES.has(DEFAULT_ENGINE_OUTPUT)) {
+  throw new Error(
+    `Le moteur d'affichage par défaut "${DEFAULT_ENGINE_OUTPUT}" n'est pas enregistré.`
+  );
+}
 
 function printUsage() {
   console.log(

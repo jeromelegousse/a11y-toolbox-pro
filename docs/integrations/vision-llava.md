@@ -45,6 +45,21 @@ La CLI charge automatiquement `LLAVA_SCRIPT_PATH`. Par défaut, le script consom
 - Saisissez ensuite le **secret LLaVA** généré côté serveur. La valeur est chiffrée via les salts WordPress avant stockage puis masquée dans l'interface.
 - Le tableau de bord indique si le duo endpoint/secret est prêt ou s'il manque une information (ou si le secret doit être régénéré).
 
+## Proxy distant sécurisé
+
+Pour déléguer l'inférence LLaVA à un proxy Node.js distant :
+
+1. **Générez un secret chiffré** avec l'utilitaire interne (CLI ou API privée) et collez la valeur chiffrée dans le champ *Secret LLaVA*. Le plugin ne stocke jamais le secret en clair.
+2. **Renseignez l'endpoint HTTPS** du proxy (ex. `https://vlm.example.com/llava`). Cette URL est injectée dans l'environnement du bridge Node lorsque WordPress déclenche le script `demo-vlm.js`.
+3. **Côté proxy Node**, exposez les variables d'environnement suivantes :
+   - `A11YTB_SECRET_KEY` : clé de chiffrement dérivée des salts WordPress (transmise automatiquement par WordPress lors de l'exécution du bridge).
+   - `A11YTB_LLAVA_TOKEN_ENCRYPTED` : secret chiffré récupéré depuis WordPress.
+   - `A11YTB_LLAVA_ENDPOINT` : URL à appeler par le bridge pour analyser l'image.
+4. Le module `remote-config` côté Node déchiffre automatiquement le secret avant d'injecter l'en-tête `Authorization: Bearer <secret>` dans les requêtes vers l'endpoint distant.
+5. En cas d'erreur de déchiffrement ou de secret absent, le bridge remonte une exception (`Configuration LLaVA distante invalide`) afin d'informer l'administrateur qu'un nouveau secret doit être généré.
+
+Cette approche garantit que la valeur sensible reste chiffrée dans la base de données WordPress et ne transite en clair que dans le processus Node démarré localement le temps de l'analyse.
+
 ## Options du module front
 
 Le module « Assistant visuel » expose les options suivantes dans le panneau global afin de guider les équipes produit et support :
