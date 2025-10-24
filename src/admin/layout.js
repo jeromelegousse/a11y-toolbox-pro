@@ -380,9 +380,8 @@ export function createAdminLayout(runtimePanel) {
     suggestionSection,
   ];
 
-  const suggestionsStatus = createNotice('info', 'Aucune recommandation disponible.');
-  suggestionsStatus.notice.setAttribute('role', 'status');
-  suggestionsStatus.notice.setAttribute('aria-live', 'polite');
+  const availabilityPanel = document.createElement('section');
+  availabilityPanel.className = 'a11ytb-admin-section a11ytb-admin-availability';
 
   const suggestionsList = document.createElement('div');
   suggestionsList.className = 'a11ytb-suggestions';
@@ -471,10 +470,13 @@ export function createAdminLayout(runtimePanel) {
   layout.append(introSection);
 
   return {
-    root,
-    introSection: intro.section,
-    dashboard: dashboard.section,
-    statusGrid: statusContainer,
+    root: layout,
+    fullscreenToggle,
+    content: stack,
+    collapsedHint,
+    introSection,
+    dashboard,
+    statusGrid,
     manifestDiff,
     moduleGrid: moduleBody,
     emptyState: moduleEmpty.notice,

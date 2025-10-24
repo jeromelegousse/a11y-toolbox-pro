@@ -278,12 +278,12 @@ body {
   overflow: hidden;
 }
 
-body.a11ytb-fullscreen {
+:where(body.a11ytb-fullscreen) {
   position: relative;
   overflow: hidden;
 }
 
-body.a11ytb-fullscreen::before {
+:where(body.a11ytb-fullscreen)::before {
   content: '';
   position: fixed;
   inset: 0;
@@ -291,6 +291,21 @@ body.a11ytb-fullscreen::before {
   background: color-mix(in srgb, var(--a11ytb-overlay) 94%, transparent);
   backdrop-filter: blur(18px) saturate(130%);
   pointer-events: none;
+}
+
+:where(body.a11ytb-fullscreen) .a11ytb-overlay {
+  background: transparent;
+  backdrop-filter: none;
+}
+
+:where(body.a11ytb-fullscreen) .a11ytb-fab-stack,
+:where(body.a11ytb-fullscreen) .a11ytb-notifications {
+  opacity: 0;
+  pointer-events: none;
+}
+
+:where(body.a11ytb-fullscreen) .a11ytb-panel[data-open='true'] {
+  box-shadow: none;
 }
 
 .a11ytb-modal-backdrop {
@@ -5520,6 +5535,142 @@ body.a11ytb-fullscreen .a11ytb-panel[data-open='true'] {
   }
 }
 
+.a11ytb-admin-shell {
+  position: relative;
+  display: grid;
+  gap: 16px;
+}
+
+.a11ytb-admin-shell-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.a11ytb-admin-fullscreen-toggle {
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--a11ytb-color-border) 65%, transparent);
+  background: var(--a11ytb-admin-surface);
+  color: #0f172a;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.a11ytb-admin-fullscreen-toggle:hover,
+.a11ytb-admin-fullscreen-toggle:focus-visible {
+  background: color-mix(in srgb, var(--a11ytb-admin-surface-alt) 50%, transparent);
+  border-color: color-mix(in srgb, var(--a11ytb-color-border) 85%, transparent);
+  color: #0f172a;
+}
+
+.a11ytb-admin-fullscreen-toggle:focus-visible {
+  outline: 2px solid var(--a11ytb-color-primary);
+  outline-offset: 2px;
+}
+
+.a11ytb-admin-collapsed-hint {
+  margin: 0;
+  padding: 16px;
+  border-radius: 4px;
+  border: 1px dashed color-mix(in srgb, var(--a11ytb-color-border) 80%, transparent);
+  background: var(--a11ytb-admin-surface-alt);
+  color: color-mix(in srgb, #0f172a 65%, transparent);
+  font-size: 14px;
+}
+
+.a11ytb-admin-stack {
+  display: grid;
+  gap: 24px;
+  margin: 0 auto;
+  width: min(1100px, 100%);
+}
+
+.a11ytb-admin-shell.is-expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 100110;
+  background: var(--a11ytb-admin-surface-alt);
+  padding: 24px min(5vw, 48px);
+  overflow-y: auto;
+}
+
+.a11ytb-admin-shell.is-expanded .a11ytb-admin-shell-controls {
+  position: sticky;
+  top: 0;
+  padding: 12px 0;
+  background: var(--a11ytb-admin-surface-alt);
+  z-index: 2;
+}
+
+.a11ytb-admin-shell.is-expanded .a11ytb-admin-stack {
+  width: min(1200px, 100%);
+}
+
+.a11ytb-admin-shell.is-expanded .a11ytb-admin-collapsed-hint {
+  display: none;
+}
+
+.a11ytb-admin-runtime {
+  display: grid;
+  gap: 16px;
+}
+
+.a11ytb-runtime-panel {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+body.a11ytb-admin-fullscreen-open {
+  overflow: hidden;
+}
+
+@media (width <= 960px) {
+  .a11ytb-admin-shell.is-expanded {
+    padding: 20px min(5vw, 32px);
+  }
+}
+
+@media (width <= 600px) {
+  .a11ytb-admin-shell.is-expanded {
+    padding: 16px;
+  }
+
+  .a11ytb-admin-shell-controls {
+    justify-content: stretch;
+  }
+
+  .a11ytb-admin-fullscreen-toggle {
+    width: 100%;
+  }
+}
+
+.a11ytb-admin-module-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  align-content: start;
+  margin-top: 20px;
+}
+
+.a11ytb-admin-module-card {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--a11ytb-border) 70%, transparent);
+  background: color-mix(in srgb, var(--a11ytb-surface) 95%, transparent);
+  box-shadow: var(--a11ytb-shadow-subtle);
+  min-width: 0;
+}
 
 
 
@@ -5579,13 +5730,12 @@ body.a11ytb-fullscreen .a11ytb-panel[data-open='true'] {
 
 
 
+.a11ytb-admin-availability {
+  display: grid;
+  gap: 20px;
+}
 
-.a11ytb-admin-manifest-diff {
-  border-radius: 18px;
-  padding: 20px 22px;
-  margin-top: 8px;
-  background: color-mix(in srgb, var(--a11ytb-surface-alt) 88%, transparent);
-  border: 1px solid color-mix(in srgb, var(--a11ytb-border) 60%, transparent);
+.a11ytb-admin-availability-header {
   display: grid;
   gap: 16px;
 }
