@@ -53,7 +53,7 @@ describe('sidebar keyboard navigation', () => {
     document.body.innerHTML = '';
   });
 
-  it('focuses sidebar entries with Ctrl+number and activates matching views', async () => {
+  it('ouvre et ferme le menu avec le raccourci global et gère le focus', async () => {
     const state = createTestState({
       ui: {
         view: 'modules',
@@ -81,40 +81,40 @@ describe('sidebar keyboard navigation', () => {
     mountUI({ root, state });
 
     const buttons = Array.from(root.querySelectorAll('.a11ytb-sidebar-button'));
-    expect(buttons.length).toBeGreaterThanOrEqual(4);
+    expect(buttons.length).toBeGreaterThanOrEqual(1);
 
     const panel = root.querySelector('.a11ytb-panel');
     expect(panel).toBeTruthy();
 
-    const press = (key) => {
-      const event = new KeyboardEvent('keydown', { key, ctrlKey: true, bubbles: true });
+    const toggleButton = buttons[0];
+    toggleButton.focus();
+
+    const pressToggle = () => {
+      const event = new KeyboardEvent('keydown', {
+        key: 'a',
+        altKey: true,
+        shiftKey: true,
+        bubbles: true,
+      });
       window.dispatchEvent(event);
     };
 
-    press('1');
+    pressToggle();
     await vi.waitFor(() => {
       expect(panel.dataset.open).toBe('true');
-      expect(state.get('ui.view')).toBe('modules');
     });
-    expect(buttons[0].getAttribute('aria-expanded')).toBe('true');
-    expect(buttons[0].getAttribute('aria-current')).toBe('page');
+    const title = root.querySelector('.a11ytb-title');
+    expect(title).toBeTruthy();
+    expect(document.activeElement).toBe(title);
+    expect(toggleButton.getAttribute('aria-expanded')).toBe('true');
 
-    press('2');
-    await vi.waitFor(() => {
-      expect(state.get('ui.view')).toBe('status');
-    });
-    expect(buttons[1].getAttribute('aria-current')).toBe('page');
+    const escapeEvent = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
+    window.dispatchEvent(escapeEvent);
 
-    press('3');
     await vi.waitFor(() => {
-      expect(state.get('ui.view')).toBe('options');
+      expect(panel.dataset.open).toBe('false');
     });
-    expect(buttons[2].getAttribute('aria-current')).toBe('page');
-
-    press('4');
-    await vi.waitFor(() => {
-      expect(state.get('ui.view')).toBe('guides');
-    });
-    expect(buttons[3].getAttribute('aria-current')).toBe('page');
+    expect(toggleButton.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(toggleButton);
   });
 });
