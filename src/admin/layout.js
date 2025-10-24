@@ -98,48 +98,7 @@ function createPinnedToggle() {
 
 export function createAdminLayout(runtimePanel) {
   const layout = document.createElement('div');
-  layout.className = 'a11ytb-admin-shell';
-
-  const pageBody = document.body || null;
-  const bodyFullscreenClass = 'a11ytb-admin-fullscreen-open';
-  if (pageBody) {
-    pageBody.classList.remove(bodyFullscreenClass);
-  }
-
-  const controlsBar = document.createElement('div');
-  controlsBar.className = 'a11ytb-admin-shell-controls';
-
-  const fullscreenToggle = document.createElement('button');
-  fullscreenToggle.type = 'button';
-  fullscreenToggle.className = 'a11ytb-admin-fullscreen-toggle';
-  fullscreenToggle.setAttribute('aria-expanded', 'false');
-  fullscreenToggle.textContent = 'Ouvrir le tableau de bord en plein écran';
-
-  controlsBar.append(fullscreenToggle);
-
-  const collapsedHint = document.createElement('p');
-  collapsedHint.className = 'a11ytb-admin-collapsed-hint';
-  collapsedHint.textContent =
-    'Accédez à la vue détaillée en plein écran pour consulter toutes les sections.';
-
-  const stack = document.createElement('div');
-  stack.className = 'a11ytb-admin-stack';
-  stack.id = 'a11ytb-admin-stack';
-  stack.hidden = true;
-  fullscreenToggle.setAttribute('aria-controls', stack.id);
-
-  fullscreenToggle.addEventListener('click', () => {
-    const expanded = layout.classList.toggle('is-expanded');
-    fullscreenToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-    fullscreenToggle.textContent = expanded
-      ? 'Fermer le tableau de bord'
-      : 'Ouvrir le tableau de bord en plein écran';
-    stack.hidden = !expanded;
-    collapsedHint.hidden = expanded;
-    if (pageBody) {
-      pageBody.classList.toggle(bodyFullscreenClass, expanded);
-    }
-  });
+  layout.className = 'a11ytb-admin-app-layout';
 
   const headerActions = document.createElement('p');
   headerActions.className = 'a11ytb-admin-header-actions';
@@ -411,16 +370,15 @@ export function createAdminLayout(runtimePanel) {
     'Aucune automatisation enregistrée.'
   );
 
-  stack.append(
-    introSection,
+  const orderedSections = [
     dashboard,
     metricsSection,
     syncSection,
     exportSection,
     shareSection,
     automationSection,
-    suggestionSection
-  );
+    suggestionSection,
+  ];
 
   const availabilityPanel = document.createElement('section');
   availabilityPanel.className = 'a11ytb-admin-section a11ytb-admin-availability';
@@ -499,11 +457,17 @@ export function createAdminLayout(runtimePanel) {
     taxonomy
   );
 
-  stack.append(availabilityPanel, runtimePanel.element);
+  orderedSections.forEach((section) => {
+    layout.append(section);
+  });
 
-  runtimePanel.element.classList.add('a11ytb-admin-section', 'a11ytb-admin-runtime');
+  availabilityPanel.classList.add('a11ytb-admin-section');
+  layout.append(availabilityPanel);
 
-  layout.append(controlsBar, collapsedHint, stack);
+  runtimePanel.element.classList.add('a11ytb-admin-section');
+  layout.append(runtimePanel.element);
+
+  layout.append(introSection);
 
   return {
     root: layout,
