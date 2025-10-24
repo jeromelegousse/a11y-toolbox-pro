@@ -5,6 +5,8 @@ const loadEnvironmentMock = vi.fn();
 const analyzeMock = vi.fn();
 const llavaRemoteAnalyzeMock = vi.fn();
 const llavaLocalAnalyzeMock = vi.fn();
+const getLlavaRemoteConfigMock = vi.fn().mockResolvedValue(null);
+const ensureLocalImageMock = vi.fn();
 
 vi.mock('../../scripts/integrations/env.js', () => ({
   loadEnvironment: loadEnvironmentMock,
@@ -33,6 +35,14 @@ vi.mock('../../src/integrations/vision/moondream.js', () => ({
 }));
 
 vi.mock('../../src/integrations/vision/llava.js', () => ({
+  llavaVisionEngine: {
+    id: 'llava',
+    analyze: llavaRemoteAnalyzeMock,
+    remote: { id: 'llava', analyze: llavaRemoteAnalyzeMock },
+    remoteAnalyze: llavaRemoteAnalyzeMock,
+    local: { id: 'llava-local', analyze: llavaLocalAnalyzeMock },
+    localAnalyze: llavaLocalAnalyzeMock,
+  },
   llavaRemoteVisionEngine: {
     id: 'llava',
     analyze: llavaRemoteAnalyzeMock,
@@ -45,6 +55,10 @@ vi.mock('../../src/integrations/vision/llava.js', () => ({
     id: 'llava',
     analyze: llavaRemoteAnalyzeMock,
   },
+}));
+
+vi.mock('../../src/integrations/vision/remote-config.js', () => ({
+  getLlavaRemoteConfig: getLlavaRemoteConfigMock,
 }));
 
 vi.mock('../../src/integrations/vision/utils.js', () => ({
@@ -63,6 +77,8 @@ describe('demo-vlm CLI', () => {
     analyzeMock.mockReset();
     llavaRemoteAnalyzeMock.mockReset();
     llavaLocalAnalyzeMock.mockReset();
+    getLlavaRemoteConfigMock.mockReset();
+    getLlavaRemoteConfigMock.mockResolvedValue(null);
     console.log = originalConsoleLog;
     console.error = originalConsoleError;
     process.argv = [...originalArgv];

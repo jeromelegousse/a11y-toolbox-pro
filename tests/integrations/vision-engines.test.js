@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const requireEnvMock = vi.fn();
 const loadImageAsBase64Mock = vi.fn();
 const execFileMock = vi.fn();
+const getLlavaRemoteConfigMock = vi.fn().mockResolvedValue(null);
 
 vi.mock('../../scripts/integrations/env.js', () => ({
   requireEnv: requireEnvMock,
@@ -15,6 +16,10 @@ vi.mock('../../src/integrations/vision/utils.js', () => ({
 vi.mock('node:child_process', () => ({
   execFile: execFileMock,
   default: { execFile: execFileMock },
+}));
+
+vi.mock('../../src/integrations/vision/remote-config.js', () => ({
+  getLlavaRemoteConfig: getLlavaRemoteConfigMock,
 }));
 
 function createJsonResponse(payload) {
@@ -32,6 +37,8 @@ beforeEach(() => {
   requireEnvMock.mockReset();
   loadImageAsBase64Mock.mockReset();
   execFileMock.mockReset();
+  getLlavaRemoteConfigMock.mockReset();
+  getLlavaRemoteConfigMock.mockResolvedValue(null);
   globalThis.fetch = vi.fn();
 });
 
@@ -179,6 +186,34 @@ describe('llavaRemoteVisionEngine', () => {
     await expect(
       llavaRemoteVisionEngine.analyze({ imagePath: './image.png', prompt: 'Décrire' })
     ).rejects.toThrow('La réponse LLaVA ne contient pas de texte.');
+  });
+
+  it('utilise la configuration distante lorsqu’elle est disponible', async () => {
+    getLlavaRemoteConfigMock.mockResolvedValue({
+      endpoint: 'https://proxy.example.test/vision',
+      token: 'remote-token',
+    });
+    loadImageAsBase64Mock.mockResolvedValue({ data: 'AAA=', mimeType: 'image/png' });
+    globalThis.fetch.mockResolvedValue(
+      createJsonResponse([
+        {
+          generated_text: 'Réponse distante',
+        },
+      ])
+    );
+
+    const { llavaRemoteVisionEngine } = await import('../../src/integrations/vision/llava.js');
+    const result = await llavaRemoteVisionEngine.analyze({
+      imagePath: './image.png',
+      prompt: 'Décrire',
+    });
+
+    expect(requireEnvMock).not.toHaveBeenCalled();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    const [endpoint, options] = globalThis.fetch.mock.calls[0];
+    expect(endpoint).toBe('https://proxy.example.test/vision');
+    expect(options.headers.Authorization).toBe('Bearer remote-token');
+    expect(result.text).toBe('Réponse distante');
   });
 });
 

@@ -1650,7 +1650,9 @@ function a11ytb_execute_llava_vision_engine(string $image, string $prompt, strin
         return $command;
     }
 
-    $result = a11ytb_run_process_with_timeout($command['command'], $command['cwd']);
+    $env = isset($command['env']) && is_array($command['env']) ? $command['env'] : [];
+
+    $result = a11ytb_run_process_with_timeout($command['command'], $command['cwd'], 60, $env);
     if ($result instanceof WP_Error) {
         return $result;
     }
@@ -1726,7 +1728,32 @@ function a11ytb_build_llava_command(string $image, string $prompt, ?string $engi
     return [
         'command' => $command,
         'cwd' => $plugin_dir,
+        'env' => a11ytb_get_llava_bridge_environment(),
     ];
+}
+
+/**
+ * Construit les variables d’environnement transmises au bridge Node.
+ */
+function a11ytb_get_llava_bridge_environment(): array
+{
+    $env = [];
+
+    $endpoint = get_option('a11ytb_llava_endpoint', '');
+    if (is_string($endpoint)) {
+        $normalized = trim($endpoint);
+        if ($normalized !== '') {
+            $env['A11YTB_LLAVA_ENDPOINT'] = $normalized;
+        }
+    }
+
+    $token = get_option('a11ytb_llava_token', '');
+    if (is_string($token) && $token !== '') {
+        $env['A11YTB_LLAVA_TOKEN_ENCRYPTED'] = $token;
+        $env['A11YTB_SECRET_KEY'] = base64_encode(a11ytb_get_secret_encryption_key());
+    }
+
+    return $env;
 }
 
 /**
@@ -1772,9 +1799,10 @@ function a11ytb_locate_node_binary(): string
  * @param string      $command
  * @param string|null $cwd
  * @param int         $timeout
+ * @param array       $environment
  * @return array{stdout:string,stderr:string}|WP_Error
  */
-function a11ytb_run_process_with_timeout(string $command, ?string $cwd = null, int $timeout = 60)
+function a11ytb_run_process_with_timeout(string $command, ?string $cwd = null, int $timeout = 60, array $environment = [])
 {
     $descriptor = [
         0 => ['pipe', 'r'],
@@ -1782,7 +1810,28 @@ function a11ytb_run_process_with_timeout(string $command, ?string $cwd = null, i
         2 => ['pipe', 'w'],
     ];
 
-    $process = proc_open($command, $descriptor, $pipes, $cwd ?: null);
+    $env = null;
+    if (!empty($environment)) {
+        $filtered = [];
+        foreach ($environment as $key => $value) {
+            if (!is_string($key) || $key === '' || !is_string($value)) {
+                continue;
+            }
+
+            $filtered[$key] = $value;
+        }
+
+        if ($filtered) {
+            $base_env = getenv();
+            if (!is_array($base_env)) {
+                $base_env = $_ENV ?? [];
+            }
+
+            $env = array_merge($base_env, $filtered);
+        }
+    }
+
+    $process = proc_open($command, $descriptor, $pipes, $cwd ?: null, $env ?: null);
     if (!is_resource($process)) {
         return new WP_Error(
             'a11ytb_vision_exec_failed',
