@@ -91,8 +91,8 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
 
 .a11ytb-admin-app {
   --a11ytb-admin-surface: #fff;
-  --a11ytb-admin-surface-alt: color-mix(in srgb, #0f172a 4%, #fff);
-  --a11ytb-admin-border: color-mix(in srgb, var(--a11ytb-color-border) 35%, transparent);
+  --a11ytb-admin-surface-alt: #f6f7f7;
+  --a11ytb-admin-border: color-mix(in srgb, var(--a11ytb-color-border) 45%, transparent);
   --a11ytb-admin-muted: color-mix(in srgb, #0f172a 35%, transparent);
   --a11ytb-admin-accent: var(--a11ytb-color-primary);
   --a11ytb-admin-accent-strong: var(--a11ytb-color-primary-strong);
@@ -100,35 +100,100 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
   color: #0f172a;
 }
 
-.a11ytb-admin-app-grid {
+.a11ytb-admin-shell {
+  position: relative;
   display: grid;
-  gap: 24px;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px) minmax(240px, 300px);
+  gap: 16px;
 }
 
-.a11ytb-admin-app-main {
+.a11ytb-admin-shell-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.a11ytb-admin-fullscreen-toggle {
+  appearance: none;
+  border: 1px solid #c3c4c7;
+  background: #fff;
+  color: #1d2327;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.a11ytb-admin-fullscreen-toggle:hover,
+.a11ytb-admin-fullscreen-toggle:focus-visible {
+  background: #f0f0f1;
+  border-color: #8c8f94;
+  color: #0f172a;
+}
+
+.a11ytb-admin-fullscreen-toggle:focus-visible {
+  outline: 2px solid var(--a11ytb-color-primary);
+  outline-offset: 2px;
+}
+
+.a11ytb-admin-collapsed-hint {
+  margin: 0;
+  padding: 16px;
+  border-radius: 4px;
+  border: 1px dashed #dcdcde;
+  background: #f6f7f7;
+  color: #50575e;
+  font-size: 14px;
+}
+
+.a11ytb-admin-stack {
   display: grid;
   gap: 24px;
+  margin: 0 auto;
+  width: min(1100px, 100%);
+}
+
+.a11ytb-admin-shell.is-expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 100110;
+  background: #f6f7f7;
+  padding: 24px min(5vw, 48px);
+  overflow-y: auto;
+}
+
+.a11ytb-admin-shell.is-expanded .a11ytb-admin-shell-controls {
+  position: sticky;
+  top: 0;
+  padding: 12px 0;
+  background: #f6f7f7;
+  z-index: 2;
+}
+
+.a11ytb-admin-shell.is-expanded .a11ytb-admin-stack {
+  width: min(1200px, 100%);
+}
+
+.a11ytb-admin-shell.is-expanded .a11ytb-admin-collapsed-hint {
+  display: none;
+}
+
+body.a11ytb-admin-fullscreen-open {
+  overflow: hidden;
 }
 
 .a11ytb-admin-availability {
-  position: sticky;
-  top: 16px;
   display: grid;
   gap: 20px;
-  background: var(--a11ytb-admin-surface);
-  border: 1px solid var(--a11ytb-admin-border);
-  border-radius: var(--a11ytb-radius-lg, 12px);
-  padding: 20px;
-  box-shadow: 0 1px 0 rgb(15 23 42 / 6%);
 }
 
 .a11ytb-admin-section {
   background: var(--a11ytb-admin-surface);
-  border: 1px solid var(--a11ytb-admin-border);
-  border-radius: var(--a11ytb-radius-lg, 12px);
-  padding: 20px;
-  box-shadow: 0 1px 0 rgb(15 23 42 / 6%);
+  border: 1px solid #dcdcde;
+  border-radius: var(--a11ytb-radius-md, 8px);
+  padding: 24px;
+  box-shadow: none;
 }
 
 .a11ytb-admin-section-header {
@@ -587,11 +652,16 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
   text-align: center;
 }
 
+.a11ytb-admin-runtime {
+  display: grid;
+  gap: 16px;
+}
+
 .a11ytb-runtime-panel {
-  background: var(--a11ytb-admin-surface);
-  border: 1px solid var(--a11ytb-admin-border);
-  border-radius: var(--a11ytb-radius-lg, 12px);
-  padding: 20px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
   display: grid;
   gap: 16px;
   align-content: start;
@@ -736,9 +806,23 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
   }
 }
 
-@media (max-width: 900px) {
-  .a11ytb-admin-app-grid {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 960px) {
+  .a11ytb-admin-shell.is-expanded {
+    padding: 20px min(5vw, 32px);
+  }
+}
+
+@media (max-width: 600px) {
+  .a11ytb-admin-shell.is-expanded {
+    padding: 16px;
+  }
+
+  .a11ytb-admin-shell-controls {
+    justify-content: stretch;
+  }
+
+  .a11ytb-admin-fullscreen-toggle {
+    width: 100%;
   }
 }
 
