@@ -43,15 +43,15 @@ function triggerDownload(filename, content, mime) {
 }
 
 function buildSummaryCard(label, value) {
-  const card = document.createElement('article');
-  card.className = 'a11ytb-admin-metric-card';
+  const card = document.createElement('div');
+  card.className = 'card a11ytb-metric-card';
 
   const title = document.createElement('h3');
-  title.className = 'a11ytb-admin-metric-title';
+  title.className = 'a11ytb-metric-title';
   title.textContent = label;
 
   const metric = document.createElement('p');
-  metric.className = 'a11ytb-admin-metric-value';
+  metric.className = 'a11ytb-metric-value';
   metric.textContent = value;
 
   card.append(title, metric);
@@ -160,18 +160,18 @@ export function createMetricsDashboard(elements = {}) {
 
     overview.topLatency.forEach((entry) => {
       const item = document.createElement('li');
-      item.className = 'a11ytb-admin-metrics-item';
+      item.className = 'a11ytb-metrics-item';
 
       const label = document.createElement('span');
-      label.className = 'a11ytb-admin-metrics-item-label';
+      label.className = 'a11ytb-metrics-item-label';
       label.textContent = entry.label;
 
       const value = document.createElement('span');
-      value.className = 'a11ytb-admin-metrics-item-value';
+      value.className = 'a11ytb-metrics-item-value';
       value.textContent = formatDuration(entry.latency?.combinedAverage);
 
       const meta = document.createElement('span');
-      meta.className = 'a11ytb-admin-metrics-item-meta';
+      meta.className = 'a11ytb-metrics-item-meta';
       meta.textContent = `${entry.attempts || 0} tentative(s)`;
 
       item.append(label, value, meta);
@@ -191,29 +191,29 @@ export function createMetricsDashboard(elements = {}) {
 
     recent.forEach((incident) => {
       const item = document.createElement('li');
-      item.className = 'a11ytb-admin-metrics-item';
+      item.className = 'a11ytb-metrics-item';
 
       const header = document.createElement('div');
-      header.className = 'a11ytb-admin-metrics-item-header';
+      header.className = 'a11ytb-metrics-item-header';
 
       const label = document.createElement('span');
-      label.className = 'a11ytb-admin-metrics-item-label';
+      label.className = 'a11ytb-metrics-item-label';
       label.textContent = incident.moduleLabel || incident.moduleId;
 
       const badge = createBadge(
         incident.severity === 'warning' ? 'Avertissement' : 'Critique',
         incident.severity === 'warning' ? 'warning' : 'alert'
       );
-      badge.classList.add('a11ytb-admin-metrics-badge');
+      badge.classList.add('a11ytb-metrics-badge');
 
       header.append(label, badge);
 
       const message = document.createElement('p');
-      message.className = 'a11ytb-admin-metrics-item-message';
+      message.className = 'a11ytb-metrics-item-message';
       message.textContent = incident.message || 'Signalement récent.';
 
       const meta = document.createElement('span');
-      meta.className = 'a11ytb-admin-metrics-item-meta';
+      meta.className = 'a11ytb-metrics-item-meta';
       meta.textContent = formatDateRelative(incident.at);
 
       item.append(header, message, meta);
@@ -232,18 +232,18 @@ export function createMetricsDashboard(elements = {}) {
 
     overview.collections.forEach((collection) => {
       const item = document.createElement('li');
-      item.className = 'a11ytb-admin-metrics-item';
+      item.className = 'a11ytb-metrics-item';
 
       const label = document.createElement('span');
-      label.className = 'a11ytb-admin-metrics-item-label';
+      label.className = 'a11ytb-metrics-item-label';
       label.textContent = collection.label || collection.id;
 
       const value = document.createElement('span');
-      value.className = 'a11ytb-admin-metrics-item-value';
+      value.className = 'a11ytb-metrics-item-value';
       value.textContent = `${collection.modules || 0} module(s)`;
 
       const meta = document.createElement('span');
-      meta.className = 'a11ytb-admin-metrics-item-meta';
+      meta.className = 'a11ytb-metrics-item-meta';
       const parts = [`${formatPercent(collection.successRate)} succès`];
       if (collection.failures) {
         parts.push(`${collection.failures} échec(s)`);
@@ -276,7 +276,8 @@ export function createMetricsDashboard(elements = {}) {
     const offlineLabel = offline
       ? `${offline} ressource(s) hors ligne`
       : 'Aucune ressource hors ligne';
-    status.textContent = `Tentatives cumulées : ${attempts} (${successes} succès, ${failures} échecs). Dernière mise à jour : ${updated}. ${offlineLabel}${syncLabel}.`;
+    const target = status.querySelector('p') || status;
+    target.textContent = `Tentatives cumulées : ${attempts} (${successes} succès, ${failures} échecs). Dernière mise à jour : ${updated}. ${offlineLabel}${syncLabel}.`;
   }
 
   function exportJson() {
@@ -366,7 +367,8 @@ export function createMetricsDashboard(elements = {}) {
         if (table) table.setAttribute('aria-hidden', 'true');
         if (empty) empty.hidden = false;
         if (status) {
-          status.textContent = 'En attente de données métriques.';
+          const target = status.querySelector('p') || status;
+          target.textContent = 'En attente de données métriques.';
         }
         return;
       }
