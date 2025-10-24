@@ -1,15 +1,14 @@
 export function renderStatusCards(container, summaries) {
   container.innerHTML = '';
   summaries.forEach((summary) => {
-    const card = document.createElement('article');
-    card.className = 'a11ytb-status-card';
+    const card = document.createElement('div');
+    card.className = 'card a11ytb-status-card';
     card.dataset.tone = summary.tone || 'info';
 
-    const header = document.createElement('header');
+    const header = document.createElement('div');
     header.className = 'a11ytb-status-card-header';
 
     const label = document.createElement('span');
-    label.className = 'a11ytb-status-label';
     label.textContent = summary.label || summary.id || '';
 
     const badge = document.createElement('span');
@@ -28,7 +27,7 @@ export function renderStatusCards(container, summaries) {
     value.setAttribute('aria-live', summary.live || 'polite');
 
     const detail = document.createElement('p');
-    detail.className = 'a11ytb-status-detail';
+    detail.className = 'description';
     detail.textContent = summary.detail || '';
     detail.hidden = !summary.detail;
 
