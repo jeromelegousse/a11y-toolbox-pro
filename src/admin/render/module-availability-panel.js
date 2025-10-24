@@ -12,7 +12,7 @@ function formatValue(value) {
 function createAvailabilityButton(bucket, activeBucket, handler) {
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = 'a11ytb-admin-availability-toggle';
+  button.className = 'a11ytb-availability-toggle button';
   button.dataset.bucket = bucket.id;
   button.dataset.tone = bucket.tone || 'info';
   button.disabled = bucket.id !== 'all' && bucket.count === 0;
@@ -30,45 +30,45 @@ function createAvailabilityButton(bucket, activeBucket, handler) {
 
 function renderModuleItem(entry, actions, handlers) {
   const item = document.createElement('li');
-  item.className = 'a11ytb-admin-availability-item';
+  item.className = 'a11ytb-availability-item';
   item.dataset.moduleId = entry.id;
 
   const header = document.createElement('div');
-  header.className = 'a11ytb-admin-availability-item-head';
+  header.className = 'a11ytb-availability-item-head';
 
   const titleButton = document.createElement('button');
   titleButton.type = 'button';
-  titleButton.className = 'a11ytb-admin-availability-item-title';
+  titleButton.className = 'button-link a11ytb-availability-item-title';
   titleButton.textContent = entry.manifest.name || entry.id;
   titleButton.addEventListener('click', () => {
     handlers.onFocusModule?.(entry);
   });
 
   const statusBadge = createBadge(entry.status, entry.statusTone);
-  statusBadge.classList.add('a11ytb-admin-availability-status');
+  statusBadge.classList.add('a11ytb-availability-status');
 
   const compatBadge = createBadge(
     COMPATIBILITY_LABELS[entry.compatStatus] || COMPATIBILITY_LABELS.none,
     COMPATIBILITY_TONES[entry.compatStatus] || COMPATIBILITY_TONES.none
   );
-  compatBadge.classList.add('a11ytb-admin-availability-compat');
+  compatBadge.classList.add('a11ytb-availability-compat');
 
   header.append(titleButton, statusBadge, compatBadge);
 
   const meta = document.createElement('p');
-  meta.className = 'a11ytb-admin-availability-meta';
+  meta.className = 'description';
   const profileCount = entry.profiles.length;
   const collectionCount = entry.collections.length;
   const attemptLabel = formatValue(entry.metrics.lastAttemptAt || entry.runtime.lastAttemptAt);
   meta.textContent = `${profileCount} profil${profileCount > 1 ? 's' : ''} • ${collectionCount} collection${collectionCount > 1 ? 's' : ''} • Dernier essai ${attemptLabel}`;
 
   const actionBar = document.createElement('div');
-  actionBar.className = 'a11ytb-admin-availability-actions';
+  actionBar.className = 'a11ytb-availability-actions';
 
   if (actions?.canToggle(entry)) {
     const toggle = document.createElement('button');
     toggle.type = 'button';
-    toggle.className = 'a11ytb-admin-availability-action';
+    toggle.className = 'button button-small';
     toggle.textContent = entry.enabled ? 'Suspendre' : 'Activer';
     toggle.addEventListener('click', () => {
       actions.toggleEnabled(entry);
@@ -80,7 +80,7 @@ function renderModuleItem(entry, actions, handlers) {
   if (actions?.canPin(entry)) {
     const pin = document.createElement('button');
     pin.type = 'button';
-    pin.className = 'a11ytb-admin-availability-action';
+    pin.className = 'button-link';
     pin.textContent = entry.isPinned ? 'Désépingler' : 'Épingler';
     pin.addEventListener('click', () => {
       actions.togglePin(entry);
@@ -108,10 +108,10 @@ function renderTaxonomy(list, empty, items, onSelect) {
   list.hidden = false;
   items.slice(0, 6).forEach((item) => {
     const li = document.createElement('li');
-    li.className = 'a11ytb-admin-availability-taxonomy-item';
+    li.className = 'a11ytb-availability-taxonomy-item';
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'a11ytb-admin-availability-taxonomy-button';
+    button.className = 'button-link a11ytb-availability-taxonomy-button';
     button.textContent = `${item.label} (${item.count})`;
     button.title = item.pathLabel || item.label;
     button.addEventListener('click', () => {
@@ -153,7 +153,7 @@ export function createModuleAvailabilityPanel(layout, handlers = {}) {
         const button = createAvailabilityButton(bucket, state.activeBucket, (bucketId) => {
           state.activeBucket = bucketId;
           layout.toolbar
-            .querySelectorAll('.a11ytb-admin-availability-toggle')
+            .querySelectorAll('.a11ytb-availability-toggle')
             .forEach((toolbarButton) => {
               const isActive = toolbarButton.dataset.bucket === state.activeBucket;
               toolbarButton.classList.toggle('is-active', isActive);
@@ -174,31 +174,31 @@ export function createModuleAvailabilityPanel(layout, handlers = {}) {
         }
         visibleBuckets += 1;
         const section = document.createElement('section');
-        section.className = 'a11ytb-admin-availability-bucket';
+        section.className = 'a11ytb-availability-bucket';
         section.dataset.bucket = bucket.id;
         if (state.activeBucket === bucket.id) {
           section.dataset.active = 'true';
         }
 
         const header = document.createElement('header');
-        header.className = 'a11ytb-admin-availability-bucket-head';
+        header.className = 'a11ytb-availability-bucket-head';
 
         const title = document.createElement('h3');
-        title.className = 'a11ytb-admin-availability-bucket-title';
+        title.className = 'a11ytb-availability-bucket-title';
         title.textContent = bucket.label;
 
         const countBadge = createBadge(`${bucket.count}`, bucket.tone || 'info');
-        countBadge.classList.add('a11ytb-admin-availability-bucket-count');
+        countBadge.classList.add('a11ytb-availability-bucket-count');
 
         const description = document.createElement('p');
-        description.className = 'a11ytb-admin-availability-bucket-description';
+        description.className = 'description';
         description.textContent = bucket.description || '';
 
         header.append(title, countBadge);
         section.append(header, description);
 
         const list = document.createElement('ul');
-        list.className = 'a11ytb-admin-availability-list';
+        list.className = 'a11ytb-availability-list';
         list.setAttribute('role', 'list');
         bucket.modules.slice(0, 6).forEach((entry) => {
           list.append(

@@ -62,10 +62,12 @@ export function initAdminDashboard(mount) {
       const mask = geminiConfig.masked || '••••••••';
       const quota = Number.isFinite(geminiConfig.quota) ? geminiConfig.quota : null;
       const quotaLabel = quota === null ? 'quota non précisé' : `${quota} requête(s)/min`;
-      layout.geminiStatus.textContent = `Clé Gemini configurée (${mask}) – ${quotaLabel}.`;
+      setNoticeText(layout.geminiStatus, `Clé Gemini configurée (${mask}) – ${quotaLabel}.`);
     } else {
-      layout.geminiStatus.textContent =
-        'Aucune clé Gemini enregistrée. Les intégrations IA restent désactivées.';
+      setNoticeText(
+        layout.geminiStatus,
+        'Aucune clé Gemini enregistrée. Les intégrations IA restent désactivées.'
+      );
     }
   }
 
@@ -77,7 +79,7 @@ export function initAdminDashboard(mount) {
         ? `endpoint ${llavaConfig.endpoint}`
         : 'endpoint actif';
       const secretLabel = llavaConfig.maskedToken ? llavaConfig.maskedToken : 'secret masqué';
-      layout.llavaStatus.textContent = `LLaVA prêt (${endpointLabel} • ${secretLabel}).`;
+      setNoticeText(layout.llavaStatus, `LLaVA prêt (${endpointLabel} • ${secretLabel}).`);
     } else {
       let message =
         'LLaVA non configuré. Renseignez un endpoint et un secret chiffré dans les réglages.';
@@ -85,7 +87,7 @@ export function initAdminDashboard(mount) {
         message +=
           ' Le secret stocké est illisible : regénérez-le puis réenregistrez le formulaire.';
       }
-      layout.llavaStatus.textContent = message;
+      setNoticeText(layout.llavaStatus, message);
     }
   }
 
@@ -112,6 +114,12 @@ export function initAdminDashboard(mount) {
   let currentSnapshot = {};
   let currentEntries = [];
   let currentSummaries = [];
+
+  function setNoticeText(element, message) {
+    if (!element) return;
+    const target = element.querySelector('p') || element;
+    target.textContent = message;
+  }
 
   function setSelectValue(select, value) {
     if (!select) return;
@@ -215,7 +223,10 @@ export function initAdminDashboard(mount) {
       layout.syncEmpty.hidden = false;
       layout.syncList.hidden = true;
       if (layout.syncStatus) {
-        layout.syncStatus.textContent = 'Aucune synchronisation enregistrée pour le moment.';
+        setNoticeText(
+          layout.syncStatus?.closest('.notice') || layout.syncStatus,
+          'Aucune synchronisation enregistrée pour le moment.'
+        );
       }
       return;
     }
@@ -263,7 +274,10 @@ export function initAdminDashboard(mount) {
     });
 
     if (layout.syncStatus) {
-      layout.syncStatus.textContent = `Dernier envoi ${formatDateRelative(items[0].timestamp)}`;
+      setNoticeText(
+        layout.syncStatus?.closest('.notice') || layout.syncStatus,
+        `Dernier envoi ${formatDateRelative(items[0].timestamp)}`
+      );
     }
   }
 
@@ -275,7 +289,10 @@ export function initAdminDashboard(mount) {
       layout.exportEmpty.hidden = false;
       layout.exportList.hidden = true;
       if (layout.exportStatus) {
-        layout.exportStatus.textContent = 'Aucun export recensé.';
+        setNoticeText(
+          layout.exportStatus?.closest('.notice') || layout.exportStatus,
+          'Aucun export recensé.'
+        );
       }
       return;
     }
@@ -312,7 +329,10 @@ export function initAdminDashboard(mount) {
     });
 
     if (layout.exportStatus) {
-      layout.exportStatus.textContent = `Dernier export ${formatDateRelative(items[0].timestamp)}`;
+      setNoticeText(
+        layout.exportStatus?.closest('.notice') || layout.exportStatus,
+        `Dernier export ${formatDateRelative(items[0].timestamp)}`
+      );
     }
   }
 
@@ -324,7 +344,10 @@ export function initAdminDashboard(mount) {
       layout.shareEmpty.hidden = false;
       layout.shareList.hidden = true;
       if (layout.shareStatus) {
-        layout.shareStatus.textContent = 'Aucun partage enregistré.';
+        setNoticeText(
+          layout.shareStatus?.closest('.notice') || layout.shareStatus,
+          'Aucun partage enregistré.'
+        );
       }
       return;
     }
@@ -387,7 +410,10 @@ export function initAdminDashboard(mount) {
     });
 
     if (layout.shareStatus) {
-      layout.shareStatus.textContent = `Dernier partage ${formatDateRelative(items[0].timestamp)}`;
+      setNoticeText(
+        layout.shareStatus?.closest('.notice') || layout.shareStatus,
+        `Dernier partage ${formatDateRelative(items[0].timestamp)}`
+      );
     }
   }
 
@@ -399,7 +425,10 @@ export function initAdminDashboard(mount) {
       layout.automationEmpty.hidden = false;
       layout.automationList.hidden = true;
       if (layout.automationStatus) {
-        layout.automationStatus.textContent = 'Aucune automatisation enregistrée.';
+        setNoticeText(
+          layout.automationStatus?.closest('.notice') || layout.automationStatus,
+          'Aucune automatisation enregistrée.'
+        );
       }
       return;
     }
@@ -452,9 +481,10 @@ export function initAdminDashboard(mount) {
     });
 
     if (layout.automationStatus) {
-      layout.automationStatus.textContent = `Dernière automatisation ${formatDateRelative(
-        items[0].timestamp
-      )}`;
+      setNoticeText(
+        layout.automationStatus?.closest('.notice') || layout.automationStatus,
+        `Dernière automatisation ${formatDateRelative(items[0].timestamp)}`
+      );
     }
   }
 
@@ -466,7 +496,10 @@ export function initAdminDashboard(mount) {
       layout.suggestionsEmpty.hidden = false;
       layout.suggestionsList.hidden = true;
       if (layout.suggestionsStatus) {
-        layout.suggestionsStatus.textContent = 'Aucune recommandation disponible.';
+        setNoticeText(
+          layout.suggestionsStatus?.closest('.notice') || layout.suggestionsStatus,
+          'Aucune recommandation disponible.'
+        );
       }
       return;
     }
@@ -479,9 +512,12 @@ export function initAdminDashboard(mount) {
       0
     );
     if (layout.suggestionsStatus) {
-      layout.suggestionsStatus.textContent = `${totalRecommendations} recommandation${
-        totalRecommendations > 1 ? 's' : ''
-      } pour ${suggestions.length} profil${suggestions.length > 1 ? 's' : ''}.`;
+      setNoticeText(
+        layout.suggestionsStatus?.closest('.notice') || layout.suggestionsStatus,
+        `${totalRecommendations} recommandation${
+          totalRecommendations > 1 ? 's' : ''
+        } pour ${suggestions.length} profil${suggestions.length > 1 ? 's' : ''}.`
+      );
     }
 
     suggestions.forEach((profileEntry) => {
@@ -749,20 +785,19 @@ export function initAdminDashboard(mount) {
 
   function attemptConnection() {
     if (!previewFrame || !previewFrame.contentWindow) {
-      layout.connectionStatus.textContent =
-        'Aucun aperçu disponible pour synchroniser les données.';
+      setNoticeText(layout.connectionStatus, 'Aucun aperçu disponible pour synchroniser les données.');
       return;
     }
     try {
       const candidate = previewFrame.contentWindow;
       const api = candidate?.a11ytb?.state;
       if (!api || typeof api.get !== 'function') {
-        layout.connectionStatus.textContent = 'Chargement de l’aperçu…';
+        setNoticeText(layout.connectionStatus, 'Chargement de l’aperçu…');
         window.setTimeout(attemptConnection, 500);
         return;
       }
       previewState = api;
-      layout.connectionStatus.textContent = 'Aperçu connecté. Les données sont synchronisées.';
+      setNoticeText(layout.connectionStatus, 'Aperçu connecté. Les données sont synchronisées.');
       const snapshot = previewState.get();
       sync(snapshot);
       if (typeof previewState.on === 'function') {
@@ -771,8 +806,10 @@ export function initAdminDashboard(mount) {
         });
       }
     } catch (error) {
-      layout.connectionStatus.textContent =
-        'Impossible de lire les données de l’aperçu (origine différente).';
+      setNoticeText(
+        layout.connectionStatus,
+        'Impossible de lire les données de l’aperçu (origine différente).'
+      );
     }
   }
 
