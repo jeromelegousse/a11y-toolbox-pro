@@ -52,6 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CI: true
+      A11YTB_PLAYWRIGHT_USE_MOCKS: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
