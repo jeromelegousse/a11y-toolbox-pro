@@ -97,11 +97,49 @@ function createPinnedToggle() {
 }
 
 export function createAdminLayout(runtimePanel) {
-  const root = document.createElement('div');
-  root.className = 'wrap a11ytb-admin-wrap';
+  const layout = document.createElement('div');
+  layout.className = 'a11ytb-admin-shell';
 
-  const heading = document.createElement('h1');
-  heading.textContent = 'A11y Toolbox Pro';
+  const pageBody = document.body || null;
+  const bodyFullscreenClass = 'a11ytb-admin-fullscreen-open';
+  if (pageBody) {
+    pageBody.classList.remove(bodyFullscreenClass);
+  }
+
+  const controlsBar = document.createElement('div');
+  controlsBar.className = 'a11ytb-admin-shell-controls';
+
+  const fullscreenToggle = document.createElement('button');
+  fullscreenToggle.type = 'button';
+  fullscreenToggle.className = 'a11ytb-admin-fullscreen-toggle';
+  fullscreenToggle.setAttribute('aria-expanded', 'false');
+  fullscreenToggle.textContent = 'Ouvrir le tableau de bord en plein écran';
+
+  controlsBar.append(fullscreenToggle);
+
+  const collapsedHint = document.createElement('p');
+  collapsedHint.className = 'a11ytb-admin-collapsed-hint';
+  collapsedHint.textContent =
+    'Accédez à la vue détaillée en plein écran pour consulter toutes les sections.';
+
+  const stack = document.createElement('div');
+  stack.className = 'a11ytb-admin-stack';
+  stack.id = 'a11ytb-admin-stack';
+  stack.hidden = true;
+  fullscreenToggle.setAttribute('aria-controls', stack.id);
+
+  fullscreenToggle.addEventListener('click', () => {
+    const expanded = layout.classList.toggle('is-expanded');
+    fullscreenToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    fullscreenToggle.textContent = expanded
+      ? 'Fermer le tableau de bord'
+      : 'Ouvrir le tableau de bord en plein écran';
+    stack.hidden = !expanded;
+    collapsedHint.hidden = expanded;
+    if (pageBody) {
+      pageBody.classList.toggle(bodyFullscreenClass, expanded);
+    }
+  });
 
   const headerActions = document.createElement('p');
   headerActions.className = 'a11ytb-admin-header-actions';
@@ -373,15 +411,19 @@ export function createAdminLayout(runtimePanel) {
     'Aucune automatisation enregistrée.'
   );
 
-  const suggestionsSection = createSection(
-    'suggestions',
-    'Collections suggérées',
-    'Identifiez les packs à compléter en fonction des modules activés dans vos profils.'
+  stack.append(
+    introSection,
+    dashboard,
+    metricsSection,
+    syncSection,
+    exportSection,
+    shareSection,
+    automationSection,
+    suggestionSection
   );
 
-  const suggestionsStatus = createNotice('info', 'Aucune recommandation disponible.');
-  suggestionsStatus.notice.setAttribute('role', 'status');
-  suggestionsStatus.notice.setAttribute('aria-live', 'polite');
+  const availabilityPanel = document.createElement('section');
+  availabilityPanel.className = 'a11ytb-admin-section a11ytb-admin-availability';
 
   const suggestionsList = document.createElement('div');
   suggestionsList.className = 'a11ytb-suggestions';
@@ -457,34 +499,20 @@ export function createAdminLayout(runtimePanel) {
     taxonomy
   );
 
-  const runtimeSection = createSection('runtime', 'Observabilité runtime');
-  runtimeSection.section.append(runtimePanel.element);
+  stack.append(availabilityPanel, runtimePanel.element);
 
-  [
-    heading,
-    headerActions,
-    intro.section,
-    dashboard.section,
-    metrics.section,
-    syncSection.section,
-    exportSection.section,
-    shareSection.section,
-    automationSection.section,
-    suggestionsSection.section,
-    availabilitySection.section,
-    runtimeSection.section,
-  ].forEach((element, index) => {
-    if (index > 1) {
-      element.style.marginTop = `${SECTION_SPACING}px`;
-    }
-    root.append(element);
-  });
+  runtimePanel.element.classList.add('a11ytb-admin-section', 'a11ytb-admin-runtime');
+
+  layout.append(controlsBar, collapsedHint, stack);
 
   return {
-    root,
-    introSection: intro.section,
-    dashboard: dashboard.section,
-    statusGrid: statusContainer,
+    root: layout,
+    fullscreenToggle,
+    content: stack,
+    collapsedHint,
+    introSection,
+    dashboard,
+    statusGrid,
     manifestDiff,
     moduleGrid: moduleBody,
     emptyState: moduleEmpty.notice,
