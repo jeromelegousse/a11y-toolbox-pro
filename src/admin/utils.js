@@ -53,7 +53,7 @@ export function formatDateRelative(timestamp) {
 
 export function createBadge(text, tone = 'info') {
   const badge = document.createElement('span');
-  badge.className = 'a11ytb-admin-badge';
+  badge.className = 'a11ytb-badge';
   badge.dataset.tone = tone;
   badge.textContent = text;
   return badge;
@@ -61,7 +61,7 @@ export function createBadge(text, tone = 'info') {
 
 export function createTag(text) {
   const tag = document.createElement('span');
-  tag.className = 'a11ytb-admin-tag';
+  tag.className = 'a11ytb-tag';
   tag.textContent = text;
   return tag;
 }
