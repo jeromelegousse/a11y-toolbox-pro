@@ -118,8 +118,7 @@ const baseInitial = {
     dock: 'right',
     category: 'all',
     search: '',
-    moduleLayout: 'double-column',
-    moduleFlyoutOpen: false,
+    fullscreenMenuOpen: false,
     fullscreen: false,
     pinned: [],
     hidden: [],
@@ -138,7 +137,6 @@ const baseInitial = {
       collection: 'all',
     },
     activity: [],
-    view: 'status',
     lastProfile: null,
     guides: {
       completedSteps: {},
@@ -216,7 +214,6 @@ const initial = normalizedManifests.reduce(
 
 const defaultConfig = pluginConfig?.defaults || {};
 const allowedDocks = new Set(['left', 'right', 'bottom']);
-const allowedViews = new Set(['modules', 'options', 'organize', 'guides', 'shortcuts']);
 
 const metricsIntegration = pluginConfig?.integrations?.metrics || {};
 const metricsEndpoint =
@@ -274,10 +271,6 @@ if (defaultConfig?.dock && allowedDocks.has(defaultConfig.dock)) {
 
 if (typeof defaultConfig?.fullscreen === 'boolean') {
   initial.ui.fullscreen = defaultConfig.fullscreen;
-}
-
-if (defaultConfig?.view && allowedViews.has(defaultConfig.view)) {
-  initial.ui.view = defaultConfig.view;
 }
 
 const moduleIcons = {
@@ -443,8 +436,7 @@ if (typeof document !== 'undefined' && typeof document.addEventListener === 'fun
 const ensureDefaults = [
   ['ui.category', initial.ui.category],
   ['ui.search', initial.ui.search],
-  ['ui.moduleLayout', initial.ui.moduleLayout],
-  ['ui.moduleFlyoutOpen', initial.ui.moduleFlyoutOpen],
+  ['ui.fullscreenMenuOpen', initial.ui.fullscreenMenuOpen],
   ['ui.fullscreen', initial.ui.fullscreen],
   ['ui.pinned', initial.ui.pinned],
   ['ui.hidden', initial.ui.hidden],
@@ -455,7 +447,6 @@ const ensureDefaults = [
   ['ui.organizeFilter', initial.ui.organizeFilter],
   ['ui.availableModules', initial.ui.availableModules],
   ['ui.activity', initial.ui.activity],
-  ['ui.view', initial.ui.view],
   ['ui.lastProfile', initial.ui.lastProfile],
   ['ui.guides', initial.ui.guides],
   ['ui.collections', initial.ui.collections],
