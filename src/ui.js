@@ -61,7 +61,21 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   const PRIORITY_LOOKUP = new Map(PRIORITY_LEVELS.map((level) => [level.id, level]));
 
   const CUSTOM_SHORTCUT_DEFINITIONS = [
-    { id: 'toggle-panel', label: 'Ouvrir ou fermer le menu accessibilité.', default: 'Alt+Shift+A' },
+    { id: 'toggle-menu', label: 'Ouvrir ou fermer le menu.', default: 'Alt+Shift+A' },
+    {
+      id: 'jump-status',
+      label: 'Aller à la section État temps réel.',
+      default: 'Alt+Shift+S',
+      target: '#a11ytb-panel-status',
+      view: 'status',
+    },
+    {
+      id: 'jump-modules',
+      label: 'Aller à la section Modules.',
+      default: 'Alt+Shift+M',
+      target: '#a11ytb-panel-modules',
+      view: 'modules',
+    },
   ];
   const CUSTOM_SHORTCUT_LOOKUP = new Map(
     CUSTOM_SHORTCUT_DEFINITIONS.map((item) => [item.id, item])
@@ -529,8 +543,11 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   }
 
   function buildShortcutSummary(snapshot) {
-    const combo = resolveShortcutCombo('toggle-panel', snapshot).raw;
-    if (!combo) {
+    const highlightOrder = ['toggle-menu', 'jump-status', 'jump-modules'];
+    const parts = highlightOrder
+      .map((id) => resolveShortcutCombo(id, snapshot).raw)
+      .filter(Boolean);
+    if (!parts.length) {
       return 'Raccourcis : définissez vos propres combinaisons.';
     }
     return `Raccourcis : ${combo}`;
@@ -4824,7 +4841,11 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     {
       title: 'Navigation du menu',
       description: 'Raccourcis globaux accessibles depuis toute la page.',
-      shortcuts: [{ id: 'toggle-panel', description: 'Ouvrir ou fermer le menu accessibilité.' }],
+      shortcuts: [
+        { id: 'toggle-menu', description: 'Ouvrir ou fermer le menu plein écran.' },
+        { id: 'jump-status', description: 'Aller directement à la section État temps réel.' },
+        { id: 'jump-modules', description: 'Aller directement à la section Modules.' },
+      ],
     },
     {
       title: 'Gestion du panneau',
@@ -9539,6 +9560,66 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     return collectFocusable(panel);
   }
 
+  function restoreFocusAfterMenu() {
+    const fallback =
+      lastFocusedElement && typeof lastFocusedElement.focus === 'function'
+        ? lastFocusedElement
+        : modulesSidebarEntry?.button || sidebarQuickAccess[0] || sidebar;
+    if (fallback && typeof fallback.focus === 'function') {
+      try {
+        fallback.focus({ preventScroll: true });
+      } catch (error) {
+        fallback.focus();
+      }
+    }
+    lastFocusedElement = null;
+  }
+
+  function syncMenuState(snapshot = state.get()) {
+    const open = !!snapshot?.ui?.menuOpen;
+    const body = root?.ownerDocument?.body ?? document.body;
+    const previouslyOpen = panel.dataset.open === 'true';
+    panel.dataset.open = String(open);
+    panel.setAttribute('aria-hidden', String(!open));
+    updateSidebarPanelState(open);
+    overlay.dataset.open = String(open);
+    overlay.setAttribute('aria-hidden', String(!open));
+    if (body) {
+      body.classList.toggle('a11ytb-modal-open', open);
+    }
+
+    if (open) {
+      if (typeof releaseOutsideInert === 'function') {
+        releaseOutsideInert();
+      }
+      releaseOutsideInert = applyInertToSiblings(root);
+      setupPanelFocusTrap();
+      if (!previouslyOpen) {
+        lastFocusedElement = document.activeElement;
+      }
+      const focusables = getFocusableElements();
+      const target = focusables[0] || panel;
+      if (target && typeof target.focus === 'function') {
+        try {
+          target.focus({ preventScroll: true });
+        } catch (error) {
+          target.focus();
+        }
+      }
+    } else {
+      teardownPanelFocusTrap();
+      if (typeof releaseOutsideInert === 'function') {
+        releaseOutsideInert();
+        releaseOutsideInert = null;
+      }
+      stopShortcutRecording();
+      if (snapshot?.ui?.fullscreen) {
+        state.set('ui.fullscreen', false);
+      }
+      restoreFocusAfterMenu();
+    }
+  }
+
   function syncFullscreenMode(snapshot) {
     const fullscreen = !!snapshot?.ui?.fullscreen;
     panel.dataset.fullscreen = String(fullscreen);
@@ -9648,59 +9729,8 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   }
 
   function toggle(open) {
-    const shouldOpen = open ?? panel.dataset.open !== 'true';
-    const isFullscreenActive = !!state.get('ui.fullscreen');
-    panel.dataset.open = String(shouldOpen);
-    panel.setAttribute('aria-hidden', String(!shouldOpen));
-    updateSidebarPanelState(shouldOpen);
-    overlay.dataset.open = String(shouldOpen);
-    overlay.setAttribute('aria-hidden', String(!shouldOpen));
-    const body = root?.ownerDocument?.body ?? document.body;
-    if (body) {
-      body.classList.toggle('a11ytb-modal-open', shouldOpen);
-    }
-    if (!shouldOpen && isFullscreenActive) {
-      state.set('ui.fullscreen', false);
-    }
-    if (shouldOpen) {
-      if (typeof releaseOutsideInert === 'function') {
-        releaseOutsideInert();
-      }
-      releaseOutsideInert = applyInertToSiblings(root);
-      lastFocusedElement = document.activeElement;
-      const focusedTitle = focusMenuTitle();
-      if (!focusedTitle) {
-        const focusables = getFocusableElements();
-        const fallback = focusables[0] || panel;
-        if (fallback && typeof fallback.focus === 'function') {
-          try {
-            fallback.focus({ preventScroll: true });
-          } catch (error) {
-            fallback.focus();
-          }
-        }
-      }
-      if (state.get('ui.view') === 'options' && !releaseOptionsFocusTrap) {
-        setupOptionsFocusTrap();
-      }
-    } else {
-      if (typeof releaseOutsideInert === 'function') {
-        releaseOutsideInert();
-        releaseOutsideInert = null;
-      }
-      if (activeViewId === 'options') {
-        teardownOptionsFocusTrap();
-      }
-      stopShortcutRecording();
-        const target =
-          lastFocusedElement && typeof lastFocusedElement.focus === 'function'
-            ? lastFocusedElement
-            : modulesSidebarEntry?.button || sidebarQuickAccess[0] || sidebar;
-      if (target && typeof target.focus === 'function') {
-        target.focus();
-      }
-      lastFocusedElement = null;
-    }
+    const shouldOpen = open ?? !state.get('ui.menuOpen');
+    state.set('ui.menuOpen', shouldOpen);
   }
 
   if (behaviorConfig.autoOpen === true) {
@@ -9734,9 +9764,37 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   }
 
   function executeShortcut(actionId) {
-    if (actionId === 'toggle-panel') {
-      toggle();
+    const definition = CUSTOM_SHORTCUT_LOOKUP.get(actionId);
+    if (!definition) return;
+    if (actionId === 'toggle-menu') {
+      const isOpen = !!state.get('ui.menuOpen');
+      state.set('ui.menuOpen', !isOpen);
+      return;
     }
+    const targetSelector = definition.target;
+    if (!targetSelector) return;
+    if (definition.view) {
+      state.set('ui.view', definition.view);
+    }
+    const target = root.querySelector(targetSelector);
+    if (!target) return;
+    if (!state.get('ui.menuOpen')) {
+      state.set('ui.menuOpen', true);
+    }
+    requestAnimationFrame(() => {
+      if (typeof target.focus === 'function') {
+        try {
+          target.focus({ preventScroll: true });
+        } catch (error) {
+          target.focus();
+        }
+      }
+      try {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (error) {
+        target.scrollIntoView({ block: 'start' });
+      }
+    });
   }
 
   window.addEventListener('keydown', (event) => {
@@ -9969,9 +10027,9 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     applyModuleLayout();
     updateActivityLog();
     refreshDependencyViews(snapshot);
+    syncMenuState(snapshot);
     syncView();
     syncFullscreenMode(snapshot);
-    syncDockControls(snapshot);
     syncTtsOverlay(snapshot);
     renderProfiles(snapshot);
     updateActiveShortcuts(snapshot);
@@ -9991,9 +10049,9 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   applyModuleLayout();
   updateActivityLog();
   refreshDependencyViews(initialSnapshot);
+  syncMenuState(initialSnapshot);
   syncView();
   syncFullscreenMode(initialSnapshot);
-  syncDockControls(initialSnapshot);
   syncTtsOverlay(initialSnapshot);
   renderProfiles(initialSnapshot);
   updateActiveShortcuts(initialSnapshot);
