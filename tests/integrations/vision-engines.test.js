@@ -222,4 +222,74 @@ describe('llavaLocalVisionEngine', () => {
       llavaLocalVisionEngine.analyze({ imagePath: './image.png', prompt: 'Décrire' })
     ).rejects.toThrow('La réponse LLaVA ne contient pas de texte.');
   });
+
+  it('expose les métadonnées REST lorsque le script échoue', async () => {
+    execFileMock.mockImplementation((command, args, options, callback) => {
+      const error = new Error('Execution failed');
+      error.code = 13;
+      callback(error, '', 'Les modules manquent');
+    });
+
+    loadImageAsBase64Mock.mockResolvedValue({
+      data: 'AAA=',
+      mimeType: 'image/png',
+      absolutePath: '/tmp/image.png',
+    });
+
+    const { llavaLocalVisionEngine } = await import('../../src/integrations/vision/llava.js');
+
+    await expect(
+      llavaLocalVisionEngine.analyze({ imagePath: './image.png', prompt: 'Décrire' })
+    ).rejects.toMatchObject({
+      name: 'LlavaLocalError',
+      status: 501,
+      exitCode: 13,
+      errorType: 'DEPENDENCY_MISSING',
+      rest: {
+        status: 501,
+        body: {
+          ok: false,
+          error: {
+            type: 'DEPENDENCY_MISSING',
+            exitCode: 13,
+            message: 'Les modules manquent',
+          },
+        },
+      },
+    });
+  });
+
+  it('convertit une interruption du script en timeout REST', async () => {
+    execFileMock.mockImplementation((command, args, options, callback) => {
+      const error = new Error('Signal reçu');
+      error.killed = true;
+      error.signal = 'SIGTERM';
+      callback(error, '', '');
+    });
+
+    loadImageAsBase64Mock.mockResolvedValue({
+      data: 'AAA=',
+      mimeType: 'image/png',
+      absolutePath: '/tmp/image.png',
+    });
+
+    const { llavaLocalVisionEngine } = await import('../../src/integrations/vision/llava.js');
+
+    await expect(
+      llavaLocalVisionEngine.analyze({ imagePath: './image.png', prompt: 'Décrire' })
+    ).rejects.toMatchObject({
+      name: 'LlavaLocalError',
+      status: 504,
+      errorType: 'LLAVA_TIMEOUT',
+      rest: {
+        status: 504,
+        body: {
+          ok: false,
+          error: {
+            type: 'LLAVA_TIMEOUT',
+          },
+        },
+      },
+    });
+  });
 });
