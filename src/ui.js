@@ -1285,6 +1285,15 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   let resetLabel = null;
   let closeButton = null;
   let closeLabel = null;
+  let dockMenuWrapper = null;
+  let dockMenuButton = null;
+  let dockMenuLabel = null;
+  let dockMenuValue = null;
+  let dockMenu = null;
+  let dockMenuAnnouncement = null;
+  let dockMenuOpen = false;
+  let dockMenuFocusIndex = -1;
+  let lastDockAnnouncementPosition = null;
   let statusTitle = null;
   let statusDescription = null;
   let statusCenter = null;
@@ -1311,6 +1320,8 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   const dockMenuItemLabels = new Map();
 
   const dockLabelRefs = new Map();
+  const dockMenuItems = new Map();
+  const dockMenuItemLabels = new Map();
   const sidebarButtons = new Map();
   const sidebarQuickAccess = [];
 
@@ -1372,30 +1383,27 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     },
     {
       id: 'audit',
-      action: 'open-audit-overlay',
+      action: 'open-status-view',
       icon: sidebarIcons.audit,
       labelKey: 'sidebar.audit',
       view: 'status',
       activeViews: ['status'],
-      overlay: 'audit',
     },
     {
       id: 'options',
-      action: 'open-options-overlay',
+      action: 'open-options-view',
       icon: sidebarIcons.options,
       labelKey: 'sidebar.options',
       view: 'options',
       activeViews: ['options', 'profiles'],
-      overlay: 'options',
     },
     {
       id: 'guides',
-      action: 'open-guides-overlay',
+      action: 'open-guides-view',
       icon: sidebarIcons.guides,
       labelKey: 'sidebar.guides',
       view: 'guides',
       activeViews: ['guides', 'shortcuts'],
-      overlay: 'guides',
     },
     {
       id: 'dock',
@@ -1557,6 +1565,23 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     left: '<svg viewBox="0 0 24 24" focusable="false"><path d="M5 12l7-7v4h7v6h-7v4l-7-7z"/></svg>',
     right:
       '<svg viewBox="0 0 24 24" focusable="false"><path d="M19 12l-7 7v-4H5V9h7V5l7 7z"/></svg>',
+  };
+
+  const DOCK_POSITIONS = ['right', 'bottom', 'left'];
+  const DOCK_LABEL_KEYS = {
+    right: 'toolbar.dockRight',
+    bottom: 'toolbar.dockBottom',
+    left: 'toolbar.dockLeft',
+  };
+  const DOCK_ICONS = {
+    trigger:
+      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h16v2H4z"/></svg>',
+    right:
+      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1zm8 2v12h5V6z"/></svg>',
+    bottom:
+      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 4h16a1 1 0 011 1v14a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1zm2 10v4h12v-4z"/></svg>',
+    left:
+      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1zm2 2v12h5V6z"/></svg>',
   };
 
   function createScrollControls(target, { orientation = 'vertical' } = {}) {
@@ -2913,15 +2938,6 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     });
   }
 
-  function openOverlayById(id) {
-    const overlayApi = window.a11ytb?.overlays?.[id];
-    if (overlayApi && typeof overlayApi.open === 'function') {
-      overlayApi.open();
-      return true;
-    }
-    return false;
-  }
-
   const DOCK_SEQUENCE = ['right', 'bottom', 'left'];
 
   function cycleDockPosition() {
@@ -2948,25 +2964,22 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
         }
         break;
       }
-      case 'open-audit-overlay': {
-        const opened = openOverlayById('audit');
-        if (!opened && panel.dataset.open !== 'true') {
+      case 'open-status-view': {
+        if (panel.dataset.open !== 'true') {
           toggle(true);
         }
         state.set('ui.view', 'status');
         break;
       }
-      case 'open-options-overlay': {
-        const opened = openOverlayById('options');
-        if (!opened && panel.dataset.open !== 'true') {
+      case 'open-options-view': {
+        if (panel.dataset.open !== 'true') {
           toggle(true);
         }
         state.set('ui.view', 'options');
         break;
       }
-      case 'open-guides-overlay': {
-        const opened = openOverlayById('guides');
-        if (!opened && panel.dataset.open !== 'true') {
+      case 'open-guides-view': {
+        if (panel.dataset.open !== 'true') {
           toggle(true);
         }
         state.set('ui.view', 'guides');
