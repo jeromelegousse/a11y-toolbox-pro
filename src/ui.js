@@ -61,32 +61,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   const PRIORITY_LOOKUP = new Map(PRIORITY_LEVELS.map((level) => [level.id, level]));
 
   const CUSTOM_SHORTCUT_DEFINITIONS = [
-    { id: 'toggle-panel', label: 'Ouvrir ou fermer la boîte à outils.', default: 'Alt+Shift+A' },
-    {
-      id: 'view-modules',
-      label: 'Afficher la vue Modules.',
-      default: 'Alt+Shift+M',
-      view: 'modules',
-    },
-    {
-      id: 'view-options',
-      label: 'Afficher la vue Options & Profils.',
-      default: 'Alt+Shift+O',
-      view: 'options',
-    },
-    {
-      id: 'view-organize',
-      label: 'Afficher la vue Organisation.',
-      default: 'Alt+Shift+G',
-      view: 'organize',
-    },
-    { id: 'view-guides', label: 'Afficher la vue Guides.', default: 'Alt+Shift+P', view: 'guides' },
-    {
-      id: 'view-shortcuts',
-      label: 'Afficher cette vue Raccourcis.',
-      default: 'Alt+Shift+H',
-      view: 'shortcuts',
-    },
+    { id: 'toggle-panel', label: 'Ouvrir ou fermer le menu accessibilité.', default: 'Alt+Shift+A' },
   ];
   const CUSTOM_SHORTCUT_LOOKUP = new Map(
     CUSTOM_SHORTCUT_DEFINITIONS.map((item) => [item.id, item])
@@ -554,14 +529,11 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   }
 
   function buildShortcutSummary(snapshot) {
-    const highlightOrder = ['toggle-panel', 'view-options', 'view-shortcuts'];
-    const parts = highlightOrder
-      .map((id) => resolveShortcutCombo(id, snapshot).raw)
-      .filter(Boolean);
-    if (!parts.length) {
+    const combo = resolveShortcutCombo('toggle-panel', snapshot).raw;
+    if (!combo) {
       return 'Raccourcis : définissez vos propres combinaisons.';
     }
-    return `Raccourcis : ${parts.join(' • ')}`;
+    return `Raccourcis : ${combo}`;
   }
 
   function setShortcutStatus(message, tone = 'info') {
@@ -1326,6 +1298,18 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   let notificationsContainer = null;
   let currentNotifications = [];
 
+  let dockMenuWrapper = null;
+  let dockMenuButton = null;
+  let dockMenu = null;
+  let dockMenuLabel = null;
+  let dockMenuValue = null;
+  let dockMenuAnnouncement = null;
+  let dockMenuOpen = false;
+  let dockMenuFocusIndex = 0;
+  let lastDockAnnouncementPosition = null;
+  const dockMenuItems = new Map();
+  const dockMenuItemLabels = new Map();
+
   const dockLabelRefs = new Map();
   const sidebarButtons = new Map();
   const sidebarQuickAccess = [];
@@ -1350,6 +1334,23 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M6 4h9l3 3v13H6zm2 4v2h8V8zm0 4v2h5v-2z"/></svg>',
     dock:
       '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v12a1 1 0 01-1 1h-5.59l-2.7 2.7A1 1 0 019 20.3V18H5a1 1 0 01-1-1V5zm2 1v10h12V6H6zm6 2h4v6h-4z"/></svg>',
+  };
+
+  const DOCK_POSITIONS = ['right', 'bottom', 'left'];
+  const DOCK_LABEL_KEYS = {
+    right: 'toolbar.dockRight',
+    bottom: 'toolbar.dockBottom',
+    left: 'toolbar.dockLeft',
+  };
+  const DOCK_ICONS = {
+    trigger:
+      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 7h16v2H4zm0 4h16v2H4zm0 4h16v2H4z"/></svg>',
+    right:
+      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 4h12v16H4zM18 4h2v16h-2z"/></svg>',
+    bottom:
+      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 4h16v12H4zM4 18h16v2H4z"/></svg>',
+    left:
+      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M8 4h12v16H8zM4 4h2v16H4z"/></svg>',
   };
 
   const sidebar = document.createElement('nav');
@@ -1540,8 +1541,9 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   const header = document.createElement('div');
   header.className = 'a11ytb-header';
 
-  headerTitle = document.createElement('div');
+  headerTitle = document.createElement('h1');
   headerTitle.className = 'a11ytb-title';
+  headerTitle.tabIndex = -1;
   header.append(headerTitle);
 
   actionsToolbar = document.createElement('div');
@@ -4741,7 +4743,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   const customShortcutsIntro = document.createElement('p');
   customShortcutsIntro.className = 'a11ytb-shortcuts-custom-intro';
   customShortcutsIntro.textContent =
-    'Définissez vos propres combinaisons pour ouvrir la boîte à outils et naviguer entre les vues.';
+    'Définissez la combinaison utilisée pour ouvrir ou fermer le menu accessibilité.';
   shortcutStatusElement = document.createElement('p');
   shortcutStatusElement.className = 'a11ytb-shortcuts-status';
   shortcutStatusElement.dataset.tone = 'info';
@@ -4807,23 +4809,16 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
 
   const shortcutGroups = [
     {
-      title: 'Navigation du panneau',
+      title: 'Navigation du menu',
       description: 'Raccourcis globaux accessibles depuis toute la page.',
-      shortcuts: [
-        { id: 'toggle-panel', description: 'Ouvrir ou fermer la boîte à outils.' },
-        { id: 'view-modules', description: 'Afficher la vue Modules.' },
-        { id: 'view-options', description: 'Afficher la vue Options & Profils.' },
-        { id: 'view-organize', description: 'Afficher la vue Organisation.' },
-        { id: 'view-guides', description: 'Afficher la vue Guides.' },
-        { id: 'view-shortcuts', description: 'Afficher cette vue Raccourcis.' },
-      ],
+      shortcuts: [{ id: 'toggle-panel', description: 'Ouvrir ou fermer le menu accessibilité.' }],
     },
     {
       title: 'Gestion du panneau',
-      description: 'Disponible lorsque la boîte à outils est ouverte.',
+      description: 'Disponible lorsque le menu est ouvert.',
       shortcuts: [
         { combo: [['Tab'], ['Shift', 'Tab']], description: 'Parcourir les commandes disponibles.' },
-        { combo: [['Échap']], description: 'Fermer le panneau en conservant le focus précédent.' },
+        { combo: [['Échap']], description: 'Fermer le menu en conservant le focus précédent.' },
       ],
     },
     {
@@ -9501,11 +9496,6 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     open: () => toggle(true),
     close: () => toggle(false),
     toggle: () => toggle(),
-    setView: (view) => {
-      if (view) {
-        state.set('ui.view', view);
-      }
-    },
   };
 
   root.append(overlay, sidebar, panel, notificationsContainer);
@@ -9519,99 +9509,17 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
 
   let lastFocusedElement = null;
   let releaseOutsideInert = null;
-  let releasePanelFocusTrap = null;
 
-  function setupPanelFocusTrap() {
-    teardownPanelFocusTrap();
-
-    const initialTabIndex = panel.tabIndex;
-
-    const getCycle = () => {
-      const focusableNodes = collectFocusable(panel);
-      if (focusableNodes.length === 0) {
-        if (panel.tabIndex < 0) {
-          panel.tabIndex = 0;
-        }
-        return [panel];
-      }
-      if (panel.tabIndex !== initialTabIndex) {
-        panel.tabIndex = initialTabIndex;
-      }
-      return focusableNodes;
-    };
-
-    const handleKeydown = (event) => {
-      if (panel.dataset.open !== 'true') {
-        return;
-      }
-      if (event.key === 'Escape') {
-        event.stopPropagation();
-        if (state.get('ui.fullscreen')) {
-          state.set('ui.fullscreen', false);
-        } else {
-          toggle(false);
-        }
-        return;
-      }
-      if (event.key !== 'Tab') {
-        return;
-      }
-      const target = event.target;
-      const optionsToggle = viewButtons?.get ? viewButtons.get('options') : null;
-      if (
-        releaseOptionsFocusTrap &&
-        ((optionsView && optionsView.contains(target)) ||
-          (optionsToggle && optionsToggle.contains?.(target)))
-      ) {
-        return;
-      }
-      const cycle = getCycle();
-      if (!cycle.length) {
-        return;
-      }
-      const first = cycle[0];
-      const last = cycle[cycle.length - 1];
-      const active = document.activeElement;
-      if (event.shiftKey) {
-        if (!panel.contains(active) || active === first) {
-          event.preventDefault();
-          last.focus();
-        }
-      } else if (active === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    const handleFocusIn = (event) => {
-      if (panel.dataset.open !== 'true') {
-        return;
-      }
-      if (panel.contains(event.target)) {
-        return;
-      }
-      const cycle = getCycle();
-      const fallback = cycle[0];
-      if (fallback && typeof fallback.focus === 'function') {
-        fallback.focus();
-      }
-    };
-
-    panel.addEventListener('keydown', handleKeydown, true);
-    document.addEventListener('focusin', handleFocusIn);
-
-    releasePanelFocusTrap = () => {
-      panel.removeEventListener('keydown', handleKeydown, true);
-      document.removeEventListener('focusin', handleFocusIn);
-      panel.tabIndex = initialTabIndex;
-    };
-  }
-
-  function teardownPanelFocusTrap() {
-    if (typeof releasePanelFocusTrap === 'function') {
-      releasePanelFocusTrap();
+  function focusMenuTitle() {
+    if (!headerTitle || typeof headerTitle.focus !== 'function') {
+      return false;
     }
-    releasePanelFocusTrap = null;
+    try {
+      headerTitle.focus({ preventScroll: true });
+    } catch (error) {
+      headerTitle.focus();
+    }
+    return document.activeElement === headerTitle;
   }
 
   function getFocusableElements() {
@@ -9628,8 +9536,8 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     if (fullscreen && panel.dataset.open !== 'true') {
       toggle(true);
     }
-    if (fullscreen && panel.dataset.open === 'true' && typeof releasePanelFocusTrap !== 'function') {
-      setupPanelFocusTrap();
+    if (fullscreen && panel.dataset.open === 'true') {
+      focusMenuTitle();
     }
     if (fullscreenToggle) {
       fullscreenToggle.setAttribute('aria-pressed', String(fullscreen));
@@ -9746,15 +9654,23 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
         releaseOutsideInert();
       }
       releaseOutsideInert = applyInertToSiblings(root);
-      setupPanelFocusTrap();
       lastFocusedElement = document.activeElement;
-      const focusables = getFocusableElements();
-      (focusables[0] || panel).focus();
+      const focusedTitle = focusMenuTitle();
+      if (!focusedTitle) {
+        const focusables = getFocusableElements();
+        const fallback = focusables[0] || panel;
+        if (fallback && typeof fallback.focus === 'function') {
+          try {
+            fallback.focus({ preventScroll: true });
+          } catch (error) {
+            fallback.focus();
+          }
+        }
+      }
       if (state.get('ui.view') === 'options' && !releaseOptionsFocusTrap) {
         setupOptionsFocusTrap();
       }
     } else {
-      teardownPanelFocusTrap();
       if (typeof releaseOutsideInert === 'function') {
         releaseOutsideInert();
         releaseOutsideInert = null;
@@ -9805,18 +9721,9 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   }
 
   function executeShortcut(actionId) {
-    const definition = CUSTOM_SHORTCUT_LOOKUP.get(actionId);
-    if (!definition) return;
     if (actionId === 'toggle-panel') {
       toggle();
-      return;
     }
-    const targetView = definition.view;
-    if (!targetView) return;
-    if (panel.dataset.open !== 'true') {
-      toggle(true);
-    }
-    state.set('ui.view', targetView);
   }
 
   window.addEventListener('keydown', (event) => {
@@ -9836,25 +9743,20 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
         return;
       }
     }
-    if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
-      let index = Number.isFinite(Number.parseInt(event.key, 10))
-        ? Number.parseInt(event.key, 10) - 1
-        : NaN;
-      if (!Number.isFinite(index) && typeof event.code === 'string' && event.code.startsWith('Digit')) {
-        const parsed = Number.parseInt(event.code.slice(5), 10);
-        if (Number.isFinite(parsed)) {
-          index = parsed - 1;
-        }
+    if (
+      panel.dataset.open === 'true' &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      event.key === 'Escape'
+    ) {
+      event.preventDefault();
+      if (state.get('ui.fullscreen')) {
+        state.set('ui.fullscreen', false);
+      } else {
+        toggle(false);
       }
-      if (Number.isFinite(index) && index >= 0 && index < sidebarQuickAccess.length) {
-        const targetButton = sidebarQuickAccess[index];
-        if (targetButton) {
-          event.preventDefault();
-          targetButton.focus();
-          targetButton.click();
-          return;
-        }
-      }
+      return;
     }
     let handled = false;
     activeShortcutCombos.forEach((entry, actionId) => {
