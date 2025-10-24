@@ -28,11 +28,15 @@ export function isElementVisible(el) {
   );
 }
 
-export function collectFocusable(container) {
+export function collectFocusable(container, { includeContainer = false } = {}) {
   if (!container) return [];
-  return Array.from(container.querySelectorAll(FOCUSABLE_SELECTORS)).filter((element) =>
-    isElementVisible(element)
+  const focusables = Array.from(container.querySelectorAll(FOCUSABLE_SELECTORS)).filter(
+    (element) => isElementVisible(element) && !element.closest('[inert]')
   );
+  if (includeContainer && container.matches?.(FOCUSABLE_SELECTORS) && isElementVisible(container)) {
+    focusables.unshift(container);
+  }
+  return focusables;
 }
 
 export { FOCUSABLE_SELECTORS };
