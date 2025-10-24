@@ -14,6 +14,109 @@ const DEFAULT_SCRIPT_PATH = path.resolve(
 const DEFAULT_REMOTE_MODEL = 'llava-hf/llava-phi-3-mini';
 const DEFAULT_REMOTE_TIMEOUT = 45000;
 
+const SCRIPT_EXIT_CODE_MAP = new Map([
+  [10, { type: 'IMAGE_NOT_FOUND', status: 404 }],
+  [11, { type: 'INVALID_ARGUMENT', status: 400 }],
+  [12, { type: 'MODEL_NOT_FOUND', status: 422 }],
+  [13, { type: 'DEPENDENCY_MISSING', status: 501 }],
+  [14, { type: 'GPU_UNAVAILABLE', status: 503 }],
+  [15, { type: 'INFERENCE_ERROR', status: 500 }],
+  [16, { type: 'IMAGE_DECODE_ERROR', status: 422 }],
+]);
+
+const TIMEOUT_ERROR_META = { type: 'LLAVA_TIMEOUT', status: 504 };
+
+function toErrorDetail(value) {
+  if (!value) {
+    return undefined;
+  }
+
+  if (typeof value === 'string') {
+    return value.trim() || undefined;
+  }
+
+  if (typeof value.toString === 'function') {
+    return value.toString().trim() || undefined;
+  }
+
+  return undefined;
+}
+
+function buildRestError({ type, status, message, exitCode, detail }) {
+  const error = new Error(message);
+  error.name = 'LlavaLocalError';
+  error.status = status;
+  error.exitCode = exitCode ?? null;
+  error.detail = detail;
+  error.errorType = type;
+  error.rest = {
+    status,
+    body: {
+      ok: false,
+      error: {
+        type,
+        message,
+        ...(exitCode !== undefined ? { exitCode } : {}),
+        ...(detail ? { detail } : {}),
+      },
+    },
+  };
+
+  return error;
+}
+
+function normalizeScriptFailure(error, stderr) {
+  const detail = toErrorDetail(stderr) || toErrorDetail(error?.stderr);
+
+  if (error?.killed || error?.signal === 'SIGTERM' || error?.signal === 'SIGKILL') {
+    const message = detail || "Le script LLaVA s'est interrompu avant de répondre (timeout).";
+    return buildRestError({
+      ...TIMEOUT_ERROR_META,
+      message,
+      detail,
+    });
+  }
+
+  const exitCode = Number.isInteger(error?.code)
+    ? Number(error.code)
+    : Number.isInteger(Number.parseInt(error?.code, 10))
+    ? Number.parseInt(error.code, 10)
+    : undefined;
+
+  if (Number.isInteger(exitCode)) {
+    const meta = SCRIPT_EXIT_CODE_MAP.get(exitCode) || {
+      type: 'LLAVA_SCRIPT_ERROR',
+      status: 500,
+    };
+
+    const message = detail || `Échec de l'exécution du script LLaVA (${meta.type}).`;
+    return buildRestError({
+      ...meta,
+      message,
+      exitCode,
+      detail,
+    });
+  }
+
+  if (typeof error?.code === 'string') {
+    const message = detail || `Impossible de lancer le script LLaVA (${error.code}).`;
+    return buildRestError({
+      type: 'LLAVA_EXECUTION_FAILED',
+      status: 500,
+      message,
+      detail,
+    });
+  }
+
+  const fallbackMessage = detail || error?.message || "Échec de l'exécution du script LLaVA.";
+  return buildRestError({
+    type: 'LLAVA_SCRIPT_ERROR',
+    status: 500,
+    message: fallbackMessage,
+    detail,
+  });
+}
+
 function ensurePrompt(prompt) {
   if (!prompt) {
     throw new Error('Le paramètre "prompt" est obligatoire pour LLaVA.');
@@ -42,8 +145,7 @@ async function runLlavaScript({ scriptPath, imagePath, prompt, env }) {
       },
       (error, stdout, stderr) => {
         if (error) {
-          const message = stderr?.toString()?.trim() || error.message;
-          reject(new Error(`Échec de l'exécution du script LLaVA : ${message}`));
+          reject(normalizeScriptFailure(error, stderr));
           return;
         }
         resolve(stdout);
@@ -51,7 +153,7 @@ async function runLlavaScript({ scriptPath, imagePath, prompt, env }) {
     );
 
     child.on('error', (spawnError) => {
-      reject(new Error(`Impossible de lancer le script LLaVA : ${spawnError.message}`));
+      reject(normalizeScriptFailure(spawnError));
     });
   });
 }
