@@ -29,7 +29,7 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
   margin-top: 24px;
   font-size: 18px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--a11ytb-admin-color-text, #1d2327);
 }
 
 .a11ytb-settings-form h2:first-of-type {
@@ -51,7 +51,7 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
   padding: 16px 24px 16px 0;
   vertical-align: top;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--a11ytb-admin-color-text, #1d2327);
 }
 
 .a11ytb-settings-form .form-table td {
@@ -69,82 +69,62 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
   margin-top: 8px;
 }
 
-.a11ytb-admin-columns {
-  display: grid;
-  gap: 32px;
-  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
-  align-items: start;
-  margin-top: 24px;
-}
-
-.a11ytb-admin-column {
-  min-width: 0;
-}
-
-.a11ytb-admin-column--preview {
-  grid-column: 2;
-}
-
 .a11ytb-admin-app-mount {
   min-height: 120px;
 }
 
+.a11ytb-admin-flow {
+  margin-top: 32px;
+  display: grid;
+  gap: 32px;
+}
+
 .a11ytb-admin-app {
   --a11ytb-admin-surface: #fff;
-  --a11ytb-admin-surface-alt: color-mix(in srgb, #0f172a 4%, #fff);
-  --a11ytb-admin-border: color-mix(in srgb, var(--a11ytb-color-border) 35%, transparent);
-  --a11ytb-admin-muted: color-mix(in srgb, #0f172a 35%, transparent);
-  --a11ytb-admin-accent: var(--a11ytb-color-primary);
-  --a11ytb-admin-accent-strong: var(--a11ytb-color-primary-strong);
-  font-family: var(--a11ytb-font-family-sans, 'Inter', system-ui);
-  color: #0f172a;
+  --a11ytb-admin-surface-alt: #f6f7f7;
+  --a11ytb-admin-border: #dcdcde;
+  --a11ytb-admin-muted: #50575e;
+  --a11ytb-admin-color-text: #1d2327;
+  --a11ytb-admin-accent: var(--a11ytb-color-primary, #2271b1);
+  --a11ytb-admin-accent-strong: var(--a11ytb-color-primary-strong, #135e96);
+  font-family: var(--a11ytb-font-family-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+  color: var(--a11ytb-admin-color-text, #1d2327);
+  line-height: 1.6;
 }
 
-.a11ytb-admin-app-grid {
+.a11ytb-admin-app-layout {
   display: grid;
   gap: 24px;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px) minmax(240px, 300px);
 }
 
-.a11ytb-admin-app-main {
-  display: grid;
-  gap: 24px;
+.a11ytb-admin-section,
+.a11ytb-admin-availability {
+  background: var(--a11ytb-admin-surface);
+  border: 1px solid var(--a11ytb-admin-border);
+  border-radius: 4px;
+  padding: 24px;
+  box-shadow: 0 1px 1px rgb(0 0 0 / 4%);
 }
 
 .a11ytb-admin-availability {
-  position: sticky;
-  top: 16px;
   display: grid;
   gap: 20px;
-  background: var(--a11ytb-admin-surface);
-  border: 1px solid var(--a11ytb-admin-border);
-  border-radius: var(--a11ytb-radius-lg, 12px);
-  padding: 20px;
-  box-shadow: 0 1px 0 rgb(15 23 42 / 6%);
-}
-
-.a11ytb-admin-section {
-  background: var(--a11ytb-admin-surface);
-  border: 1px solid var(--a11ytb-admin-border);
-  border-radius: var(--a11ytb-radius-lg, 12px);
-  padding: 20px;
-  box-shadow: 0 1px 0 rgb(15 23 42 / 6%);
 }
 
 .a11ytb-admin-section-header {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
   align-items: baseline;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .a11ytb-admin-section-title {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--a11ytb-admin-color-text, #1d2327);
 }
 
 .a11ytb-admin-section-description {
@@ -157,7 +137,7 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
   margin: 16px 0 8px;
   font-size: 16px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--a11ytb-admin-color-text, #1d2327);
 }
 
 .a11ytb-admin-steps {
@@ -246,7 +226,7 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
   margin: 0;
   font-size: 24px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--a11ytb-admin-color-text, #1d2327);
 }
 
 .a11ytb-status-detail {
@@ -294,7 +274,7 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
   border-radius: var(--a11ytb-radius-sm, 6px);
   background: var(--a11ytb-admin-surface);
   font-size: 14px;
-  color: #0f172a;
+  color: var(--a11ytb-admin-color-text, #1d2327);
 }
 
 .a11ytb-admin-sort-select {
@@ -316,7 +296,7 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
   border-radius: var(--a11ytb-radius-sm, 6px);
   background: var(--a11ytb-admin-surface);
   font-size: 14px;
-  color: #0f172a;
+  color: var(--a11ytb-admin-color-text, #1d2327);
 }
 
 .a11ytb-admin-filter-toggle {
@@ -386,7 +366,7 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--a11ytb-admin-color-text, #1d2327);
 }
 
 .a11ytb-admin-badge {
@@ -490,7 +470,7 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
 .a11ytb-admin-module-insights > summary {
   cursor: pointer;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--a11ytb-admin-color-text, #1d2327);
   margin-bottom: 8px;
 }
 
@@ -519,7 +499,7 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
 
 .a11ytb-admin-dependency-label {
   font-weight: 500;
-  color: #0f172a;
+  color: var(--a11ytb-admin-color-text, #1d2327);
 }
 
 .a11ytb-admin-dependency-badge {
@@ -536,7 +516,7 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
   margin: 0;
   font-size: 13px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--a11ytb-admin-color-text, #1d2327);
 }
 
 .a11ytb-admin-metrics dt {
@@ -588,10 +568,6 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
 }
 
 .a11ytb-runtime-panel {
-  background: var(--a11ytb-admin-surface);
-  border: 1px solid var(--a11ytb-admin-border);
-  border-radius: var(--a11ytb-radius-lg, 12px);
-  padding: 20px;
   display: grid;
   gap: 16px;
   align-content: start;
@@ -601,7 +577,7 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--a11ytb-admin-color-text, #1d2327);
 }
 
 .a11ytb-runtime-counters {
@@ -620,7 +596,7 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
 .a11ytb-runtime-counters dd {
   margin: 0;
   text-align: right;
-  color: #0f172a;
+  color: var(--a11ytb-admin-color-text, #1d2327);
   font-weight: 600;
 }
 
@@ -712,12 +688,21 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
 .a11ytb-admin-preview {
   position: relative;
   aspect-ratio: 16 / 9;
-  background: color-mix(in srgb, var(--a11ytb-color-surface) 92%, transparent);
-  border: 1px solid color-mix(in srgb, var(--a11ytb-color-border) 55%, transparent);
-  border-radius: 16px;
+  background: var(--a11ytb-admin-surface-alt);
+  border: 1px solid var(--a11ytb-admin-border);
+  border-radius: 4px;
   overflow: hidden;
-  box-shadow: 0 24px 56px rgb(15 23 42 / 18%);
   min-height: 420px;
+}
+
+.a11ytb-admin-preview-block {
+  display: grid;
+  gap: 16px;
+}
+
+.a11ytb-admin-preview-block .description {
+  margin: 0;
+  color: var(--a11ytb-admin-muted);
 }
 
 .a11ytb-admin-preview iframe {
@@ -726,28 +711,12 @@ body.toplevel_page_a11y-toolbox-pro #adminmenu .wp-submenu {
   width: 100%;
   height: 100%;
   border: 0;
-  background: color-mix(in srgb, var(--a11ytb-color-surface) 85%, transparent);
+  background: #fff;
 }
 
 @supports not (aspect-ratio: 1 / 1) {
   .a11ytb-admin-preview {
     padding-top: 56.25%;
     min-height: 0;
-  }
-}
-
-@media (max-width: 900px) {
-  .a11ytb-admin-app-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 782px) {
-  .a11ytb-admin-columns {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .a11ytb-admin-column--preview {
-    grid-column: 1;
   }
 }

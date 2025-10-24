@@ -1,9 +1,6 @@
 export function createAdminLayout(runtimePanel) {
   const layout = document.createElement('div');
-  layout.className = 'a11ytb-admin-app-grid';
-
-  const mainColumn = document.createElement('div');
-  mainColumn.className = 'a11ytb-admin-app-main';
+  layout.className = 'a11ytb-admin-app-layout';
 
   const introSection = document.createElement('section');
   introSection.className = 'a11ytb-admin-section';
@@ -445,16 +442,15 @@ export function createAdminLayout(runtimePanel) {
 
   suggestionSection.append(suggestionHeader, suggestionList, suggestionEmpty);
 
-  mainColumn.append(
-    introSection,
+  const orderedSections = [
     dashboard,
     metricsSection,
     syncSection,
     exportSection,
     shareSection,
     automationSection,
-    suggestionSection
-  );
+    suggestionSection,
+  ];
 
   const availabilityPanel = document.createElement('aside');
   availabilityPanel.className = 'a11ytb-admin-availability';
@@ -541,7 +537,17 @@ export function createAdminLayout(runtimePanel) {
     taxonomy
   );
 
-  layout.append(mainColumn, availabilityPanel, runtimePanel.element);
+  orderedSections.forEach((section) => {
+    layout.append(section);
+  });
+
+  availabilityPanel.classList.add('a11ytb-admin-section');
+  layout.append(availabilityPanel);
+
+  runtimePanel.element.classList.add('a11ytb-admin-section');
+  layout.append(runtimePanel.element);
+
+  layout.append(introSection);
 
   return {
     root: layout,

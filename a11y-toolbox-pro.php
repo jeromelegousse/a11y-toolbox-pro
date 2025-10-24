@@ -4529,21 +4529,19 @@ function a11ytb_render_admin_page(): void
             <?php submit_button(__('Enregistrer', 'a11ytb')); ?>
         </form>
 
-        <div class="a11ytb-admin-columns">
-            <div class="a11ytb-admin-column">
-                <div
-                    id="a11ytb-admin-app"
-                    class="a11ytb-admin-app-mount"
-                    aria-live="polite"
-                    aria-busy="true"
-                >
-                    <p class="a11ytb-admin-app-placeholder">
-                        <?php esc_html_e('Chargement du tableau de bord d’administration…', 'a11ytb'); ?>
-                    </p>
-                </div>
+        <div class="a11ytb-admin-flow">
+            <div
+                id="a11ytb-admin-app"
+                class="a11ytb-admin-app-mount"
+                aria-live="polite"
+                aria-busy="true"
+            >
+                <p class="a11ytb-admin-app-placeholder">
+                    <?php esc_html_e('Chargement du tableau de bord d’administration…', 'a11ytb'); ?>
+                </p>
             </div>
 
-            <div class="a11ytb-admin-column a11ytb-admin-column--preview">
+            <section class="a11ytb-admin-section a11ytb-admin-preview-block">
                 <h2><?php esc_html_e('Aperçu interactif', 'a11ytb'); ?></h2>
                 <p class="description">
                     <?php esc_html_e('L’aperçu charge la démo embarquée afin de tester la barre latérale sans quitter l’administration.', 'a11ytb'); ?>
@@ -4556,7 +4554,7 @@ function a11ytb_render_admin_page(): void
                         referrerpolicy="no-referrer"
                     ></iframe>
                 </div>
-            </div>
+            </section>
         </div>
     </div>
     <?php
