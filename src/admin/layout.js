@@ -1,5 +1,3 @@
-const SECTION_SPACING = 20;
-
 function createSection(id, titleText, descriptionText) {
   const section = document.createElement('section');
   section.className = 'a11ytb-admin-section';
@@ -98,20 +96,26 @@ function createPinnedToggle() {
 
 export function createAdminLayout(runtimePanel) {
   const layout = document.createElement('div');
-  layout.className = 'a11ytb-admin-app-layout';
+  layout.className = 'wrap a11ytb-admin-wrap';
+
+  const heading = document.createElement('h1');
+  heading.className = 'wp-heading-inline';
+  heading.textContent = 'A11y Toolbox Pro';
+  layout.append(heading);
 
   const headerActions = document.createElement('p');
   headerActions.className = 'a11ytb-admin-header-actions';
 
-  const fullscreenButton = document.createElement('button');
-  fullscreenButton.type = 'button';
-  fullscreenButton.className = 'button button-secondary';
-  fullscreenButton.dataset.adminAction = 'open-fullscreen';
-  fullscreenButton.textContent = 'Ouvrir la boîte à outils en plein écran';
+  const fullscreenToggle = document.createElement('button');
+  fullscreenToggle.type = 'button';
+  fullscreenToggle.className = 'button button-secondary';
+  fullscreenToggle.dataset.adminAction = 'open-fullscreen';
+  fullscreenToggle.textContent = 'Ouvrir la boîte à outils en plein écran';
 
-  headerActions.append(fullscreenButton);
+  headerActions.append(fullscreenToggle);
+  layout.append(headerActions);
 
-  const intro = createSection(
+  const guideSection = createSection(
     'guide',
     'Guide rapide',
     'Découvrez les chemins les plus utilisés pour ouvrir la boîte à outils et accéder aux profils.'
@@ -121,9 +125,11 @@ export function createAdminLayout(runtimePanel) {
   introCard.className = 'card';
 
   const introSteps = document.createElement('ol');
-  ['Ouvrez n’importe quelle page publique pour afficher la boîte à outils.',
-   'Utilisez Alt+Shift+A ou le bouton flottant pour la barre latérale.',
-   'Explorez les vues Modules, Options & Profils puis Organisation.'].forEach((text) => {
+  [
+    'Ouvrez n’importe quelle page publique pour afficher la boîte à outils.',
+    'Utilisez Alt+Shift+A ou le bouton flottant pour la barre latérale.',
+    'Explorez les vues Modules, Options & Profils puis Organisation.',
+  ].forEach((text) => {
     const item = document.createElement('li');
     item.textContent = text;
     introSteps.append(item);
@@ -133,7 +139,11 @@ export function createAdminLayout(runtimePanel) {
   shortcutsTitle.textContent = 'Raccourcis utiles';
 
   const shortcutsList = document.createElement('ul');
-  ['Alt+Shift+O : Options & Profils', 'Alt+Shift+G : Organisation des modules', 'Alt+Shift+H : Raccourcis complets'].forEach((text) => {
+  [
+    'Alt+Shift+O : Options & Profils',
+    'Alt+Shift+G : Organisation des modules',
+    'Alt+Shift+H : Raccourcis complets',
+  ].forEach((text) => {
     const item = document.createElement('li');
     item.textContent = text;
     shortcutsList.append(item);
@@ -145,9 +155,9 @@ export function createAdminLayout(runtimePanel) {
     'Inspiré des workflows guidés d’Accessibility Insights et de Stark : suivez les indicateurs pour prioriser les correctifs rapides.';
 
   introCard.append(introSteps, shortcutsTitle, shortcutsList, compareNote);
-  intro.section.append(introCard);
+  guideSection.section.append(introCard);
 
-  const dashboard = createSection(
+  const modulesSection = createSection(
     'modules',
     'Suivi des modules',
     'Filtrez le catalogue, examinez la compatibilité et déclenchez les actions directes sur les modules.'
@@ -165,9 +175,9 @@ export function createAdminLayout(runtimePanel) {
   llavaNotice.notice.classList.add('a11ytb-admin-llava');
   llavaNotice.notice.hidden = true;
 
-  const statusContainer = document.createElement('div');
-  statusContainer.className = 'a11ytb-status-list';
-  statusContainer.dataset.role = 'status-cards';
+  const statusGrid = document.createElement('div');
+  statusGrid.className = 'a11ytb-status-list';
+  statusGrid.dataset.role = 'status-cards';
 
   const manifestDiff = document.createElement('div');
   manifestDiff.className = 'a11ytb-admin-manifest';
@@ -210,24 +220,21 @@ export function createAdminLayout(runtimePanel) {
 
   moduleTable.append(moduleCaption, moduleHead, moduleBody);
 
-  const moduleEmpty = createNotice(
-    'info',
-    'Aucun module ne correspond aux filtres sélectionnés.'
-  );
+  const moduleEmpty = createNotice('info', 'Aucun module ne correspond aux filtres sélectionnés.');
   moduleEmpty.notice.hidden = true;
 
-  dashboard.section.append(
+  modulesSection.section.append(
     connectionNotice.notice,
     geminiNotice.notice,
     llavaNotice.notice,
-    statusContainer,
+    statusGrid,
     manifestDiff,
     filtersRow.wrapper,
     moduleTable,
     moduleEmpty.notice
   );
 
-  const metrics = createSection(
+  const metricsSection = createSection(
     'metrics',
     'Métriques consolidées',
     'Analysez les performances globales, les incidents récents et les collections à surveiller.'
@@ -319,7 +326,7 @@ export function createAdminLayout(runtimePanel) {
 
   metricsExport.append(exportJsonButton, exportCsvButton);
 
-  metrics.section.append(
+  metricsSection.section.append(
     metricsStatus.notice,
     metricsSummary,
     metricsEmpty.notice,
@@ -370,18 +377,15 @@ export function createAdminLayout(runtimePanel) {
     'Aucune automatisation enregistrée.'
   );
 
-  const orderedSections = [
-    dashboard,
-    metricsSection,
-    syncSection,
-    exportSection,
-    shareSection,
-    automationSection,
-    suggestionSection,
-  ];
+  const suggestionsSection = createSection(
+    'suggestions',
+    'Suggestions de profils',
+    'Identifiez les modules à recommander selon les profils et collections suivis.'
+  );
 
-  const availabilityPanel = document.createElement('section');
-  availabilityPanel.className = 'a11ytb-admin-section a11ytb-admin-availability';
+  const suggestionsStatus = createNotice('info', 'En attente de recommandations.');
+  suggestionsStatus.notice.setAttribute('role', 'status');
+  suggestionsStatus.notice.setAttribute('aria-live', 'polite');
 
   const suggestionsList = document.createElement('div');
   suggestionsList.className = 'a11ytb-suggestions';
@@ -419,10 +423,7 @@ export function createAdminLayout(runtimePanel) {
   const availabilityBucketList = document.createElement('div');
   availabilityBucketList.className = 'a11ytb-availability-buckets';
 
-  const availabilityEmpty = createNotice(
-    'info',
-    'Aucun module à afficher pour cette catégorie.'
-  );
+  const availabilityEmpty = createNotice('info', 'Aucun module à afficher pour cette catégorie.');
   availabilityEmpty.notice.hidden = true;
 
   const taxonomy = document.createElement('div');
@@ -457,37 +458,41 @@ export function createAdminLayout(runtimePanel) {
     taxonomy
   );
 
-  orderedSections.forEach((section) => {
+  const sections = [
+    guideSection.section,
+    modulesSection.section,
+    metricsSection.section,
+    syncSection.section,
+    exportSection.section,
+    shareSection.section,
+    automationSection.section,
+    suggestionsSection.section,
+    availabilitySection.section,
+  ];
+
+  sections.forEach((section) => {
+    section.classList.add('a11ytb-admin-section');
     layout.append(section);
   });
-
-  availabilityPanel.classList.add('a11ytb-admin-section');
-  layout.append(availabilityPanel);
 
   runtimePanel.element.classList.add('a11ytb-admin-section');
   layout.append(runtimePanel.element);
 
-  layout.append(introSection);
-
   return {
     root: layout,
     fullscreenToggle,
-    content: stack,
-    collapsedHint,
-    introSection,
-    dashboard,
-    statusGrid,
     manifestDiff,
     moduleGrid: moduleBody,
     emptyState: moduleEmpty.notice,
     connectionStatus: connectionNotice.notice,
     geminiStatus: geminiNotice.notice,
     llavaStatus: llavaNotice.notice,
+    statusGrid,
     syncList: syncSection.list,
     syncEmpty: syncSection.empty,
     syncStatus: syncSection.status,
     metrics: {
-      section: metrics.section,
+      section: metricsSection.section,
       status: metricsStatus.paragraph,
       summary: metricsSummary,
       empty: metricsEmpty.notice,
