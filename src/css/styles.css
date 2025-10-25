@@ -428,10 +428,17 @@ body.a11ytb-tts-overlay-open {
   opacity: 0;
   visibility: hidden;
   transform: translate3d(0, 24px, 0);
-  transition:
-    opacity 0.28s ease,
-    transform 0.3s ease,
-    visibility 0.3s ease;
+  transition: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .a11ytb-panel,
+  .a11ytb-menu {
+    transition:
+      opacity 0.28s ease,
+      transform 0.3s ease,
+      visibility 0.3s ease;
+  }
 }
 
 .a11ytb-panel[data-open='true'],
