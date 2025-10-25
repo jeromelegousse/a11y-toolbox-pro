@@ -316,13 +316,32 @@ export function createMetricsSyncService({
     if (!isNavigatorOnline()) {
       return false;
     }
+    const shouldTimeout = Number.isFinite(timeoutMs) && timeoutMs > 0;
+    const supportsAbort = typeof AbortController === 'function';
+    const controller = shouldTimeout && supportsAbort ? new AbortController() : null;
+    const transportArgs = controller ? [payload, { signal: controller.signal }] : [payload];
+    const sendPromise = Promise.resolve().then(() => transport(...transportArgs));
+    let timeoutHandle = null;
+    let didTimeout = false;
     try {
-      const sendPromise = Promise.resolve().then(() => transport(payload));
-      if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
+      if (shouldTimeout) {
         await Promise.race([
           sendPromise,
           new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('timeout')), timeoutMs);
+            timeoutHandle = setTimeout(() => {
+              didTimeout = true;
+              if (controller) {
+                try {
+                  controller.abort();
+                } catch (abortError) {
+                  console.warn(
+                    'a11ytb: impossible d’annuler le transport métriques.',
+                    abortError
+                  );
+                }
+              }
+              reject(new Error('timeout'));
+            }, timeoutMs);
           }),
         ]);
       } else {
@@ -330,8 +349,21 @@ export function createMetricsSyncService({
       }
       return true;
     } catch (error) {
-      console.warn('a11ytb: synchronisation métriques échouée.', error);
+      const isAbort = error?.name === 'AbortError' || didTimeout;
+      if (isAbort) {
+        console.warn('a11ytb: synchronisation métriques échouée (timeout).', error);
+      } else {
+        console.warn('a11ytb: synchronisation métriques échouée.', error);
+      }
       return false;
+    }
+    finally {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+      if (didTimeout) {
+        sendPromise.catch(() => {});
+      }
     }
   }
 

@@ -152,7 +152,8 @@ export function createStore(key, initial, options = {}) {
   const api = {
     get(path) {
       if (!path) return safeClone(state);
-      return path.split('.').reduce((acc, k) => acc?.[k], state);
+      const value = path.split('.').reduce((acc, k) => acc?.[k], state);
+      return safeClone(value);
     },
     set(path, value) {
       if (!path) return;
