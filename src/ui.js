@@ -9691,6 +9691,8 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       item.classList.toggle('is-active', active);
       item.setAttribute('aria-checked', String(active));
     });
+    updateDockMenuDisplay(dock);
+    announceDockPosition(dock, { force: true });
     const dockContext = sidebarButtons.get('dock');
     if (dockContext?.button) {
       dockContext.button.dataset.dock = dock;
