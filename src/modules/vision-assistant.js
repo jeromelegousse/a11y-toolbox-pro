@@ -405,6 +405,7 @@ function bindUI(elements = {}) {
   const update = (snapshot) => {
     const visionState = snapshot?.visionAssistant || {};
     const { status, error, lastResponse, prompt, lastUrl } = visionState;
+    const ready = Boolean(resolveIntegrationConfig().endpoint);
     if (statusNode) {
       const message = formatStatus(status, error);
       statusNode.textContent = message;
@@ -419,16 +420,16 @@ function bindUI(elements = {}) {
     }
     const isLoading = status === 'loading';
     if (uploadButton) {
-      uploadButton.disabled = isLoading;
-      if (isLoading) {
+      uploadButton.disabled = !ready || isLoading;
+      if (ready && isLoading) {
         uploadButton.setAttribute('aria-busy', 'true');
       } else {
         uploadButton.removeAttribute('aria-busy');
       }
     }
     if (fetchButton) {
-      fetchButton.disabled = isLoading;
-      if (isLoading) {
+      fetchButton.disabled = !ready || isLoading;
+      if (ready && isLoading) {
         fetchButton.setAttribute('aria-busy', 'true');
       } else {
         fetchButton.removeAttribute('aria-busy');
@@ -439,7 +440,7 @@ function bindUI(elements = {}) {
       const engines = Array.isArray(visionState.availableEngines)
         ? visionState.availableEngines
         : [];
-      engineSelect.disabled = !moduleReady || engines.length <= 1;
+      engineSelect.disabled = !ready || engines.length <= 1;
     }
     if (promptInput && document.activeElement !== promptInput) {
       const nextPrompt = prompt ?? getDefaultPrompt();
