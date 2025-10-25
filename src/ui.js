@@ -9608,6 +9608,9 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
       }
     } else {
       teardownPanelFocusTrap();
+      if (activeViewId === 'options') {
+        teardownOptionsFocusTrap();
+      }
       if (typeof releaseOutsideInert === 'function') {
         releaseOutsideInert();
         releaseOutsideInert = null;
