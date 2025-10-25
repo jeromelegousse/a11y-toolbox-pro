@@ -3,7 +3,11 @@ import { loadEnvironment } from './env.js';
 import { openAiGpt4oEngine } from '../../src/integrations/vision/openai-gpt4o.js';
 import { googleGeminiVisionEngine } from '../../src/integrations/vision/google-gemini.js';
 import { moondreamVisionEngine } from '../../src/integrations/vision/moondream.js';
-import { llavaVisionEngine } from '../../src/integrations/vision/llava.js';
+import {
+  llavaVisionEngine,
+  llavaRemoteVisionEngine,
+  llavaLocalVisionEngine,
+} from '../../src/integrations/vision/llava.js';
 import { ensureLocalImage } from '../../src/integrations/vision/utils.js';
 
 function normalizeEngine(candidate, { id, analyze }) {
@@ -20,30 +24,37 @@ function normalizeEngine(candidate, { id, analyze }) {
   return { ...candidate, id: resolvedId, analyze: resolvedAnalyze };
 }
 
-const llavaRemoteVisionEngine = normalizeEngine(llavaVisionEngine?.remote, {
-  id: 'llava',
-  analyze: llavaVisionEngine?.remoteAnalyze ?? llavaVisionEngine?.analyze,
-});
+const normalizedLlavaRemoteEngine = normalizeEngine(
+  llavaRemoteVisionEngine ?? llavaVisionEngine?.remote,
+  {
+    id: llavaVisionEngine?.id ?? 'llava',
+    analyze: llavaVisionEngine?.remoteAnalyze ?? llavaVisionEngine?.analyze,
+  }
+);
 
-const llavaLocalVisionEngine = normalizeEngine(llavaVisionEngine?.local, {
-  id: 'llava-local',
-  analyze: llavaVisionEngine?.localAnalyze ?? llavaVisionEngine?.analyze,
-});
+const normalizedLlavaLocalEngine = normalizeEngine(
+  llavaLocalVisionEngine ?? llavaVisionEngine?.local,
+  {
+    id: 'llava-local',
+    analyze: llavaVisionEngine?.localAnalyze ?? llavaVisionEngine?.analyze,
+  }
+);
 
 const ENGINES = new Map(
   [
     openAiGpt4oEngine,
     googleGeminiVisionEngine,
     moondreamVisionEngine,
-    llavaRemoteVisionEngine,
-    llavaLocalVisionEngine,
+    normalizedLlavaRemoteEngine,
+    normalizedLlavaLocalEngine,
   ]
     .filter((engine) => engine && typeof engine.id === 'string')
     .map((engine) => [engine.id, engine])
 );
 
-const DEFAULT_ENGINE = llavaRemoteVisionEngine.id;
-const DEFAULT_ENGINE_OUTPUT = llavaLocalVisionEngine.id;
+const DEFAULT_ENGINE = normalizedLlavaRemoteEngine.id;
+const DEFAULT_ENGINE_OUTPUT = normalizedLlavaRemoteEngine.id;
+const CANONICAL_ENGINE_IDS = new Map([[normalizedLlavaLocalEngine.id, DEFAULT_ENGINE]]);
 
 if (!ENGINES.has(DEFAULT_ENGINE)) {
   throw new Error(`Le moteur par défaut "${DEFAULT_ENGINE}" n'est pas enregistré.`);
@@ -102,9 +113,14 @@ async function main() {
     throw new Error(`Le moteur ${engine.id} ne définit pas de méthode analyze().`);
   }
 
-  const absoluteImage = resolve(args.image);
-  if (!existsSync(absoluteImage)) {
-    throw new Error(`Le fichier ${absoluteImage} est introuvable.`);
+  let image;
+  try {
+    image = await ensureLocalImage(args.image);
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      throw new Error(`Le fichier ${args.image} est introuvable.`);
+    }
+    throw error;
   }
 
   const result = await engine.analyze({
@@ -112,13 +128,17 @@ async function main() {
     prompt: args.prompt,
   });
 
+  const canonicalEngineId = CANONICAL_ENGINE_IDS.get(engine.id) ?? engine.id;
+  const engineForOutput = args.engineProvided ? canonicalEngineId : DEFAULT_ENGINE_OUTPUT;
+
   console.log(
     JSON.stringify(
       {
-        engine: args.engineProvided ? engine.id : DEFAULT_ENGINE_OUTPUT,
-        image: absoluteImage,
+        engine: engineForOutput,
+        image: image.originalPath ?? args.image,
+        cachedImagePath: image.absolutePath,
         prompt: args.prompt,
-        text: result.text,
+        text: result?.text ?? '',
       },
       null,
       2
