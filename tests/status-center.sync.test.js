@@ -105,7 +105,17 @@ describe('createMetricsSyncService', () => {
   });
 
   it('utilise un timeout pour les transports lents', async () => {
-    const transport = vi.fn(() => new Promise(() => {}));
+    const transport = vi.fn((_, { signal } = {}) => {
+      return new Promise((resolve, reject) => {
+        if (signal) {
+          signal.addEventListener('abort', () => {
+            const error = new Error('aborted');
+            error.name = 'AbortError';
+            reject(error);
+          });
+        }
+      });
+    });
     const service = createMetricsSyncService({
       transport,
       timeoutMs: 10,
@@ -127,5 +137,8 @@ describe('createMetricsSyncService', () => {
     const result = await service.flush({ force: true });
     expect(result.sent).toBe(0);
     expect(service.getQueue().length).toBeGreaterThan(0);
+    expect(transport).toHaveBeenCalledTimes(1);
+    const [, options] = transport.mock.calls[0];
+    expect(options?.signal).toBeInstanceOf(AbortSignal);
   });
 });

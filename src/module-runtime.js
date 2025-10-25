@@ -155,16 +155,22 @@ function ensureArrayBuffer(value) {
 function encodeArrayBuffer(value) {
   const buffer = ensureArrayBuffer(value);
   if (!buffer) return null;
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i += 1) {
-    binary += String.fromCharCode(bytes[i]);
+  if (typeof globalThis !== 'undefined' && typeof globalThis.Buffer === 'function') {
+    try {
+      return globalThis.Buffer.from(buffer).toString('base64');
+    } catch (error) {
+      console.warn('a11ytb: encodage Buffer base64 impossible.', error);
+    }
   }
   if (typeof btoa === 'function') {
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 0x8000;
+    let binary = '';
+    for (let offset = 0; offset < bytes.byteLength; offset += chunkSize) {
+      const chunk = bytes.subarray(offset, offset + chunkSize);
+      binary += String.fromCharCode(...chunk);
+    }
     return btoa(binary);
-  }
-  if (typeof globalThis !== 'undefined' && typeof globalThis.Buffer === 'function') {
-    return globalThis.Buffer.from(binary, 'binary').toString('base64');
   }
   console.warn('a11ytb: aucun encodeur base64 disponible pour sérialiser une ressource binaire.');
   return null;
@@ -173,22 +179,22 @@ function encodeArrayBuffer(value) {
 function decodeArrayBuffer(serialized) {
   if (!serialized) return null;
   try {
-    let binary;
+    if (typeof globalThis !== 'undefined' && typeof globalThis.Buffer === 'function') {
+      const decoded = globalThis.Buffer.from(serialized, 'base64');
+      return decoded.buffer.slice(decoded.byteOffset, decoded.byteOffset + decoded.byteLength);
+    }
     if (typeof atob === 'function') {
-      binary = atob(serialized);
-    } else if (typeof globalThis !== 'undefined' && typeof globalThis.Buffer === 'function') {
-      binary = globalThis.Buffer.from(serialized, 'base64').toString('binary');
-    } else {
-      console.warn(
-        'a11ytb: aucun décodeur base64 disponible pour une ressource binaire mise en cache.'
-      );
-      return null;
+      const binary = atob(serialized);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes.buffer;
     }
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes.buffer;
+    console.warn(
+      'a11ytb: aucun décodeur base64 disponible pour une ressource binaire mise en cache.'
+    );
+    return null;
   } catch (error) {
     console.warn('a11ytb: impossible de décoder une ressource binaire mise en cache.', error);
     return null;
@@ -297,36 +303,111 @@ function createPersistentResourceCache({
     };
   }
 
+  const entryPrefix = `${storageKey}::entry::`;
+  const indexKey = `${storageKey}::index`;
   let store = new Map();
+  const knownKeys = new Set();
   let storageAvailable = false;
+
+  function entryStorageKey(key) {
+    return `${entryPrefix}${key}`;
+  }
+
+  function persistIndex() {
+    if (!storageAvailable) return;
+    try {
+      localStorage.setItem(indexKey, JSON.stringify(Array.from(knownKeys)));
+    } catch (error) {
+      console.warn('a11ytb: impossible de persister l’index des ressources runtime.', error);
+    }
+  }
+
+  function persistEntry(key, entry) {
+    if (!storageAvailable) return;
+    try {
+      localStorage.setItem(entryStorageKey(key), JSON.stringify(entry));
+    } catch (error) {
+      console.warn('a11ytb: impossible de persister une ressource runtime.', error);
+    }
+  }
+
+  function removeEntry(key) {
+    if (!storageAvailable) return;
+    try {
+      localStorage.removeItem(entryStorageKey(key));
+    } catch (error) {
+      console.warn('a11ytb: impossible de supprimer une ressource runtime persistée.', error);
+    }
+  }
+
   try {
     if (typeof localStorage?.getItem === 'function') {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object') {
-          Object.entries(parsed).forEach(([key, value]) => {
-            store.set(key, value);
-          });
+      storageAvailable = true;
+      let persistedKeys = [];
+      let migratedFromLegacy = false;
+      try {
+        const rawIndex = localStorage.getItem(indexKey);
+        if (rawIndex) {
+          const parsedIndex = JSON.parse(rawIndex);
+          if (Array.isArray(parsedIndex)) {
+            persistedKeys = parsedIndex
+              .map((value) => (typeof value === 'string' ? value : null))
+              .filter(Boolean);
+          }
+        }
+      } catch (error) {
+        console.warn('a11ytb: lecture de l’index des ressources runtime impossible.', error);
+      }
+
+      if (!persistedKeys.length) {
+        try {
+          const legacyRaw = localStorage.getItem(storageKey);
+          if (legacyRaw) {
+            const legacyParsed = JSON.parse(legacyRaw);
+            if (legacyParsed && typeof legacyParsed === 'object') {
+              Object.entries(legacyParsed).forEach(([key, value]) => {
+                if (typeof key === 'string') {
+                  knownKeys.add(key);
+                  store.set(key, value);
+                }
+              });
+              localStorage.removeItem(storageKey);
+              migratedFromLegacy = true;
+            }
+          }
+        } catch (error) {
+          console.warn('a11ytb: migration du cache runtime impossible.', error);
         }
       }
-      storageAvailable = true;
+
+      persistedKeys.forEach((key) => {
+        if (typeof key !== 'string') return;
+        try {
+          const rawEntry = localStorage.getItem(entryStorageKey(key));
+          if (!rawEntry) return;
+          const parsedEntry = JSON.parse(rawEntry);
+          store.set(key, parsedEntry);
+          knownKeys.add(key);
+        } catch (error) {
+          console.warn('a11ytb: lecture d’une ressource runtime persistée impossible.', error);
+        }
+      });
+
+      if ((migratedFromLegacy || !persistedKeys.length) && store.size) {
+        store.forEach((entry, key) => {
+          knownKeys.add(key);
+          persistEntry(key, entry);
+        });
+        persistIndex();
+      } else if (persistedKeys.length) {
+        persistIndex();
+      }
     }
   } catch (error) {
     console.warn('a11ytb: stockage local indisponible pour les ressources runtime.', error);
-  }
-
-  function persist() {
-    if (!storageAvailable) return;
-    try {
-      const payload = {};
-      store.forEach((value, key) => {
-        payload[key] = value;
-      });
-      localStorage.setItem(storageKey, JSON.stringify(payload));
-    } catch (error) {
-      console.warn('a11ytb: impossible de persister les ressources runtime.', error);
-    }
+    storageAvailable = false;
+    knownKeys.clear();
+    store = new Map();
   }
 
   return {
@@ -347,16 +428,35 @@ function createPersistentResourceCache({
         entry = { ...value, data: encoded };
       }
       store.set(key, entry);
-      persist();
+      if (storageAvailable) {
+        knownKeys.add(key);
+        persistEntry(key, entry);
+        persistIndex();
+      }
     },
     async delete(key) {
-      if (store.delete(key)) {
-        persist();
+      const removed = store.delete(key);
+      if (removed && storageAvailable) {
+        knownKeys.delete(key);
+        removeEntry(key);
+        persistIndex();
       }
     },
     async clear() {
+      if (!store.size && !knownKeys.size) {
+        return;
+      }
+      const keys = Array.from(knownKeys);
       store.clear();
-      persist();
+      knownKeys.clear();
+      if (storageAvailable) {
+        keys.forEach((key) => removeEntry(key));
+        try {
+          localStorage.removeItem(indexKey);
+        } catch (error) {
+          console.warn('a11ytb: impossible de réinitialiser l’index des ressources runtime.', error);
+        }
+      }
     },
   };
 }

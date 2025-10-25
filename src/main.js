@@ -225,7 +225,7 @@ const metricsFlushMs = Number(metricsIntegration.flushMs);
 const metricsTimeoutMs = Number(metricsIntegration.timeoutMs);
 let metricsTransport = null;
 if (metricsEndpoint && typeof fetch === 'function') {
-  metricsTransport = async (payload) => {
+  metricsTransport = async (payload, { signal } = {}) => {
     const response = await fetch(metricsEndpoint, {
       method: 'POST',
       headers: {
@@ -233,6 +233,7 @@ if (metricsEndpoint && typeof fetch === 'function') {
         ...(metricsAuthToken ? { Authorization: `Bearer ${metricsAuthToken}` } : {}),
       },
       body: JSON.stringify(payload),
+      signal,
     });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
