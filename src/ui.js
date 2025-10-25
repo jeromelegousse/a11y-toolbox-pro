@@ -544,13 +544,15 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
 
   function buildShortcutSummary(snapshot) {
     const highlightOrder = ['toggle-menu', 'jump-status', 'jump-modules'];
-    const parts = highlightOrder
+    const combos = highlightOrder
       .map((id) => resolveShortcutCombo(id, snapshot).raw)
+      .map((value) => (typeof value === 'string' ? value.trim() : ''))
       .filter(Boolean);
-    if (!parts.length) {
+    if (!combos.length) {
       return 'Raccourcis : définissez vos propres combinaisons.';
     }
-    return `Raccourcis : ${combo}`;
+    const summary = combos.join(' • ');
+    return `Raccourcis : ${summary}`;
   }
 
   function setShortcutStatus(message, tone = 'info') {
@@ -1324,21 +1326,9 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
   let notificationsContainer = null;
   let currentNotifications = [];
 
-  let dockMenuWrapper = null;
-  let dockMenuButton = null;
-  let dockMenu = null;
-  let dockMenuLabel = null;
-  let dockMenuValue = null;
-  let dockMenuAnnouncement = null;
-  let dockMenuOpen = false;
-  let dockMenuFocusIndex = 0;
-  let lastDockAnnouncementPosition = null;
   const dockMenuItems = new Map();
   const dockMenuItemLabels = new Map();
-
   const dockLabelRefs = new Map();
-  const dockMenuItems = new Map();
-  const dockMenuItemLabels = new Map();
   const sidebarButtons = new Map();
   const sidebarQuickAccess = [];
 
@@ -1582,23 +1572,6 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     left: '<svg viewBox="0 0 24 24" focusable="false"><path d="M5 12l7-7v4h7v6h-7v4l-7-7z"/></svg>',
     right:
       '<svg viewBox="0 0 24 24" focusable="false"><path d="M19 12l-7 7v-4H5V9h7V5l7 7z"/></svg>',
-  };
-
-  const DOCK_POSITIONS = ['right', 'bottom', 'left'];
-  const DOCK_LABEL_KEYS = {
-    right: 'toolbar.dockRight',
-    bottom: 'toolbar.dockBottom',
-    left: 'toolbar.dockLeft',
-  };
-  const DOCK_ICONS = {
-    trigger:
-      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h16v2H4z"/></svg>',
-    right:
-      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1zm8 2v12h5V6z"/></svg>',
-    bottom:
-      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 4h16a1 1 0 011 1v14a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1zm2 10v4h12v-4z"/></svg>',
-    left:
-      '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1zm2 2v12h5V6z"/></svg>',
   };
 
   function createScrollControls(target, { orientation = 'vertical' } = {}) {
@@ -9543,6 +9516,7 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
 
   let lastFocusedElement = null;
   let releaseOutsideInert = null;
+  let releasePanelFocusTrap = null;
 
   function focusMenuTitle() {
     if (!headerTitle || typeof headerTitle.focus !== 'function') {
@@ -9575,6 +9549,72 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
     lastFocusedElement = null;
   }
 
+  function setupPanelFocusTrap() {
+    if (typeof releasePanelFocusTrap === 'function') {
+      releasePanelFocusTrap();
+    }
+
+    const keydownHandler = (event) => {
+      if (event.key !== 'Tab') {
+        return;
+      }
+
+      const focusables = getFocusableElements();
+      if (!focusables.length) {
+        event.preventDefault();
+        if (panel && typeof panel.focus === 'function') {
+          panel.focus();
+        }
+        return;
+      }
+
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = panel.contains(document.activeElement)
+        ? document.activeElement
+        : null;
+
+      if (event.shiftKey) {
+        if (active === first || !active) {
+          event.preventDefault();
+          if (last && typeof last.focus === 'function') {
+            last.focus();
+          }
+        }
+      } else if (active === last || !active) {
+        event.preventDefault();
+        if (first && typeof first.focus === 'function') {
+          first.focus();
+        }
+      }
+    };
+
+    const focusInHandler = (event) => {
+      if (!panel.contains(event.target)) {
+        const focusables = getFocusableElements();
+        const fallback = focusables[0] || panel;
+        if (fallback && typeof fallback.focus === 'function') {
+          fallback.focus();
+        }
+      }
+    };
+
+    panel.addEventListener('keydown', keydownHandler, true);
+    document.addEventListener('focusin', focusInHandler);
+
+    releasePanelFocusTrap = () => {
+      panel.removeEventListener('keydown', keydownHandler, true);
+      document.removeEventListener('focusin', focusInHandler);
+    };
+  }
+
+  function teardownPanelFocusTrap() {
+    if (typeof releasePanelFocusTrap === 'function') {
+      releasePanelFocusTrap();
+    }
+    releasePanelFocusTrap = null;
+  }
+
   function syncMenuState(snapshot = state.get()) {
     const open = !!snapshot?.ui?.menuOpen;
     const body = root?.ownerDocument?.body ?? document.body;
@@ -9598,12 +9638,14 @@ export function mountUI({ root, state, config = {}, i18n: providedI18n, notifica
         lastFocusedElement = document.activeElement;
       }
       const focusables = getFocusableElements();
-      const target = focusables[0] || panel;
-      if (target && typeof target.focus === 'function') {
-        try {
-          target.focus({ preventScroll: true });
-        } catch (error) {
-          target.focus();
+      if (!focusMenuTitle()) {
+        const target = focusables[0] || panel;
+        if (target && typeof target.focus === 'function') {
+          try {
+            target.focus({ preventScroll: true });
+          } catch (error) {
+            target.focus();
+          }
         }
       }
     } else {

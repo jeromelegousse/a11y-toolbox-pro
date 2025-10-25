@@ -77,6 +77,7 @@ describe('demo-vlm CLI', () => {
     analyzeMock.mockReset();
     llavaRemoteAnalyzeMock.mockReset();
     llavaLocalAnalyzeMock.mockReset();
+    ensureLocalImageMock.mockReset();
     getLlavaRemoteConfigMock.mockReset();
     getLlavaRemoteConfigMock.mockResolvedValue(null);
     console.log = originalConsoleLog;
@@ -85,6 +86,12 @@ describe('demo-vlm CLI', () => {
 
     tempImagePath = './tmp-demo-vlm.png';
     await writeFile(tempImagePath, 'temp');
+
+    ensureLocalImageMock.mockImplementation(async (imagePath) => ({
+      absolutePath: imagePath,
+      originalPath: imagePath,
+      source: imagePath?.startsWith('http') ? 'remote' : 'local',
+    }));
   });
 
   afterEach(async () => {
@@ -151,7 +158,7 @@ describe('demo-vlm CLI', () => {
       originalPath: tempImagePath,
       source: 'local',
     });
-    llavaAnalyzeMock.mockResolvedValue({ text: 'Réponse locale' });
+    llavaLocalAnalyzeMock.mockResolvedValue({ text: 'Réponse locale' });
 
     const logs = [];
     console.log = (message) => logs.push(message);
@@ -166,7 +173,7 @@ describe('demo-vlm CLI', () => {
 
     await import('../../scripts/integrations/demo-vlm.js');
 
-    expect(llavaAnalyzeMock).toHaveBeenCalledWith(expect.objectContaining({ prompt: 'Compat' }));
+    expect(llavaLocalAnalyzeMock).toHaveBeenCalledWith(expect.objectContaining({ prompt: 'Compat' }));
 
     const output = JSON.parse(logs.at(-1));
     expect(output.engine).toBe('llava');
@@ -180,7 +187,7 @@ describe('demo-vlm CLI', () => {
       originalPath: remoteUrl,
       source: 'remote',
     });
-    llavaAnalyzeMock.mockResolvedValue({ text: 'Réponse distante' });
+    llavaRemoteAnalyzeMock.mockResolvedValue({ text: 'Réponse distante' });
 
     const logs = [];
     console.log = (message) => logs.push(message);
@@ -190,7 +197,7 @@ describe('demo-vlm CLI', () => {
     await import('../../scripts/integrations/demo-vlm.js');
 
     expect(ensureLocalImageMock).toHaveBeenCalledWith(remoteUrl);
-    expect(llavaAnalyzeMock).toHaveBeenCalledWith(
+    expect(llavaRemoteAnalyzeMock).toHaveBeenCalledWith(
       expect.objectContaining({ imagePath: '/tmp/cached/demo.png', prompt: 'Remote' })
     );
 
