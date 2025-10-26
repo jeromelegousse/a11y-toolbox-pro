@@ -1,9 +1,9 @@
 import { escapeAttr } from '../utils/dom.js';
 
-const SOURCE_FALLBACK = 'Micro par défaut';
+const DEFAULT_SOURCE_LABEL = 'Micro par défaut';
 
 function getSourceLabel(snapshot) {
-  return snapshot?.stt?.inputSource || SOURCE_FALLBACK;
+  return snapshot?.stt?.inputSource || DEFAULT_SOURCE_LABEL;
 }
 
 export function createSttControlsBlock({ icon } = {}) {
@@ -15,28 +15,27 @@ export function createSttControlsBlock({ icon } = {}) {
     category: 'interaction',
     keywords: ['dictée', 'micro', 'voix'],
     render: (state) => {
-      const snapshot = state.get();
-      const sourceLabel = getSourceLabel(snapshot);
-      const escapedSource = escapeAttr(sourceLabel);
-      const sttState = snapshot?.stt ?? {};
-      const status = sttState.status ?? '';
+      const snapshot = state.get?.() ?? {};
+      const sttState = snapshot.stt ?? {};
+      const status = sttState.status ?? 'idle';
       const transcript = sttState.transcript ?? '';
-      const isListening = sttState.status === 'listening';
+      const badgeState = status === 'listening' ? '' : ' hidden';
+
       return `
       <div class="a11ytb-row">
         <button class="a11ytb-button" data-action="start">Démarrer</button>
         <button class="a11ytb-button" data-action="stop">Arrêter</button>
       </div>
       <div class="a11ytb-status-line">
-        <span class="a11ytb-badge" data-ref="badge"${isListening ? '' : ' hidden'}>Écoute en cours</span>
+        <span class="a11ytb-badge" data-ref="badge"${badgeState}>Écoute en cours</span>
         <span class="a11ytb-status-text">Statut&nbsp;: <strong data-ref="status">${status}</strong></span>
         <button
           type="button"
           class="a11ytb-chip a11ytb-chip--ghost a11ytb-audio-source"
           data-action="refresh-source"
           data-ref="source-button"
-          aria-label="Source audio : ${escapedSource}"
-          title="Source audio : ${escapedSource}"
+          aria-label="Source audio"
+          title="Source audio"
         >
           <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
             <path d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3zm5-3a1 1 0 012 0 7 7 0 01-6 6.92V21h3v1H8v-1h3v-3.08A7 7 0 015 11a1 1 0 012 0 5 5 0 0010 0z" />
@@ -56,10 +55,10 @@ export function createSttControlsBlock({ icon } = {}) {
 
       root
         .querySelector('[data-action="start"]')
-        .addEventListener('click', () => window.a11ytb?.stt?.start?.());
+        ?.addEventListener('click', () => window.a11ytb?.stt?.start?.());
       root
         .querySelector('[data-action="stop"]')
-        .addEventListener('click', () => window.a11ytb?.stt?.stop?.());
+        ?.addEventListener('click', () => window.a11ytb?.stt?.stop?.());
 
       if (sourceButton) {
         sourceButton.addEventListener('click', () => {
@@ -67,35 +66,37 @@ export function createSttControlsBlock({ icon } = {}) {
         });
       }
 
-      const applySourceDetails = (snapshot) => {
-        const label = getSourceLabel(snapshot);
-        if (sourceLabel) {
-          sourceLabel.textContent = label;
-        }
-        if (sourceButton) {
-          const attrValue = `Source audio : ${label}`;
-          sourceButton.setAttribute('aria-label', attrValue);
-          sourceButton.setAttribute('title', attrValue);
-        }
-      };
-
-      const applyState = (snapshot) => {
+      const applySnapshot = (snapshot) => {
         const sttState = snapshot?.stt ?? {};
-        if (txt) txt.value = sttState.transcript || '';
-        if (statusEl) statusEl.textContent = sttState.status ?? '';
+        const label = getSourceLabel(snapshot);
+        const statusValue = sttState.status ?? 'idle';
+
+        if (txt) {
+          txt.value = sttState.transcript || '';
+        }
+        if (statusEl) {
+          statusEl.textContent = statusValue;
+        }
         if (badge) {
-          if (sttState.status === 'listening') {
+          if (statusValue === 'listening') {
             badge.removeAttribute('hidden');
           } else {
             badge.setAttribute('hidden', '');
           }
         }
-        applySourceDetails(snapshot);
+        if (sourceLabel) {
+          sourceLabel.textContent = label;
+        }
+        if (sourceButton) {
+          const escapedLabel = escapeAttr(label);
+          sourceButton.setAttribute('aria-label', `Source audio : ${escapedLabel}`);
+          sourceButton.setAttribute('title', `Source audio : ${escapedLabel}`);
+        }
       };
 
-      applyState(state.get());
-      state.on((snapshot) => {
-        applyState(snapshot);
+      applySnapshot(state.get?.() ?? {});
+      state.on?.((snapshot) => {
+        applySnapshot(snapshot ?? {});
       });
     },
   };

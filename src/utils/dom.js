@@ -1,17 +1,12 @@
-const ATTR_ESCAPE_MAP = new Map([
-  ['&', '&amp;'],
-  ['<', '&lt;'],
-  ['>', '&gt;'],
-  ['"', '&quot;'],
-  ["'", '&#39;'],
-]);
-
-const ATTR_ESCAPE_REGEX = /[&<>"']/g;
+const ENTITY_MAP = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
 
 export function escapeAttr(value) {
-  if (value === null || value === undefined) {
-    return '';
-  }
-  const input = String(value);
-  return input.replace(ATTR_ESCAPE_REGEX, (match) => ATTR_ESCAPE_MAP.get(match));
+  const text = String(value ?? '');
+  return text.replace(/[&<>"']/g, (char) => ENTITY_MAP[char] || char);
 }
