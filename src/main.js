@@ -19,7 +19,7 @@ import { createI18nService } from './i18n-service.js';
 import { createNotificationCenter } from './notifications.js';
 import { createPreferenceSync } from './integrations/preferences.js';
 import { attachModuleTriggers } from './integrations/inline-triggers.js';
-import { escapeAttr } from './utils/dom.js';
+import { createSttControlsBlock } from './blocks/stt-controls.js';
 
 const profilePresets = {
   'vision-basse': {
@@ -718,90 +718,7 @@ registerBlock({
   },
 });
 
-registerBlock({
-  id: 'stt-controls',
-  moduleId: 'stt',
-  title: 'Reconnaissance vocale (STT)',
-  icon: moduleIcons.stt,
-  category: 'interaction',
-  keywords: ['dictée', 'micro', 'voix'],
-  render: (state) => {
-    const s = state.get();
-    const sourceLabel = s.stt.inputSource || 'Micro par défaut';
-    const escapedSourceLabel = escapeAttr(sourceLabel);
-    return `
-      <div class="a11ytb-row">
-        <button class="a11ytb-button" data-action="start">Démarrer</button>
-        <button class="a11ytb-button" data-action="stop">Arrêter</button>
-      </div>
-      <div class="a11ytb-status-line">
-        <span class="a11ytb-badge" data-ref="badge"${s.stt.status === 'listening' ? '' : ' hidden'}>Écoute en cours</span>
-        <span class="a11ytb-status-text">Statut&nbsp;: <strong data-ref="status">${s.stt.status}</strong></span>
-        <button
-          type="button"
-          class="a11ytb-chip a11ytb-chip--ghost a11ytb-audio-source"
-          data-action="refresh-source"
-          data-ref="source-button"
-          aria-label="Source audio : ${escapedSourceLabel}"
-          title="Source audio : ${escapedSourceLabel}"
-        >
-          <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-            <path d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3zm5-3a1 1 0 012 0 7 7 0 01-6 6.92V21h3v1H8v-1h3v-3.08A7 7 0 015 11a1 1 0 012 0 5 5 0 0010 0z" />
-          </svg>
-          <span aria-live="polite" data-ref="source-label"></span>
-        </button>
-      </div>
-      <textarea rows="3" style="width:100%" placeholder="Transcription..." data-ref="txt"></textarea>
-    `;
-  },
-  wire: ({ root, state }) => {
-    const txt = root.querySelector('[data-ref="txt"]');
-    txt.value = state.get().stt.transcript || '';
-    const statusEl = root.querySelector('[data-ref="status"]');
-    const badge = root.querySelector('[data-ref="badge"]');
-    const sourceButton = root.querySelector('[data-ref="source-button"]');
-    const sourceLabel = root.querySelector('[data-ref="source-label"]');
-    const current = state.get();
-    if (txt) txt.value = current.stt.transcript || '';
-    root
-      .querySelector('[data-action="start"]')
-      .addEventListener('click', () => window.a11ytb?.stt?.start?.());
-    root
-      .querySelector('[data-action="stop"]')
-      .addEventListener('click', () => window.a11ytb?.stt?.stop?.());
-    if (sourceButton) {
-      sourceButton.addEventListener('click', () => {
-        window.a11ytb?.stt?.refreshInputSource?.();
-      });
-    }
-    function applySourceDetails(sttState) {
-      const label = sttState?.inputSource || 'Micro par défaut';
-      if (sourceLabel) {
-        sourceLabel.textContent = label;
-      }
-      if (sourceButton) {
-        const attrValue = `Source audio : ${label}`;
-        sourceButton.setAttribute('aria-label', attrValue);
-        sourceButton.setAttribute('title', attrValue);
-      }
-    }
-
-    applySourceDetails(state.get()?.stt);
-
-    state.on((s) => {
-      txt.value = s.stt.transcript || '';
-      if (statusEl) statusEl.textContent = s.stt.status;
-      if (badge) {
-        if (s.stt.status === 'listening') {
-          badge.removeAttribute('hidden');
-        } else {
-          badge.setAttribute('hidden', '');
-        }
-      }
-      applySourceDetails(s.stt);
-    });
-  },
-});
+registerBlock(createSttControlsBlock({ icon: moduleIcons.stt }));
 
 registerBlock({
   id: 'braille-controls',

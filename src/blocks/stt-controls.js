@@ -1,0 +1,102 @@
+import { escapeAttr } from '../utils/dom.js';
+
+const SOURCE_FALLBACK = 'Micro par défaut';
+
+function getSourceLabel(snapshot) {
+  return snapshot?.stt?.inputSource || SOURCE_FALLBACK;
+}
+
+export function createSttControlsBlock({ icon } = {}) {
+  return {
+    id: 'stt-controls',
+    moduleId: 'stt',
+    title: 'Reconnaissance vocale (STT)',
+    icon,
+    category: 'interaction',
+    keywords: ['dictée', 'micro', 'voix'],
+    render: (state) => {
+      const snapshot = state.get();
+      const sourceLabel = getSourceLabel(snapshot);
+      const escapedSource = escapeAttr(sourceLabel);
+      const sttState = snapshot?.stt ?? {};
+      const status = sttState.status ?? '';
+      const transcript = sttState.transcript ?? '';
+      const isListening = sttState.status === 'listening';
+      return `
+      <div class="a11ytb-row">
+        <button class="a11ytb-button" data-action="start">Démarrer</button>
+        <button class="a11ytb-button" data-action="stop">Arrêter</button>
+      </div>
+      <div class="a11ytb-status-line">
+        <span class="a11ytb-badge" data-ref="badge"${isListening ? '' : ' hidden'}>Écoute en cours</span>
+        <span class="a11ytb-status-text">Statut&nbsp;: <strong data-ref="status">${status}</strong></span>
+        <button
+          type="button"
+          class="a11ytb-chip a11ytb-chip--ghost a11ytb-audio-source"
+          data-action="refresh-source"
+          data-ref="source-button"
+          aria-label="Source audio : ${escapedSource}"
+          title="Source audio : ${escapedSource}"
+        >
+          <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3zm5-3a1 1 0 012 0 7 7 0 01-6 6.92V21h3v1H8v-1h3v-3.08A7 7 0 015 11a1 1 0 012 0 5 5 0 0010 0z" />
+          </svg>
+          <span aria-live="polite" data-ref="source-label"></span>
+        </button>
+      </div>
+      <textarea rows="3" style="width:100%" placeholder="Transcription..." data-ref="txt">${transcript}</textarea>
+    `;
+    },
+    wire: ({ root, state }) => {
+      const txt = root.querySelector('[data-ref="txt"]');
+      const statusEl = root.querySelector('[data-ref="status"]');
+      const badge = root.querySelector('[data-ref="badge"]');
+      const sourceButton = root.querySelector('[data-ref="source-button"]');
+      const sourceLabel = root.querySelector('[data-ref="source-label"]');
+
+      root
+        .querySelector('[data-action="start"]')
+        .addEventListener('click', () => window.a11ytb?.stt?.start?.());
+      root
+        .querySelector('[data-action="stop"]')
+        .addEventListener('click', () => window.a11ytb?.stt?.stop?.());
+
+      if (sourceButton) {
+        sourceButton.addEventListener('click', () => {
+          window.a11ytb?.stt?.refreshInputSource?.();
+        });
+      }
+
+      const applySourceDetails = (snapshot) => {
+        const label = getSourceLabel(snapshot);
+        if (sourceLabel) {
+          sourceLabel.textContent = label;
+        }
+        if (sourceButton) {
+          const attrValue = `Source audio : ${label}`;
+          sourceButton.setAttribute('aria-label', attrValue);
+          sourceButton.setAttribute('title', attrValue);
+        }
+      };
+
+      const applyState = (snapshot) => {
+        const sttState = snapshot?.stt ?? {};
+        if (txt) txt.value = sttState.transcript || '';
+        if (statusEl) statusEl.textContent = sttState.status ?? '';
+        if (badge) {
+          if (sttState.status === 'listening') {
+            badge.removeAttribute('hidden');
+          } else {
+            badge.setAttribute('hidden', '');
+          }
+        }
+        applySourceDetails(snapshot);
+      };
+
+      applyState(state.get());
+      state.on((snapshot) => {
+        applyState(snapshot);
+      });
+    },
+  };
+}
