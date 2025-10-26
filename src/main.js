@@ -756,6 +756,7 @@ registerBlock({
   },
   wire: ({ root, state }) => {
     const txt = root.querySelector('[data-ref="txt"]');
+    txt.value = state.get().stt.transcript || '';
     const statusEl = root.querySelector('[data-ref="status"]');
     const badge = root.querySelector('[data-ref="badge"]');
     const sourceButton = root.querySelector('[data-ref="source-button"]');
@@ -825,6 +826,7 @@ registerBlock({
   },
   wire: ({ root, state }) => {
     const out = root.querySelector('[data-ref="out"]');
+    out.value = state.get().braille.output || '';
     const badge = root.querySelector('[data-ref="badge"]');
     const current = state.get();
     if (out) out.value = current.braille.output || '';
