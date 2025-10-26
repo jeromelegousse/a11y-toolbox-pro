@@ -85,7 +85,7 @@ function cloneWithFallback(value, seen = new WeakMap()) {
   return value;
 }
 
-function safeClone(value) {
+export function cloneValue(value) {
   if (structuredCloneFn) {
     return structuredCloneFn(value);
   }
@@ -124,14 +124,14 @@ export function createStore(key, initial, options = {}) {
       return;
     }
     try {
-      const snapshot = safeClone(state);
+      const snapshot = cloneValue(state);
       if (snapshot && typeof snapshot === 'object') {
         if (
           initial &&
           typeof initial === 'object' &&
           Object.prototype.hasOwnProperty.call(initial, 'runtime')
         ) {
-          snapshot.runtime = safeClone(initial.runtime);
+          snapshot.runtime = cloneValue(initial.runtime);
         } else {
           delete snapshot.runtime;
         }
@@ -144,16 +144,16 @@ export function createStore(key, initial, options = {}) {
 
   const subs = new Set();
   const loaded = load();
-  let state = safeClone(initial);
+  let state = cloneValue(initial);
   if (loaded && typeof loaded === 'object') {
     state = { ...state, ...loaded };
   }
 
   const api = {
     get(path) {
-      if (!path) return safeClone(state);
+      if (!path) return cloneValue(state);
       const value = path.split('.').reduce((acc, k) => acc?.[k], state);
-      return safeClone(value);
+      return cloneValue(value);
     },
     set(path, value) {
       if (!path) return;
@@ -169,21 +169,21 @@ export function createStore(key, initial, options = {}) {
       if (shouldPersist) {
         persist();
       }
-      subs.forEach((fn) => fn(safeClone(state)));
+      subs.forEach((fn) => fn(cloneValue(state)));
     },
     tx(patch) {
       state = { ...state, ...patch };
       persist();
-      subs.forEach((fn) => fn(safeClone(state)));
+      subs.forEach((fn) => fn(cloneValue(state)));
     },
     on(fn) {
       subs.add(fn);
       return () => subs.delete(fn);
     },
     reset() {
-      state = safeClone(initial);
+      state = cloneValue(initial);
       persist();
-      subs.forEach((fn) => fn(safeClone(state)));
+      subs.forEach((fn) => fn(cloneValue(state)));
     },
     serialize() {
       return JSON.stringify(state, null, 2);
