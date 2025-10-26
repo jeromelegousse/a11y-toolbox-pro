@@ -751,7 +751,7 @@ registerBlock({
           <span aria-live="polite" data-ref="source-label"></span>
         </button>
       </div>
-      <textarea rows="3" style="width:100%" placeholder="Transcription..." data-ref="txt">${s.stt.transcript}</textarea>
+      <textarea rows="3" style="width:100%" placeholder="Transcription..." data-ref="txt"></textarea>
     `;
   },
   wire: ({ root, state }) => {
@@ -760,6 +760,8 @@ registerBlock({
     const badge = root.querySelector('[data-ref="badge"]');
     const sourceButton = root.querySelector('[data-ref="source-button"]');
     const sourceLabel = root.querySelector('[data-ref="source-label"]');
+    const current = state.get();
+    if (txt) txt.value = current.stt.transcript || '';
     root
       .querySelector('[data-action="start"]')
       .addEventListener('click', () => window.a11ytb?.stt?.start?.());
@@ -818,12 +820,14 @@ registerBlock({
         <span class="a11ytb-badge" data-ref="badge"${s.braille.output ? '' : ' hidden'}>Sortie prête</span>
         <span aria-live="polite" class="a11ytb-status-text">Sortie&nbsp;:</span>
       </div>
-      <textarea rows="3" style="width:100%" readonly data-ref="out">${s.braille.output || ''}</textarea>
+      <textarea rows="3" style="width:100%" readonly data-ref="out"></textarea>
     `;
   },
   wire: ({ root, state }) => {
     const out = root.querySelector('[data-ref="out"]');
     const badge = root.querySelector('[data-ref="badge"]');
+    const current = state.get();
+    if (out) out.value = current.braille.output || '';
     root
       .querySelector('[data-action="sel"]')
       .addEventListener('click', () => window.brailleSelection());
