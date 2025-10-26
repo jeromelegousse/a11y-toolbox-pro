@@ -749,7 +749,7 @@ registerBlock({
           <span aria-live="polite" data-ref="source-label">${sourceLabel}</span>
         </button>
       </div>
-      <textarea rows="3" style="width:100%" placeholder="Transcription..." data-ref="txt">${s.stt.transcript}</textarea>
+      <textarea rows="3" style="width:100%" placeholder="Transcription..." data-ref="txt"></textarea>
     `;
   },
   wire: ({ root, state }) => {
@@ -769,8 +769,12 @@ registerBlock({
         window.a11ytb?.stt?.refreshInputSource?.();
       });
     }
+    if (txt) {
+      const currentState = state.get();
+      txt.value = currentState.stt.transcript || '';
+    }
     state.on((s) => {
-      txt.value = s.stt.transcript || '';
+      if (txt) txt.value = s.stt.transcript || '';
       if (statusEl) statusEl.textContent = s.stt.status;
       if (badge) {
         if (s.stt.status === 'listening') {
@@ -807,7 +811,7 @@ registerBlock({
         <span class="a11ytb-badge" data-ref="badge"${s.braille.output ? '' : ' hidden'}>Sortie prête</span>
         <span aria-live="polite" class="a11ytb-status-text">Sortie&nbsp;:</span>
       </div>
-      <textarea rows="3" style="width:100%" readonly data-ref="out">${s.braille.output || ''}</textarea>
+      <textarea rows="3" style="width:100%" readonly data-ref="out"></textarea>
     `;
   },
   wire: ({ root, state }) => {
@@ -819,8 +823,12 @@ registerBlock({
     root
       .querySelector('[data-action="clear"]')
       .addEventListener('click', () => window.clearBraille());
+    if (out) {
+      const currentState = state.get();
+      out.value = currentState.braille.output || '';
+    }
     state.on((s) => {
-      out.value = s.braille.output || '';
+      if (out) out.value = s.braille.output || '';
       if (badge) {
         if (s.braille.output) {
           badge.removeAttribute('hidden');
