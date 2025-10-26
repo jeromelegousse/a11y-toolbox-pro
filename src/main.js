@@ -1,4 +1,4 @@
-import { createStore } from './store.js';
+import { createStore, cloneValue } from './store.js';
 import { mountUI } from './ui.js';
 import { registerBlock, registerModuleManifest } from './registry.js';
 import { createFeedback } from './feedback.js';
@@ -465,7 +465,7 @@ ensureDefaults.forEach(([path, fallback]) => {
     const clone = Array.isArray(fallback)
       ? [...fallback]
       : typeof fallback === 'object' && fallback !== null
-        ? structuredClone(fallback)
+        ? cloneValue(fallback)
         : fallback;
     state.set(path, clone);
   }
@@ -738,12 +738,15 @@ registerBlock({
         <span class="a11ytb-badge" data-ref="badge"${s.braille.output ? '' : ' hidden'}>Sortie prête</span>
         <span aria-live="polite" class="a11ytb-status-text">Sortie&nbsp;:</span>
       </div>
-      <textarea rows="3" style="width:100%" readonly data-ref="out">${s.braille.output || ''}</textarea>
+      <textarea rows="3" style="width:100%" readonly data-ref="out"></textarea>
     `;
   },
   wire: ({ root, state }) => {
     const out = root.querySelector('[data-ref="out"]');
+    out.value = state.get().braille.output || '';
     const badge = root.querySelector('[data-ref="badge"]');
+    const current = state.get();
+    if (out) out.value = current.braille.output || '';
     root
       .querySelector('[data-action="sel"]')
       .addEventListener('click', () => window.brailleSelection());
