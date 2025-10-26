@@ -14,7 +14,6 @@ import {
   renderAuditStats,
   renderAuditViolations,
 } from './modules/audit-view.js';
-import { createSttControlsBlock } from './blocks/stt-controls.js';
 import { resolveLocale } from '../languages/index.js';
 import { createI18nService } from './i18n-service.js';
 import { createNotificationCenter } from './notifications.js';
