@@ -19,7 +19,7 @@ import { createI18nService } from './i18n-service.js';
 import { createNotificationCenter } from './notifications.js';
 import { createPreferenceSync } from './integrations/preferences.js';
 import { attachModuleTriggers } from './integrations/inline-triggers.js';
-import { escapeAttr } from './utils/dom.js';
+import { createSttControlsBlock } from './blocks/stt-controls.js';
 
 const profilePresets = {
   'vision-basse': {
