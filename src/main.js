@@ -1,4 +1,4 @@
-import { createStore } from './store.js';
+import { createStore, cloneValue } from './store.js';
 import { mountUI } from './ui.js';
 import { registerBlock, registerModuleManifest } from './registry.js';
 import { createFeedback } from './feedback.js';
@@ -464,7 +464,7 @@ ensureDefaults.forEach(([path, fallback]) => {
     const clone = Array.isArray(fallback)
       ? [...fallback]
       : typeof fallback === 'object' && fallback !== null
-        ? structuredClone(fallback)
+        ? cloneValue(fallback)
         : fallback;
     state.set(path, clone);
   }
