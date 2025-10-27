@@ -46,7 +46,19 @@
 #a11ytb-root,
 #a11ytb-root *,
 #a11ytb-root *::before,
-#a11ytb-root *::after {
+#a11ytb-root *::after,
+.a11ytb-overlay,
+.a11ytb-overlay *,
+.a11ytb-overlay *::before,
+.a11ytb-overlay *::after,
+.a11ytb-modal-backdrop,
+.a11ytb-modal-backdrop *,
+.a11ytb-modal-backdrop *::before,
+.a11ytb-modal-backdrop *::after,
+.a11ytb-modal,
+.a11ytb-modal *,
+.a11ytb-modal *::before,
+.a11ytb-modal *::after {
   box-sizing: border-box;
 }
 
